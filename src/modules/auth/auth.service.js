@@ -83,7 +83,7 @@ class AuthService {
       const verificationToken = crypto.randomBytes(32).toString("hex");
       const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      await authRepository.setVerificationToken(result.user.userId, verificationTokenHash, expiresAt);
+      await authRepository.createEmailVerificationToken(result.user.userId, verificationTokenHash, expiresAt);
 
       // TODO: Send email with verification link (containing the token)
       // Example: sendVerificationEmail(email, verificationToken)
@@ -229,14 +229,13 @@ class AuthService {
   async verifyEmail(verificationToken) {
     try {
       const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
-      const user = await authRepository.findByVerificationToken(verificationTokenHash);
+      const user = await authRepository.findEmailVerificationToken(verificationTokenHash);
       if (!user) {
         throw new AuthenticationError("Invalid or expired verification token");
       }
-      // Update user to set is_email_verified and is_active to true
       await authRepository.updateEmailVerification(user.userId, true);
       await authRepository.updateUserStatus(user.userId, true);
-      await authRepository.clearVerificationToken(user.userId);
+      await authRepository.deleteEmailVerificationToken(verificationTokenHash);
       logger.info("Email verified and account activated", {
         userId: user.userId,
         email: user.email
@@ -342,14 +341,12 @@ class AuthService {
    * @returns {Promise<Object>} Success message (do not reveal if email exists)
    */
   async forgotPassword(email) {
-
     const user = await authRepository.findByEmail(email);
     if (user && user.isActive) {
-    
       const resetToken = crypto.randomBytes(32).toString("hex");
-    
-      const expiresAt = new Date(Date.now() + 20 * 60 * 1000);  
-      await authRepository.setResetToken(user.userId, resetToken, expiresAt);
+      const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min
+      await authRepository.createPasswordResetToken(user.userId, resetTokenHash, expiresAt);
       logger.info(`Password reset token for ${email}: ${resetToken}`);
       // TODO: send actual email with reset link containing the token
     }
@@ -363,13 +360,14 @@ class AuthService {
    * @returns {Promise<Object>} Success message
    */
   async resetPassword(resetToken, newPassword) {
-    const user = await authRepository.findByResetToken(resetToken);
+    const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
+    const user = await authRepository.findPasswordResetToken(resetTokenHash);
     if (!user) {
       throw new AuthenticationError("Invalid or expired reset token");
     }
     const newPasswordHash = await hashPassword(newPassword);
     await authRepository.updatePassword(user.userId, newPasswordHash);
-    await authRepository.clearResetToken(user.userId);
+    await authRepository.deletePasswordResetToken(resetTokenHash);
     return { message: "Password has been reset successfully." };
   }
 

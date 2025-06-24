@@ -127,14 +127,12 @@ export const getProfile = async (req, res, next) => {
  */
 export const verifyEmail = async (req, res, next) => {
   try {
-    // Accept token from query or body
+   
     const verificationToken = req.query.token || req.body.token;
     if (!verificationToken) {
       return ResponseFactory.badRequest(res, "Verification token is required");
     }
-    // Verify email
     const result = await authService.verifyEmail(verificationToken);
-    // Send success response
     ResponseFactory.ok(
       res,
       "Email verified and account activated successfully",

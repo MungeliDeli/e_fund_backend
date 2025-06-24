@@ -378,37 +378,38 @@ class AuthRepository {
   }
 
   /**
-   * Sets a password reset token and expiry for a user
+   * Creates a password reset token for a user
    * @param {string} userId
-   * @param {string} resetToken
+   * @param {string} tokenHash
    * @param {Date} expiresAt
    * @returns {Promise<void>}
    */
-  async setResetToken(userId, resetToken, expiresAt) {
+  async createPasswordResetToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        UPDATE users
-        SET reset_token = $1, reset_token_expires = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $3
+        INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+        VALUES ($1, $2, $3)
       `;
-      await query(queryText, [resetToken, expiresAt, userId]);
+      await query(queryText, [userId, tokenHash, expiresAt]);
     } catch (error) {
-      logger.error("Failed to set reset token", { error: error.message, userId });
-      throw new DatabaseError("Failed to set reset token", error);
+      logger.error("Failed to create password reset token", { error: error.message, userId });
+      throw new DatabaseError("Failed to create password reset token", error);
     }
   }
 
   /**
-   * Finds a user by reset token (and checks expiry)
-   * @param {string} resetToken
+   * Finds a user by password reset token (and checks expiry)
+   * @param {string} tokenHash
    * @returns {Promise<Object|null>} User object or null
    */
-  async findByResetToken(resetToken) {
+  async findPasswordResetToken(tokenHash) {
     try {
       const queryText = `
-        SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()
+        SELECT u.* FROM password_reset_tokens prt
+        JOIN users u ON prt.user_id = u.user_id
+        WHERE prt.token_hash = $1 AND prt.expires_at > NOW()
       `;
-      const result = await query(queryText, [resetToken]);
+      const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
@@ -422,27 +423,25 @@ class AuthRepository {
         updatedAt: user.updated_at
       };
     } catch (error) {
-      logger.error("Failed to find user by reset token", { error: error.message });
-      throw new DatabaseError("Failed to find user by reset token", error);
+      logger.error("Failed to find user by password reset token", { error: error.message });
+      throw new DatabaseError("Failed to find user by password reset token", error);
     }
   }
 
   /**
-   * Clears the reset token and expiry for a user
-   * @param {string} userId
+   * Deletes a password reset token (by token hash)
+   * @param {string} tokenHash
    * @returns {Promise<void>}
    */
-  async clearResetToken(userId) {
+  async deletePasswordResetToken(tokenHash) {
     try {
       const queryText = `
-        UPDATE users
-        SET reset_token = NULL, reset_token_expires = NULL, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
+        DELETE FROM password_reset_tokens WHERE token_hash = $1
       `;
-      await query(queryText, [userId]);
+      await query(queryText, [tokenHash]);
     } catch (error) {
-      logger.error("Failed to clear reset token", { error: error.message, userId });
-      throw new DatabaseError("Failed to clear reset token", error);
+      logger.error("Failed to delete password reset token", { error: error.message });
+      throw new DatabaseError("Failed to delete password reset token", error);
     }
   }
 
@@ -467,37 +466,38 @@ class AuthRepository {
   }
 
   /**
-   * Sets an email verification token and expiry for a user
+   * Creates an email verification token for a user
    * @param {string} userId
-   * @param {string} verificationTokenHash
+   * @param {string} tokenHash
    * @param {Date} expiresAt
    * @returns {Promise<void>}
    */
-  async setVerificationToken(userId, verificationTokenHash, expiresAt) {
+  async  createEmailVerificationToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        UPDATE users
-        SET verification_token = $1, verification_token_expires = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $3
+        INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+        VALUES ($1, $2, $3)
       `;
-      await query(queryText, [verificationTokenHash, expiresAt, userId]);
+      await query(queryText, [userId, tokenHash, expiresAt]);
     } catch (error) {
-      logger.error("Failed to set verification token", { error: error.message, userId });
-      throw new DatabaseError("Failed to set verification token", error);
+      logger.error("Failed to create email verification token", { error: error.message, userId });
+      throw new DatabaseError("Failed to create email verification token", error);
     }
   }
 
   /**
-   * Finds a user by verification token (and checks expiry)
-   * @param {string} verificationTokenHash
+   * Finds a user by email verification token (and checks expiry)
+   * @param {string} tokenHash
    * @returns {Promise<Object|null>} User object or null
    */
-  async findByVerificationToken(verificationTokenHash) {
+  async findEmailVerificationToken(tokenHash) {
     try {
       const queryText = `
-        SELECT * FROM users WHERE verification_token = $1 AND verification_token_expires > NOW()
+        SELECT u.* FROM email_verification_tokens evt
+        JOIN users u ON evt.user_id = u.user_id
+        WHERE evt.token_hash = $1 AND evt.expires_at > NOW()
       `;
-      const result = await query(queryText, [verificationTokenHash]);
+      const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
@@ -511,27 +511,25 @@ class AuthRepository {
         updatedAt: user.updated_at
       };
     } catch (error) {
-      logger.error("Failed to find user by verification token", { error: error.message });
-      throw new DatabaseError("Failed to find user by verification token", error);
+      logger.error("Failed to find user by email verification token", { error: error.message });
+      throw new DatabaseError("Failed to find user by email verification token", error);
     }
   }
 
   /**
-   * Clears the verification token and expiry for a user
-   * @param {string} userId
+   * Deletes an email verification token (by token hash)
+   * @param {string} tokenHash
    * @returns {Promise<void>}
    */
-  async clearVerificationToken(userId) {
+  async deleteEmailVerificationToken(tokenHash) {
     try {
       const queryText = `
-        UPDATE users
-        SET verification_token = NULL, verification_token_expires = NULL, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
+        DELETE FROM email_verification_tokens WHERE token_hash = $1
       `;
-      await query(queryText, [userId]);
+      await query(queryText, [tokenHash]);
     } catch (error) {
-      logger.error("Failed to clear verification token", { error: error.message, userId });
-      throw new DatabaseError("Failed to clear verification token", error);
+      logger.error("Failed to delete email verification token", { error: error.message });
+      throw new DatabaseError("Failed to delete email verification token", error);
     }
   }
 }
