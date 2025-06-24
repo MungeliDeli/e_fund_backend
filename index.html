@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNZA Fundflow - Empowering Campus Causes</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #333; /* Dark grey for general text */
+        }
+        /* Custom scroll-behavior for smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+        /* Custom green palette */
+        .bg-primary-green { background-color: #047857; /* Emerald-700 equivalent */ }
+        .text-primary-green { color: #047857; }
+        .hover\:bg-primary-green-darker:hover { background-color: #065F46; /* Slightly darker green */ }
+        .border-primary-green { border-color: #047857; }
+        .bg-secondary-green { background-color: #34D399; /* Emerald-400 equivalent */ }
+        .text-secondary-green { color: #34D399; }
+
+        /* Custom image placeholder styling */
+        .placeholder-img {
+            background-color: #D1FAE5; /* Light green background for placeholders */
+            color: #047857;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm fixed w-full z-50">
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <!-- Logo -->
+            <a href="#" class="flex items-center space-x-2">
+                <svg class="h-8 w-8 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13.5m0-13.5C10.835 5.485 9.165 4.5 7.5 4.5S4.165 5.485 3 6.253m9 0c1.165-.768 2.835-1.753 4.5-1.753 1.665 0 3.335.985 4.5 1.753m-9 0V21.75c0 .385-.286.7-.66.7S11 22.135 11 21.75V6.253M12 6.253V2.25c0-.385-.286-.7-.66-.7S11 1.865 11 2.25v4.003m9 0V21.75c0 .385-.286.7-.66.7S21 22.135 21 21.75V6.253M12 6.253V2.25c0-.385-.286-.7-.66-.7S11 1.865 11 2.25v4.003m-9 0V21.75c0 .385-.286.7-.66.7S1 22.135 1 21.75V6.253"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14v6.75m0 0a2.25 2.25 0 01-4.5 0m4.5 0H7.5m7.5 0c1.165-.768 2.835-1.753 4.5-1.753 1.665 0 3.335.985 4.5 1.753m-9 0V21.75c0 .385-.286.7-.66.7S11 22.135 11 21.75V14m-5 7.75c-1.165-.768-2.835-1.753-4.5-1.753-1.665 0-3.335.985-4.5 1.753"></path>
+                </svg>
+                <span class="text-2xl font-bold text-gray-800">UNZA Fundflow</span>
+            </a>
+
+            <!-- Mobile Menu Button -->
+            <div class="md:hidden">
+                <button id="mobile-menu-button" class="text-gray-600 focus:outline-none focus:text-gray-900">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Desktop Navigation -->
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#home" class="text-gray-600 hover:text-primary-green font-medium">Home</a>
+                <a href="#about" class="text-gray-600 hover:text-primary-green font-medium">About</a>
+                <a href="#how-it-works" class="text-gray-600 hover:text-primary-green font-medium">How It Works</a>
+                <a href="#features" class="text-gray-600 hover:text-primary-green font-medium">Features</a>
+                <a href="#contact" class="text-gray-600 hover:text-primary-green font-medium">Contact</a>
+                <a href="#" class="px-6 py-2 bg-primary-green text-white rounded-lg shadow-md hover:bg-primary-green-darker transition duration-300">Login</a>
+                <a href="#" class="px-6 py-2 border border-primary-green text-primary-green rounded-lg hover:bg-primary-green hover:text-white transition duration-300">Register</a>
+            </div>
+        </nav>
+
+        <!-- Mobile Menu (Hidden by default) -->
+        <div id="mobile-menu" class="md:hidden bg-white py-2 px-4 shadow-lg hidden">
+            <a href="#home" class="block py-2 text-gray-700 hover:bg-gray-100 rounded-md">Home</a>
+            <a href="#about" class="block py-2 text-gray-700 hover:bg-gray-100 rounded-md">About</a>
+            <a href="#how-it-works" class="block py-2 text-gray-700 hover:bg-gray-100 rounded-md">How It Works</a>
+            <a href="#features" class="block py-2 text-gray-700 hover:bg-gray-100 rounded-md">Features</a>
+            <a href="#contact" class="block py-2 text-gray-700 hover:bg-gray-100 rounded-md">Contact</a>
+            <hr class="my-2 border-gray-200">
+            <a href="#" class="block py-2 text-primary-green hover:bg-gray-100 rounded-md">Login</a>
+            <a href="#" class="block py-2 text-primary-green hover:bg-gray-100 rounded-md">Register</a>
+        </div>
+    </header>
+
+    <main class="pt-16">
+        <!-- Hero Section -->
+        <section id="home" class="relative bg-gradient-to-r from-primary-green to-secondary-green text-white py-20 md:py-32 overflow-hidden">
+            <div class="absolute inset-0 z-0 opacity-20">
+                <!-- Background pattern/illustration (placeholder for visual appeal) -->
+                <svg class="h-full w-full" fill="none" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="pattern-zigzag" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+                            <path d="M4 0 L6 10 L0 10 L2 0 Z M9 0 L11 10 L5 10 L7 0 Z" fill="rgba(255,255,255,0.1)"/>
+                        </pattern>
+                    </defs>
+                    <rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-zigzag)"/>
+                </svg>
+            </div>
+            <div class="container mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between">
+                <div class="text-center md:text-left md:w-1/2 mb-10 md:mb-0">
+                    <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-4 drop-shadow-md">
+                        Empowering UNZA: <br> Your Cause, Our Community, Together We Fundraise.
+                    </h1>
+                    <p class="text-lg md:text-xl mb-8 opacity-90 max-w-lg mx-auto md:mx-0">
+                        A centralized, secure, and transparent digital system for campus fundraising and event ticketing. Say goodbye to fragmented methods!
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center md:justify-start space-y-4 sm:space-y-0 sm:space-x-4">
+                        <a href="#" class="px-8 py-4 bg-white text-primary-green font-bold rounded-full shadow-lg hover:bg-gray-200 transition duration-300 transform hover:scale-105">
+                            Start a Campaign
+                        </a>
+                        <a href="#" class="px-8 py-4 border-2 border-white text-white font-bold rounded-full shadow-lg hover:bg-white hover:text-primary-green transition duration-300 transform hover:scale-105">
+                            Explore Campaigns
+                        </a>
+                    </div>
+                </div>
+                <div class="md:w-1/2 flex justify-center">
+                    <!-- Placeholder for a relevant image or illustration -->
+                    <div class="w-full max-w-md h-64 md:h-80 lg:h-96 rounded-2xl shadow-xl overflow-hidden placeholder-img">
+                        Campus Community Impact Illustration
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="py-16 md:py-24 bg-white">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6">About UNZA Fundflow</h2>
+                <p class="text-lg text-gray-600 mb-12 max-w-3xl mx-auto">
+                    The Online Campus Fundraiser System is designed to revolutionize fundraising at the University of Zambia. We replace informal, fragmented methods with a secure, transparent, and centralized platform.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Value Proposition 1 -->
+                    <div class="p-8 bg-gray-50 rounded-xl shadow-md transform hover:scale-105 transition duration-300">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-12 w-12 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V4m0 8v4m-4 10h8a2 2 0 002-2V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Centralized Campaigns</h3>
+                        <p class="text-gray-600">Bring all campus fundraising activities, from student projects to club events, under one secure roof.</p>
+                    </div>
+
+                    <!-- Value Proposition 2 -->
+                    <div class="p-8 bg-gray-50 rounded-xl shadow-md transform hover:scale-105 transition duration-300">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-12 w-12 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.001 12.001 0 002 12c0 2.757 1.256 5.257 3.284 7.143l-.001.001A12.002 12.002 0 0012 22a12.002 12.002 0 006.716-2.857l.001-.001A12.001 12.001 0 0022 12c0-2.846-1.147-5.418-3.04-7.392z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Secure & Transparent</h3>
+                        <p class="text-gray-600">Ensure every donation and ticket purchase is secure, with real-time tracking and full financial accountability.</p>
+                    </div>
+
+                    <!-- Value Proposition 3 -->
+                    <div class="p-8 bg-gray-50 rounded-xl shadow-md transform hover:scale-105 transition duration-300">
+                        <div class="flex justify-center mb-4">
+                            <svg class="h-12 w-12 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Enhanced Participation</h3>
+                        <p class="text-gray-600">Make it easier for students, staff, and alumni to support causes they care about and attend campus events.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works" class="py-16 md:py-24 bg-gray-100">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6">How It Works</h2>
+                <p class="text-lg text-gray-600 mb-12 max-w-3xl mx-auto">
+                    Whether you're an aspiring organizer or a generous supporter, UNZA Fundflow simplifies the process.
+                </p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 text-left">
+                    <!-- For Organizers -->
+                    <div class="bg-white p-8 rounded-xl shadow-lg border-t-4 border-primary-green">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-3 text-primary-green">
+                                <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h-2V10h2m0 10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v3m-2 7v-7m-2-4H7"></path></svg>
+                            </span>
+                            For Organizers
+                        </h3>
+                        <ol class="list-decimal list-inside text-gray-700 space-y-4">
+                            <li><strong class="text-primary-green">Get Your Organization Profile Set Up:</strong> Admins will create and manage your organization's profile, providing you access to create campaigns.</li>
+                            <li><strong class="text-primary-green">Create & Launch Your Campaign:</strong> Easily set up fundraising campaigns or ticketed events with goals, descriptions, and media.</li>
+                            <li><strong class="text-primary-green">Track Progress in Real-Time:</strong> Monitor donations, ticket sales, and overall progress via your personalized dashboard.</li>
+                            <li><strong class="text-primary-green">Manage Funds & Tickets:</strong> Handle withdrawals and validate event tickets with integrated QR-code scanning.</li>
+                        </ol>
+                    </div>
+
+                    <!-- For Supporters -->
+                    <div class="bg-white p-8 rounded-xl shadow-lg border-t-4 border-secondary-green">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span class="mr-3 text-secondary-green">
+                                <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                            </span>
+                            For Supporters
+                        </h3>
+                        <ol class="list-decimal list-inside text-gray-700 space-y-4">
+                            <li><strong class="text-secondary-green">Register Your Account:</strong> Sign up quickly to become an individual user and start supporting causes.</li>
+                            <li><strong class="text-secondary-green">Discover Campaigns & Events:</strong> Browse a wide range of campus initiatives and exciting events.</li>
+                            <li><strong class="text-secondary-green">Make Secure Contributions:</strong> Donate to campaigns or purchase tickets using secure online payment methods.</li>
+                            <li><strong class="text-secondary-green">Receive Instant Notifications:</strong> Get real-time updates and digital tickets for every successful transaction.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="py-16 md:py-24 bg-white">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6">Key Features</h2>
+                <p class="text-lg text-gray-600 mb-12 max-w-3xl mx-auto">
+                    UNZA Fundflow is built with robust functionalities to ensure a seamless experience for everyone.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Feature 1: User & Identity Management -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h-2V10h2m0 10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v3m-2 7v-7m-2-4H7"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">User & Org Profiles</h3>
+                        <p class="text-gray-600">Individual user registration and admin-managed organization profiles for verified campaigns.</p>
+                    </div>
+
+                    <!-- Feature 2: Campaign Management -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Verified Campaigns</h3>
+                        <p class="text-gray-600">Create, manage, and track fundraising campaigns with clear goals and progress tracking.</p>
+                    </div>
+
+                    <!-- Feature 3: Secure Donation Module -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Secure Donations</h3>
+                        <p class="text-gray-600">Multiple secure payment options for one-time or recurring contributions.</p>
+                    </div>
+
+                    <!-- Feature 4: Event & Ticketing Module -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M9 9V7m0 4v2m0 4v2M3 3h12a2 2 0 012 2v12a2 2 0 01-2 2H3a2 2 0 01-2-2V5a2 2 0 012-2zm0 0c0-1.105 1.12-2 2.5-2S8 2.895 8 4m-2 4h4m-4 8h4m-4-4h4"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Event Ticketing</h3>
+                        <p class="text-gray-600">Sell tickets for campus events with QR-code delivery and easy redemption.</p>
+                    </div>
+
+                    <!-- Feature 5: Real-time Analytics -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M18 10h4M12 21a9 9 0 100-18 9 9 0 000 18z"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Real-Time Tracking</h3>
+                        <p class="text-gray-600">Dashboards for organizers to monitor contributions, ticket sales, and overall progress.</p>
+                    </div>
+
+                    <!-- Feature 6: Notifications & Admin Panel -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-md flex flex-col items-center text-center">
+                        <svg class="h-16 w-16 text-primary-green mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Automated Notifications</h3>
+                        <p class="text-gray-600">Receive instant alerts for successful transactions and important campaign updates.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action Section -->
+        <section class="py-16 md:py-24 bg-primary-green text-white text-center">
+            <div class="container mx-auto px-4">
+                <h2 class="text-3xl md:text-4xl font-bold mb-6">Ready to Make a Difference?</h2>
+                <p class="text-lg md:text-xl mb-10 max-w-2xl mx-auto">
+                    Join the UNZA Fundflow community today. Start your campaign or support a cause that matters to you.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <a href="#" class="px-8 py-4 bg-white text-primary-green font-bold rounded-full shadow-lg hover:bg-gray-200 transition duration-300 transform hover:scale-105">
+                        Launch Your Campaign
+                    </a>
+                    <a href="#" class="px-8 py-4 border-2 border-white text-white font-bold rounded-full shadow-lg hover:bg-white hover:text-primary-green transition duration-300 transform hover:scale-105">
+                        Find a Cause to Support
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="py-16 md:py-24 bg-gray-50">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6">Get in Touch</h2>
+                <p class="text-lg text-gray-600 mb-10 max-w-xl mx-auto">
+                    Have questions or need assistance? Our team is here to help!
+                </p>
+                <div class="flex flex-col md:flex-row justify-center items-center space-y-8 md:space-y-0 md:space-x-12">
+                    <div class="flex items-center space-x-4">
+                        <svg class="h-10 w-10 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-17 4v7a2 2 0 002 2h14a2 2 0 002-2v-7"></path></svg>
+                        <span class="text-lg text-gray-700">info@unzafundflow.org</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <svg class="h-10 w-10 text-primary-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                        <span class="text-lg text-gray-700">+260 971 123456</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-center md:text-left">
+            <div class="mb-4 md:mb-0">
+                <p>&copy; 2025 UNZA Fundflow. All rights reserved.</p>
+            </div>
+            <div class="flex space-x-6 mb-4 md:mb-0">
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">Privacy Policy</a>
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">Terms of Service</a>
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">FAQs</a>
+            </div>
+            <div class="flex space-x-4">
+                <!-- Social Media Icons (placeholders) -->
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">
+                    <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.776-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33V22C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" /></svg>
+                </a>
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">
+                    <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12.422 2.96c-1.284 0-1.58.006-2.14.031-.6.027-.993.123-1.348.258a3.17 3.17 0 00-1.122.753 3.17 3.17 0 00-.753 1.122c-.135.355-.231.748-.258 1.348-.025.56-.031.856-.031 2.14 0 1.284.006 1.58.031 2.14.027.6.123.993.258 1.348a3.17 3.17 0 00.753 1.122 3.17 3.17 0 001.122.753c.355.135.748.231 1.348.258.56.025.856.031 2.14.031 1.284 0 1.58-.006 2.14-.031.6-.027.993-.123 1.348-.258a3.17 3.17 0 001.122-.753 3.17 3.17 0 00.753-1.122c.135-.355.231-.748.258-1.348.025-.56.031-.856.031-2.14 0-1.284-.006-1.58-.031-2.14-.027-.6-.123-.993-.258-1.348a3.17 3.17 0 00-.753-1.122 3.17 3.17 0 00-1.122-.753c-.355-.135-.748-.231-1.348-.258-.56-.025-.856-.031-2.14-.031Zm0 1.402c1.267 0 1.411.005 1.905.027.536.023.832.097.986.155a2.12 2.12 0 01.758.462 2.12 2.12 0 01.462.758c.058.154.132.45.155.986.022.494.027.638.027 1.905s-.005 1.411-.027 1.905c-.023.536-.097.832-.155.986a2.12 2.12 0 01-.462.758 2.12 2.12 0 01-.758.462c-.154.058-.45.132-.986.155-.494.022-.638.027-1.905.027s-1.411-.005-1.905-.027c-.536-.023-.832-.097-.986-.155a2.12 2.12 0 01-.758-.462 2.12 2.12 0 01-.462-.758c-.058-.154-.132-.45-.155-.986-.022-.494-.027-.638-.027-1.905s.005-1.411.027-1.905c.023-.536.097-.832.155-.986a2.12 2.12 0 01.462-.758 2.12 2.12 0 01.758-.462c.154-.058.45-.132.986-.155.494-.022.638-.027 1.905-.027ZM12 7.41a4.59 4.59 0 100 9.18 4.59 4.59 0 000-9.18Zm0 1.402a3.188 3.188 0 110 6.376 3.188 3.188 0 010-6.376Zm6.402-4.505a1.11 1.11 0 100 2.22 1.11 1.11 0 000-2.22Z" clip-rule="evenodd" /></svg>
+                </a>
+                <a href="#" class="text-gray-300 hover:text-white transition duration-300">
+                    <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M.057 4.908A8.883 8.883 0 010 3.328C0 1.57 1.57 0 3.328 0h17.344C22.43 0 24 1.57 24 3.328v17.344c0 1.758-1.57 3.328-3.328 3.328H3.328C1.57 24 0 22.43 0 20.672V9.098a8.883 8.883 0 01.057-4.19ZM20.672 2c.732 0 1.328.596 1.328 1.328v.535L12 9.42l-9.998-5.556v-.535C2 2.596 2.596 2 3.328 2h17.344Zm-.602 20H3.328c-.732 0-1.328-.596-1.328-1.328V9.098l10.938 6.075 10.062-5.586v11.759c0 .732-.596 1.328-1.328 1.328Z" /></svg>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Mobile menu toggle
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // Close mobile menu when a link is clicked
+        mobileMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.add('hidden');
+            });
+        });
+    </script>
+</body>
+</html>

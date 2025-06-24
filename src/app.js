@@ -1,10 +1,104 @@
-import express from 'express';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
+import config from "./config/index.js";
+import logger from "./utils/logger.js";
+import {
+  errorHandler,
+  notFoundHandler,
+  handleUncaughtException,
+  handleUnhandledRejection,
+} from "./middlewares/errorHandler.js";
 
+// Import routes
+import authRoutes from "./modules/auth/auth.routes.js";
+
+/**
+ * Express Application Setup
+ * Configures middleware, routes, and error handling
+ */
 const app = express();
 
-// Middleware setup
-app.use(express.json());
+// Trust proxy for rate limiting and security
+app.set("trust proxy", 1);
 
-// TODO: Register routes here
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
-export default app; 
+// CORS configuration
+app.use(cors({
+  origin: config.cors.origins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: config.env === "production" ? 100 : 1000, // Limit each IP to 100 requests per windowMs in production
+  message: {
+    success: false,
+    message: "Too many requests from this IP, please try again later.",
+    errorCode: "RATE_LIMIT_EXCEEDED",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/", limiter);
+
+// Compression middleware
+app.use(compression());
+
+// Body parsing middleware
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Request logging middleware
+app.use(morgan("combined", { stream: logger.stream }));
+
+// Request timing middleware
+app.use((req, res, next) => {
+  req.startTime = Date.now();
+  next();
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString(),
+    environment: config.env,
+    version: process.env.npm_package_version || "1.0.0",
+  });
+});
+
+// API routes
+app.use("/api/v1/auth", authRoutes);
+
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// Global error handling middleware (must be last)
+app.use(errorHandler);
+
+// Handle uncaught exceptions and unhandled rejections
+handleUncaughtException();
+handleUnhandledRejection();
+
+export default app;

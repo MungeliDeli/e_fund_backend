@@ -1,6 +1,11 @@
-// src/config/db.config.js
-// Placeholder for DB connection logic
+import config from './index.js';
 
-export const connectDB = async () => {
-  // TODO: Implement DB connection
-}; 
+const dbConfig = {
+  host: config.db.host,
+  port: config.db.port,
+  user: config.db.user,
+  password: config.db.password,
+  database: config.db.database
+}
+
+export default dbConfig;
