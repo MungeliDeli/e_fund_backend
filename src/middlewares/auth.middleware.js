@@ -131,7 +131,7 @@ export const optionalAuth = catchAsync(async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(); // Continue without authentication
+    return next(); 
   }
 
   try {
@@ -150,7 +150,6 @@ export const optionalAuth = catchAsync(async (req, res, next) => {
       };
     }
   } catch (error) {
-    // Continue without authentication if token is invalid
     logger.debug('Optional auth failed, continuing without authentication', {
       error: error.message,
       ip: req.ip,

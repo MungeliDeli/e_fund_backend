@@ -63,11 +63,7 @@ export const register = async (req, res, next) => {
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
-    
     const result = await authService.authenticateUser(email, password);
-
-   
     ResponseFactory.ok(
       res,
       "Login successful",
@@ -80,10 +76,10 @@ export const login = async (req, res, next) => {
           isActive: result.user.isActive,
           createdAt: result.user.createdAt
         },
-        token: result.token
+        token: result.token,
+        refreshToken: result.refreshToken
       }
     );
-
     logger.api.response(req.method, req.originalUrl, 200, Date.now() - req.startTime);
   } catch (error) {
     next(error);
@@ -127,7 +123,6 @@ export const getProfile = async (req, res, next) => {
  */
 export const verifyEmail = async (req, res, next) => {
   try {
-   
     const verificationToken = req.query.token || req.body.token;
     if (!verificationToken) {
       return ResponseFactory.badRequest(res, "Verification token is required");
@@ -140,7 +135,9 @@ export const verifyEmail = async (req, res, next) => {
         userId: result.userId,
         email: result.email,
         isEmailVerified: result.isEmailVerified,
-        isActive: result.isActive
+        isActive: result.isActive,
+        token: result.token,
+        refreshToken: result.refreshToken
       }
     );
     logger.api.response(req.method, req.originalUrl, 200, Date.now() - req.startTime);
@@ -215,7 +212,8 @@ export const resetPassword = async (req, res, next) => {
  */
 export const logout = async (req, res, next) => {
   try {
-    // Optionally, you can blacklist the token here if you implement token blacklisting
+    const { refreshToken } = req.body;
+    await authService.logout(refreshToken);
     ResponseFactory.ok(res, "Logged out successfully");
   } catch (error) {
     next(error);
@@ -228,8 +226,11 @@ export const logout = async (req, res, next) => {
  */
 export const refreshToken = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-    const result = await authService.refreshToken(userId);
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return ResponseFactory.badRequest(res, "Refresh token is required");
+    }
+    const result = await authService.refreshToken(refreshToken);
     ResponseFactory.ok(res, "Token refreshed successfully", result);
   } catch (error) {
     next(error);

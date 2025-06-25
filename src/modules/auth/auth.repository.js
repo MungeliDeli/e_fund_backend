@@ -532,6 +532,91 @@ class AuthRepository {
       throw new DatabaseError("Failed to delete email verification token", error);
     }
   }
+
+  /**
+   * Creates a refresh token for a user
+   * @param {string} userId
+   * @param {string} tokenHash
+   * @param {Date} expiresAt
+   * @returns {Promise<void>}
+   */
+  async createRefreshToken(userId, tokenHash, expiresAt) {
+    try {
+      const queryText = `
+        INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+        VALUES ($1, $2, $3)
+      `;
+      await query(queryText, [userId, tokenHash, expiresAt]);
+    } catch (error) {
+      logger.error("Failed to create refresh token", { error: error.message, userId });
+      throw new DatabaseError("Failed to create refresh token", error);
+    }
+  }
+
+  /**
+   * Finds a user by refresh token (and checks expiry)
+   * @param {string} tokenHash
+   * @returns {Promise<Object|null>} User object or null
+   */
+  async findRefreshToken(tokenHash) {
+    try {
+      const queryText = `
+        SELECT u.* FROM refresh_tokens rt
+        JOIN users u ON rt.user_id = u.user_id
+        WHERE rt.token_hash = $1 AND rt.expires_at > NOW()
+      `;
+      const result = await query(queryText, [tokenHash]);
+      if (result.rowCount === 0) return null;
+      const user = result.rows[0];
+      return {
+        userId: user.user_id,
+        email: user.email,
+        passwordHash: user.password_hash,
+        userType: user.user_type,
+        isEmailVerified: user.is_email_verified,
+        isActive: user.is_active,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at
+      };
+    } catch (error) {
+      logger.error("Failed to find user by refresh token", { error: error.message });
+      throw new DatabaseError("Failed to find user by refresh token", error);
+    }
+  }
+
+  /**
+   * Deletes a refresh token (by token hash)
+   * @param {string} tokenHash
+   * @returns {Promise<void>}
+   */
+  async deleteRefreshToken(tokenHash) {
+    try {
+      const queryText = `
+        DELETE FROM refresh_tokens WHERE token_hash = $1
+      `;
+      await query(queryText, [tokenHash]);
+    } catch (error) {
+      logger.error("Failed to delete refresh token", { error: error.message });
+      throw new DatabaseError("Failed to delete refresh token", error);
+    }
+  }
+
+  /**
+   * Deletes all refresh tokens for a user (optional, for logout all)
+   * @param {string} userId
+   * @returns {Promise<void>}
+   */
+  async deleteAllRefreshTokensForUser(userId) {
+    try {
+      const queryText = `
+        DELETE FROM refresh_tokens WHERE user_id = $1
+      `;
+      await query(queryText, [userId]);
+    } catch (error) {
+      logger.error("Failed to delete all refresh tokens for user", { error: error.message, userId });
+      throw new DatabaseError("Failed to delete all refresh tokens for user", error);
+    }
+  }
 }
 
 export default new AuthRepository();

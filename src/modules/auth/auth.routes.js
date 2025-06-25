@@ -122,7 +122,3 @@ router.post(
 router.get("/health", healthCheck);
 
 export default router;
-
-// Usage in your main app:
-// import testRoutes from './example-routes.js';
-// app.use('/api/v1/test', testRoutes);

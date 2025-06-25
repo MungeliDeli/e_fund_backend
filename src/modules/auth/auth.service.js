@@ -114,7 +114,7 @@ class AuthService {
           address: result.profile.address
         },
       
-        verificationToken // REMOVE in production
+        verificationToken // to be removed in prod
       };
     } catch (error) {
       logger.error("Failed to register individual user", {
@@ -157,6 +157,11 @@ class AuthService {
         email: user.email,
         userType: user.userType
       });
+     
+      const refreshToken = crypto.randomBytes(64).toString("hex");
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
       logger.security.loginAttempt(email, "N/A", true);
       return {
         user: {
@@ -167,7 +172,8 @@ class AuthService {
           isActive: user.isActive,
           createdAt: user.createdAt
         },
-        token
+        token,
+        refreshToken 
       };
     } catch (error) {
       logger.security.loginAttempt(email, "N/A", false);
@@ -236,6 +242,16 @@ class AuthService {
       await authRepository.updateEmailVerification(user.userId, true);
       await authRepository.updateUserStatus(user.userId, true);
       await authRepository.deleteEmailVerificationToken(verificationTokenHash);
+  
+      const token = signToken({
+        userId: user.userId,
+        email: user.email,
+        userType: user.userType
+      });
+      const refreshToken = crypto.randomBytes(64).toString("hex");
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
       logger.info("Email verified and account activated", {
         userId: user.userId,
         email: user.email
@@ -244,7 +260,9 @@ class AuthService {
         userId: user.userId,
         email: user.email,
         isEmailVerified: true,
-        isActive: true
+        isActive: true,
+        token,
+        refreshToken
       };
     } catch (error) {
       logger.error("Failed to verify email", {
@@ -297,41 +315,39 @@ class AuthService {
   }
 
   /**
-   * Refreshes user's authentication token
-   * @param {string} userId - User's ID
-   * @returns {Promise<Object>} New token
+   * Refreshes user's authentication token using a refresh token includes rotating it 
+   * @param {string} refreshToken
+   * @returns {Promise<Object>} New JWT and refresh token
    */
-  async refreshToken(userId) {
+  async refreshToken(refreshToken) {
     try {
-      const user = await authRepository.findById(userId);
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const user = await authRepository.findRefreshToken(refreshTokenHash);
       if (!user) {
-        throw new NotFoundError("User");
+        throw new AuthenticationError("Invalid or expired refresh token");
       }
-
-      if (!user.isActive) {
-        throw new AuthenticationError("Account is deactivated");
-      }
-
+     
       const token = signToken({
         userId: user.userId,
         email: user.email,
         userType: user.userType
       });
-
+    
+      const newRefreshToken = crypto.randomBytes(64).toString("hex");
+      const newRefreshTokenHash = createHash("sha256").update(newRefreshToken).digest("hex");
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); 
+      await authRepository.createRefreshToken(user.userId, newRefreshTokenHash, refreshExpiresAt);
+      await authRepository.deleteRefreshToken(refreshTokenHash);
       logger.security.tokenGenerated(user.userId, "refresh");
-
-      return { token };
+      return { token, refreshToken: newRefreshToken };
     } catch (error) {
       logger.error("Failed to refresh token", {
-        error: error.message,
-        userId
+        error: error.message
       });
-
-      if (error instanceof NotFoundError || error instanceof AuthenticationError) {
+      if (error instanceof AuthenticationError) {
         throw error;
       }
-
-      throw error;
+      throw new AuthenticationError("Failed to refresh token");
     }
   }
 
@@ -372,12 +388,15 @@ class AuthService {
   }
 
   /**
-   * Logs out a user (client-side token invalidation)
+   * Logs out a user (deletes refresh token)
+   * @param {string} refreshToken
    * @returns {Promise<Object>} Success message
    */
-  async logout() {
-    // For JWT, logout is handled client-side (token removal)
-    // Optionally, implement token blacklisting here
+  async logout(refreshToken) {
+    if (refreshToken) {
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      await authRepository.deleteRefreshToken(refreshTokenHash);
+    }
     return { message: "Logged out successfully." };
   }
 }
