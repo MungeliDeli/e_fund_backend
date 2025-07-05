@@ -121,6 +121,14 @@ export const requireAdmin = restrictTo(
 export const requireSuperAdmin = restrictTo('super_admin');
 
 /**
+ * Middleware to restrict access to support admin only
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next function
+ */
+export const requireSupportAdmin = restrictTo('support_admin');
+
+/**
  * Optional authentication middleware
  * Attaches user data if token is provided, but doesn't require it
  * @param {Object} req - Express request object

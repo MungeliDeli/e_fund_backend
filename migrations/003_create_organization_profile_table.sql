@@ -4,13 +4,11 @@ CREATE TABLE organization_profiles (
   organization_name VARCHAR(255) NOT NULL,
   organization_short_name VARCHAR(50),
   organization_type VARCHAR(50) NOT NULL,
-  official_registration_number VARCHAR(100) UNIQUE,
   official_email VARCHAR(255) UNIQUE,
   official_website_url VARCHAR(255),
   profile_picture UUID,
   cover_picture UUID,
-  campaign_event_logo UUID,
-  physical_office_location VARCHAR(255),
+  address VARCHAR(255),
   mission_description TEXT,
   establishment_date DATE,
   campus_affiliation_scope VARCHAR(50),
@@ -24,7 +22,7 @@ CREATE TABLE organization_profiles (
   total_ratings_count INTEGER DEFAULT 0,      
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);  -- Added semicolon
+);  
 
 -- Trigger for organization_profiles
 CREATE TRIGGER trigger_update_organization_profiles

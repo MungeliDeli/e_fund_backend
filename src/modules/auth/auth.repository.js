@@ -13,7 +13,7 @@ class AuthRepository {
    * @param {Object} profileData - Individual profile data
    * @returns {Promise<Object>} Created user with profile
    */
-  async createUserWithProfile(userData, profileData) {
+  async createUserAndProfile(userData, profileData) {
     try {
       const result = await transaction(async (client) => {
         // Insert into users table
@@ -102,6 +102,79 @@ class AuthRepository {
       }
 
       throw new DatabaseError("Failed to create user", error);
+    }
+  }
+
+
+  /**
+   * Creates an organization user and profile in a transaction
+   * @param {Object} userData
+   * @param {Object} profileData
+   * @returns {Promise<Object>} Created user and profile
+   */
+  async createOrganizationUserAndProfile(userData, profileData) {
+    try {
+      const result = await transaction(async (client) => {
+        // Insert into users table
+        const userQuery = `
+          INSERT INTO users (email, password_hash, user_type, is_email_verified, is_active)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING user_id, email, user_type, is_email_verified, is_active, created_at
+        `;
+        const userValues = [
+          userData.email,
+          userData.passwordHash,
+          userData.userType,
+          userData.isEmailVerified,
+          userData.isActive
+        ];
+        const userResult = await client.query(userQuery, userValues);
+        const user = userResult.rows[0];
+        // Insert into organization_profiles table
+        const profileQuery = `
+          INSERT INTO organization_profiles (
+            user_id, organization_name, organization_short_name, organization_type, official_email, official_website_url, profile_picture, cover_picture, address, mission_description, establishment_date, campus_affiliation_scope, affiliated_schools_names, affiliated_department_names, primary_contact_person_name, primary_contact_person_email, primary_contact_person_phone, created_by_admin_id
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+          ) RETURNING *
+        `;
+        const profileValues = [
+          user.user_id,
+          profileData.organizationName,
+          profileData.organizationShortName,
+          profileData.organizationType,
+          profileData.officialEmail,
+          profileData.officialWebsiteUrl,
+          profileData.profilePicture,
+          profileData.coverPicture,
+          profileData.address,
+          profileData.missionDescription,
+          profileData.establishmentDate,
+          profileData.campusAffiliationScope,
+          profileData.affiliatedSchoolsNames,
+          profileData.affiliatedDepartmentNames,
+          profileData.primaryContactPersonName,
+          profileData.primaryContactPersonEmail,
+          profileData.primaryContactPersonPhone,
+          profileData.createdByAdminId
+        ];
+        const profileResult = await client.query(profileQuery, profileValues);
+        const profile = profileResult.rows[0];
+        return {
+          user: {
+            userId: user.user_id,
+            email: user.email,
+            userType: user.user_type,
+            isEmailVerified: user.is_email_verified,
+            isActive: user.is_active,
+            createdAt: user.created_at
+          },
+          profile
+        };
+      });
+      return result;
+    } catch (error) {
+      throw new DatabaseError("Failed to create organization user and profile", error);
     }
   }
 
@@ -340,7 +413,7 @@ class AuthRepository {
   }
 
   /**
-   * Checks if email already exists
+   * Checks if user email already exists
    * @param {string} email - Email to check
    * @returns {Promise<boolean>} True if email exists, false otherwise
    */
@@ -357,6 +430,26 @@ class AuthRepository {
       throw new DatabaseError("Failed to check email existence", error);
     }
   }
+
+ /**
+   * Checks if official email already exists
+   * @param {string} email - Email to check
+   * @returns {Promise<boolean>} True if email exists, false otherwise
+   */
+ async OfficialEmailExists(email) {
+  try {
+    const queryText = "SELECT 1 FROM organization_profiles WHERE email = $1";
+    const result = await query(queryText, [email]);
+    return result.rowCount > 0;
+  } catch (error) {
+    logger.error("Failed to check email existence", {
+      error: error.message,
+      email
+    });
+    throw new DatabaseError("Failed to check email existence", error);
+  }
+}
+
 
   /**
    * Checks if phone number already exists
@@ -376,6 +469,8 @@ class AuthRepository {
       throw new DatabaseError("Failed to check phone number existence", error);
     }
   }
+
+  // PASSWORD RESET TOKEN
 
   /**
    * Creates a password reset token for a user
@@ -446,6 +541,23 @@ class AuthRepository {
   }
 
   /**
+   * Deletes all password reset tokens for a user (by userId)
+   * @param {string} userId
+   * @returns {Promise<void>}
+   */
+  async deletePasswordResetTokenByUserId(userId) {
+    try {
+      const queryText = `
+        DELETE FROM password_reset_tokens WHERE user_id = $1
+      `;
+      await query(queryText, [userId]);
+    } catch (error) {
+      logger.error("Failed to delete password reset token by userId", { error: error.message, userId });
+      throw new DatabaseError("Failed to delete password reset token by userId", error);
+    }
+  }
+
+  /**
    * Updates a user's password
    * @param {string} userId
    * @param {string} newPasswordHash
@@ -465,6 +577,8 @@ class AuthRepository {
     }
   }
 
+
+  // EMAIL VERIFICATION TOKEN
   /**
    * Creates an email verification token for a user
    * @param {string} userId
@@ -532,6 +646,30 @@ class AuthRepository {
       throw new DatabaseError("Failed to delete email verification token", error);
     }
   }
+
+  /**
+   * Deletes all email verification tokens for a user (by userId)
+   * @param {string} userId
+   * @returns {Promise<void>}
+   */
+  async deleteEmailVerificationTokenByUserId(userId) {
+    try {
+      const queryText = `
+        DELETE FROM email_verification_tokens WHERE user_id = $1
+      `;
+      await query(queryText, [userId]);
+    } catch (error) {
+      logger.error("Failed to delete email verification token by userId", { error: error.message, userId });
+      throw new DatabaseError("Failed to delete email verification token by userId", error);
+    }
+  }
+
+
+
+
+
+
+  // REFRESH TOKEN
 
   /**
    * Creates a refresh token for a user
@@ -615,6 +753,94 @@ class AuthRepository {
     } catch (error) {
       logger.error("Failed to delete all refresh tokens for user", { error: error.message, userId });
       throw new DatabaseError("Failed to delete all refresh tokens for user", error);
+    }
+  }
+
+
+  // PASSWORD SETUP TOKEN
+  
+
+  /**
+   * Creates a password setup token for a user (organizational activation)
+   * @param {string} userId
+   * @param {string} tokenHash
+   * @param {Date} expiresAt
+   * @returns {Promise<void>}
+   */
+  async createPasswordSetupToken(userId, tokenHash, expiresAt) {
+    try {
+      const queryText = `
+        INSERT INTO password_setup_tokens (user_id, token_hash, expires_at)
+        VALUES ($1, $2, $3)
+      `;
+      await query(queryText, [userId, tokenHash, expiresAt]);
+    } catch (error) {
+      throw new DatabaseError("Failed to create password setup token", error);
+    }
+  }
+
+  /**
+   * Finds a user by password setup token (and checks expiry)
+   * @param {string} tokenHash
+   * @returns {Promise<Object|null>} User object or null
+   */
+  async findPasswordSetupToken(tokenHash) {
+    try {
+      const queryText = `
+        SELECT u.* FROM password_setup_tokens pst
+        JOIN users u ON pst.user_id = u.user_id
+        WHERE pst.token_hash = $1 AND pst.expires_at > NOW()
+      `;
+      const result = await query(queryText, [tokenHash]);
+      if (result.rowCount === 0) return null;
+      const user = result.rows[0];
+      return {
+        userId: user.user_id,
+        email: user.email,
+        passwordHash: user.password_hash,
+        userType: user.user_type,
+        isEmailVerified: user.is_email_verified,
+        isActive: user.is_active,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at
+      };
+    } catch (error) {
+      throw new DatabaseError("Failed to find user by password setup token", error);
+    }
+  }
+
+  /**
+   * Deletes a password setup token (by token hash)
+   * @param {string} tokenHash
+   * @returns {Promise<void>}
+   */
+  async deletePasswordSetupToken(tokenHash) {
+    try {
+      const queryText = `
+        DELETE FROM password_setup_tokens WHERE token_hash = $1
+      `;
+      await query(queryText, [tokenHash]);
+    } catch (error) {
+      throw new DatabaseError("Failed to delete password setup token", error);
+    }
+  }
+
+  /**
+   * Updates user's password and activates account (for org user activation)
+   * @param {string} userId
+   * @param {string} newPasswordHash
+   * @returns {Promise<void>}
+   */
+  async updateUserPasswordAndActivate(userId, newPasswordHash) {
+    try {
+      const queryText = `
+        UPDATE users
+        SET password_hash = $1, is_email_verified = TRUE, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $2
+      `;
+      await query(queryText, [newPasswordHash, userId]);
+    } catch (error) {
+      throw new DatabaseError("Failed to update user password and activate", error);
     }
   }
 }

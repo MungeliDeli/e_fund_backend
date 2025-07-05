@@ -11,7 +11,9 @@ import {
   notFoundHandler,
   handleUncaughtException,
   handleUnhandledRejection,
+  rateLimitLogger,
 } from "./middlewares/errorHandler.js";
+import { apiLimiter } from "./middlewares/rateLimiters.js";
 
 // Import routes
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -46,21 +48,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.env === "production" ? 100 : 1000, // Limit each IP to 100 requests per windowMs in production
-  message: {
-    success: false,
-    message: "Too many requests from this IP, please try again later.",
-    errorCode: "RATE_LIMIT_EXCEEDED",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use("/api/", limiter);
-
 // Compression middleware
 app.use(compression());
 
@@ -76,6 +63,9 @@ app.use((req, res, next) => {
   req.startTime = Date.now();
   next();
 });
+
+// Rate limit logging middleware (must be before routes to intercept responses)
+app.use(rateLimitLogger);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -100,5 +90,7 @@ app.use(errorHandler);
 // Handle uncaught exceptions and unhandled rejections
 handleUncaughtException();
 handleUnhandledRejection();
+
+app.use("/api/", apiLimiter);
 
 export default app;

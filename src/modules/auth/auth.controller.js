@@ -19,10 +19,9 @@ export const register = async (req, res, next) => {
   try {
     const registrationData = req.body;
 
-    // Register the user
     const result = await authService.registerIndividualUser(registrationData);
 
-    // Send success response
+    
     ResponseFactory.created(
       res,
       "User registered successfully. Please check your email for a verification link to activate your account.",
@@ -124,6 +123,8 @@ export const getProfile = async (req, res, next) => {
 export const verifyEmail = async (req, res, next) => {
   try {
     const verificationToken = req.query.token || req.body.token;
+    logger.info(req.query.token  )
+    
     if (!verificationToken) {
       return ResponseFactory.badRequest(res, "Verification token is required");
     }
@@ -232,6 +233,58 @@ export const refreshToken = async (req, res, next) => {
     }
     const result = await authService.refreshToken(refreshToken);
     ResponseFactory.ok(res, "Token refreshed successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Support admin creates an organization user and sends invite
+ */
+export const createOrganizationUser = async (req, res, next) => {
+  try {
+    const registrationData = req.body;
+    const createdByAdminId = req.user.userId;
+    const result = await authService.createOrganizationUserAndInvite(registrationData, createdByAdminId);
+    ResponseFactory.created(
+      res,
+      "Organization user created and invitation sent.",
+      {
+        user: result.user,
+        profile: result.profile,
+        setupToken: result.setupToken // REMOVE in production
+      }
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Organizational user activates account and sets password
+ */
+export const activateAndSetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+    const result = await authService.activateAndSetPassword(token, newPassword);
+    ResponseFactory.ok(res, "Account activated and password set successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Resend verification email
+ * @route POST /api/v1/auth/resend-verification
+ */
+export const resendVerificationEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return ResponseFactory.badRequest(res, "Email is required");
+    }
+    await authService.resendVerificationEmail(email);
+    ResponseFactory.ok(res, "Verification email resent if the account exists and is not verified");
   } catch (error) {
     next(error);
   }

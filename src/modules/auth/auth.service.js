@@ -12,12 +12,20 @@ import {
 import logger from "../../utils/logger.js";
 import crypto from "crypto";
 import { createHash } from "crypto";
+import { sendVerificationEmail, sendPasswordResetEmail, sendSetupEmail } from "../../utils/email.utils.js";
+
+
+
 
 /**
  * Authentication Service
  * Contains business logic for authentication and user management
  */
 class AuthService {
+
+
+// INDIVIDUAL USER CREATION
+
   /**
    * Registers a new individual user
    * @param {Object} registrationData - User registration data
@@ -38,13 +46,13 @@ class AuthService {
         address
       } = registrationData;
 
-      // Check if email already exists
+      
       const emailExists = await authRepository.emailExists(email);
       if (emailExists) {
         throw new ConflictError("Email address is already registered");
       }
 
-      // Check if phone number already exists (if provided)
+      
       if (phoneNumber) {
         const phoneExists = await authRepository.phoneNumberExists(phoneNumber);
         if (phoneExists) {
@@ -52,10 +60,10 @@ class AuthService {
         }
       }
 
-      // Hash the password
+      
       const passwordHash = await hashPassword(password);
 
-      // Prepare user data
+      
       const userData = {
         email: email.toLowerCase().trim(),
         passwordHash,
@@ -64,7 +72,7 @@ class AuthService {
         isActive: false
       };
 
-      // Prepare profile data
+      
       const profileData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -76,45 +84,39 @@ class AuthService {
         address: address ? address.trim() : null
       };
 
-      // Create user with profile in a transaction
-      const result = await authRepository.createUserWithProfile(userData, profileData);
+      
+      const result = await authRepository.createUserAndProfile(userData, profileData);
 
-      // Generate email verification token
+      
       const verificationToken = crypto.randomBytes(32).toString("hex");
       const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
       await authRepository.createEmailVerificationToken(result.user.userId, verificationTokenHash, expiresAt);
 
-      // TODO: Send email with verification link (containing the token)
-      // Example: sendVerificationEmail(email, verificationToken)
-      logger.info(`Email verification token for ${email}: ${verificationToken}`);
+       
+      sendVerificationEmail(email, verificationToken)
+        .then(() => {
+          logger.info(`Verification email sent successfully to ${email} in background.`);
+        })
+        .catch(emailError => {
+          logger.error(`Failed to send verification email to ${email} in background: ${emailError.message}`, {
+            userId: result.user.userId,
+            email: result.user.email,
+            error: emailError
+          });
+          
+          
+        });
 
-      logger.info("Individual user registered successfully (pending email verification)", {
+      logger.info("Individual user registered successfully (pending email verification) - Email sending initiated in background.", {
         userId: result.user.userId,
         email: result.user.email
       });
 
+
       return {
-        user: {
-          userId: result.user.userId,
-          email: result.user.email,
-          userType: result.user.userType,
-          isEmailVerified: result.user.isEmailVerified,
-          isActive: result.user.isActive,
-          createdAt: result.user.createdAt
-        },
-        profile: {
-          firstName: result.profile.firstName,
-          lastName: result.profile.lastName,
-          phoneNumber: result.profile.phoneNumber,
-          gender: result.profile.gender,
-          dateOfBirth: result.profile.dateOfBirth,
-          country: result.profile.country,
-          city: result.profile.city,
-          address: result.profile.address
-        },
-      
-        verificationToken // to be removed in prod
+        user: result.user,
+        profile: result.profile,
       };
     } catch (error) {
       logger.error("Failed to register individual user", {
@@ -128,6 +130,196 @@ class AuthService {
 
       throw error;
     }
+  }
+
+
+  /**
+   * Verifies user's email using a verification token
+   * @param {string} verificationToken
+   * @returns {Promise<Object>} Updated user
+   */
+  async verifyEmail(verificationToken) {
+    try {
+      const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
+      const user = await authRepository.findEmailVerificationToken(verificationTokenHash);
+      if (!user) {
+        throw new AuthenticationError("Invalid or expired verification token");
+      }
+      await authRepository.updateEmailVerification(user.userId, true);
+      await authRepository.updateUserStatus(user.userId, true);
+      // Delete all email verification tokens for this user (cleanup)
+      await authRepository.deleteEmailVerificationTokenByUserId(user.userId);
+  
+      const token = signToken({
+        userId: user.userId,
+        email: user.email,
+        userType: user.userType
+      });
+      const refreshToken = crypto.randomBytes(64).toString("hex");
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
+      logger.info("Email verified and account activated", {
+        userId: user.userId,
+        email: user.email
+      });
+      return {
+        userId: user.userId,
+        email: user.email,
+        isEmailVerified: true,
+        isActive: true,
+        token,
+        refreshToken
+      };
+    } catch (error) {
+      logger.error("Failed to verify email", {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+
+  // ORGANIZATION USER CREATION
+
+
+   /**
+   * Admin creates an organization user and sends invite
+   * @param {Object} userData
+   * @param {Object} profileData
+   * @returns {Promise<Object>} Created user, profile, and raw setup token
+   */
+   async createOrganizationUserAndInvite(registrationData , createdByAdminId) {
+ 
+
+    const { 
+      email,
+      organizationName,
+      organizationShortName,
+      organizationType,
+      officialEmail,
+      officialWebsiteUrl,
+      profilePicture,
+      coverPicture,
+      address,
+      missionDescription,
+      establishmentDate,
+      campusAffiliationScope,
+      affiliatedSchoolsNames,
+      affiliatedDepartmentNames,
+      primaryContactPersonName,
+      primaryContactPersonEmail,
+      primaryContactPersonPhone,
+    } = registrationData;
+
+
+
+    const emailExists = await authRepository.emailExists(email);
+    if(emailExists){
+      throw new ConflictError("Email address is alread registered")
+    }
+
+    if(officialEmail){
+      const officialEmailExists = await authRepository.OfficialEmailExists(officialEmail);
+      if(officialEmailExists){
+        throw new ConflictError("Organizations officail Email already Exists")
+      }
+    }
+    
+
+    
+
+    // prepareing user data
+    const userData = {
+      email: email.toLowerCase().trim(),
+      passwordHash: 'placeholder', 
+      userType: 'organization_user',
+      isEmailVerified: false,
+      isActive: false
+    };
+
+    // preparing profile data
+
+    const profileData = {
+      organizationName : organizationName.trim(),
+      organizationShortName: organizationShortName? organizationShortName.trim() : null,
+      organizationType: organizationType.trim(),
+      officialEmail: officialEmail? officialEmail.toLowerCase().trim() : null,
+      officialWebsiteUrl: officialWebsiteUrl? officialWebsiteUrl.trim() : null,
+      profilePicture: profilePicture? profilePicture.trim() : null,
+      coverPicture: coverPicture? coverPicture.trim() : null,
+      address: address? address.trim() : null,
+      missionDescription: missionDescription? missionDescription.trim() : null,
+      establishmentDate: establishmentDate? establishmentDate.trim() : null,
+      campusAffiliationScope: campusAffiliationScope? campusAffiliationScope.trim() : null,
+      affiliatedSchoolsNames: affiliatedSchoolsNames? affiliatedSchoolsNames.trim() : null,
+      affiliatedDepartmentNames: affiliatedDepartmentNames? affiliatedDepartmentNames.trim() : null,
+      primaryContactPersonName: primaryContactPersonName? primaryContactPersonName.trim() : null,
+      primaryContactPersonEmail: primaryContactPersonEmail? primaryContactPersonEmail.trim() : null,
+      primaryContactPersonPhone: primaryContactPersonPhone? primaryContactPersonPhone.trim() : null,
+      createdByAdminId: createdByAdminId
+    }
+    
+    const result = await authRepository.createOrganizationUserAndProfile(userData, profileData);
+    
+    const setupToken = crypto.randomBytes(48).toString('hex');
+    const setupTokenHash = createHash('sha256').update(setupToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+    await authRepository.createPasswordSetupToken(result.user.userId, setupTokenHash, expiresAt);
+      
+    sendSetupEmail(userData.email, setupToken)
+      .then(() => {
+        logger.info(`Setup email sent successfully to ${userData.email} in background.`);
+      })
+      .catch(emailError => {
+        logger.error(`Failed to send setup email to ${userData.email} in background: ${emailError.message}`, {
+          userId: result.user.userId,
+
+        })
+      });
+
+    logger.info(`Organization user created successfully (pending verification )`, {
+      userId: result.user.userId,
+      email: result.user.email,
+      organizationName: result.profile.organizationName,
+      
+    });
+    return {
+      user: result.user,
+      profile: result.profile,
+      setupToken // REMOVE in production
+    };
+  }
+
+  /**
+   * Organizational user activates account and sets password
+   * @param {string} token
+   * @param {string} newPassword
+   * @returns {Promise<Object>} JWT and refreshToken for auto-login
+   */
+  async activateAndSetPassword(token, newPassword) {
+    const setupTokenHash = createHash('sha256').update(token).digest('hex');
+    const user = await authRepository.findPasswordSetupToken(setupTokenHash);
+    if (!user || user.isEmailVerified || user.isActive) {
+      throw new AuthenticationError('Activation link is invalid or has expired. Please contact your administrator.');
+    }
+    const newPasswordHash = await hashPassword(newPassword);
+    await authRepository.updateUserPasswordAndActivate(user.userId, newPasswordHash);
+    await authRepository.deletePasswordSetupToken(setupTokenHash);
+    // Issue JWT and refresh token for auto-login
+    const jwt = signToken({
+      userId: user.userId,
+      email: user.email,
+      userType: user.userType
+    });
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshTokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
+    return {
+      token: jwt,
+      refreshToken
+    };
   }
 
   /**
@@ -188,6 +380,21 @@ class AuthService {
     }
   }
 
+
+  
+  /**
+   * Logs out a user (deletes refresh token)
+   * @param {string} refreshToken
+   * @returns {Promise<Object>} Success message
+   */
+  async logout(refreshToken) {
+    if (refreshToken) {
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      await authRepository.deleteRefreshToken(refreshTokenHash);
+    }
+    return { message: "Logged out successfully." };
+  }
+
   /**
    * Gets user profile by ID
    * @param {string} userId - User's ID
@@ -227,50 +434,7 @@ class AuthService {
     }
   }
 
-  /**
-   * Verifies user's email using a verification token
-   * @param {string} verificationToken
-   * @returns {Promise<Object>} Updated user
-   */
-  async verifyEmail(verificationToken) {
-    try {
-      const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
-      const user = await authRepository.findEmailVerificationToken(verificationTokenHash);
-      if (!user) {
-        throw new AuthenticationError("Invalid or expired verification token");
-      }
-      await authRepository.updateEmailVerification(user.userId, true);
-      await authRepository.updateUserStatus(user.userId, true);
-      await authRepository.deleteEmailVerificationToken(verificationTokenHash);
   
-      const token = signToken({
-        userId: user.userId,
-        email: user.email,
-        userType: user.userType
-      });
-      const refreshToken = crypto.randomBytes(64).toString("hex");
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
-      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
-      logger.info("Email verified and account activated", {
-        userId: user.userId,
-        email: user.email
-      });
-      return {
-        userId: user.userId,
-        email: user.email,
-        isEmailVerified: true,
-        isActive: true,
-        token,
-        refreshToken
-      };
-    } catch (error) {
-      logger.error("Failed to verify email", {
-        error: error.message
-      });
-      throw error;
-    }
-  }
 
   /**
    * Changes user's password
@@ -359,12 +523,25 @@ class AuthService {
   async forgotPassword(email) {
     const user = await authRepository.findByEmail(email);
     if (user && user.isActive) {
+      // Delete any existing password reset tokens for this user
+      await authRepository.deletePasswordResetTokenByUserId(user.userId);
+      
       const resetToken = crypto.randomBytes(32).toString("hex");
       const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
       const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min
       await authRepository.createPasswordResetToken(user.userId, resetTokenHash, expiresAt);
-      logger.info(`Password reset token for ${email}: ${resetToken}`);
-      // TODO: send actual email with reset link containing the token
+    
+      sendPasswordResetEmail(email, resetToken)
+        .then(() => {
+          logger.info(`Password Reset email sent successfully to ${email}`);
+        })
+        .catch(emailError => {
+          logger.error(`Failed to send password reset email to ${email}: ${emailError.message}`, {
+            userId: user.userId,
+            email: user.email,
+            error: emailError
+          });
+        });
     }
     return { message: "If the email exists, password reset instructions have been sent." };
   }
@@ -383,22 +560,36 @@ class AuthService {
     }
     const newPasswordHash = await hashPassword(newPassword);
     await authRepository.updatePassword(user.userId, newPasswordHash);
-    await authRepository.deletePasswordResetToken(resetTokenHash);
+    // Delete all password reset tokens for this user (cleanup)
+    await authRepository.deletePasswordResetTokenByUserId(user.userId);
     return { message: "Password has been reset successfully." };
   }
 
   /**
-   * Logs out a user (deletes refresh token)
-   * @param {string} refreshToken
-   * @returns {Promise<Object>} Success message
+   * Resends email verification link for unverified users
+   * @param {string} email
+   * @returns {Promise<void>}
    */
-  async logout(refreshToken) {
-    if (refreshToken) {
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
-      await authRepository.deleteRefreshToken(refreshTokenHash);
+  async resendVerificationEmail(email) {
+    // Find user by email
+    const user = await authRepository.findByEmail(email.toLowerCase().trim());
+    if (!user || user.isEmailVerified) {
+      // For security, do not reveal if user exists or is already verified
+      return;
     }
-    return { message: "Logged out successfully." };
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Remove any existing token for this user (optional, for safety)
+    await authRepository.deleteEmailVerificationTokenByUserId(user.userId);
+    // Insert new token
+    await authRepository.createEmailVerificationToken(user.userId, verificationTokenHash, expiresAt);
+    // Send email
+    await sendVerificationEmail(user.email, verificationToken);
+    logger.info("Resent verification email", { userId: user.userId, email: user.email });
   }
+
 }
 
 export default new AuthService(); 

@@ -17,7 +17,7 @@ const config = {
   
   },
   cors:{
-    origin: process.env.CORS_ORIGIN || "*"
+    origins: process.env.CORS_ORIGIN || "*"
   }
 };
 

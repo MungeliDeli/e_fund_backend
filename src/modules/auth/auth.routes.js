@@ -1,7 +1,7 @@
 import express from "express";
 import { catchAsync } from "../../middlewares/errorHandler.js";
-import { authenticate, requireEmailVerification } from "../../middlewares/auth.middleware.js";
-import { validateRegistration, validateLogin } from "./auth.validation.js";
+import { authenticate, requireEmailVerification, requireSupportAdmin } from "../../middlewares/auth.middleware.js";
+import { validateRegistration, validateLogin, validateCreateOrganizationUser, validatePasswordSetup } from "./auth.validation.js";
 import {
   register,
   login,
@@ -12,8 +12,12 @@ import {
   forgotPassword,
   resetPassword,
   logout,
-  refreshToken
+  refreshToken,
+  createOrganizationUser,
+  activateAndSetPassword,
+  resendVerificationEmail
 } from "./auth.controller.js";
+import { loginLimiter, passwordResetLimiter, resendVerificationLimiter } from '../../middlewares/rateLimiters.js';
 
 const router = express.Router();
 
@@ -35,6 +39,7 @@ router.post(
  */
 router.post(
   "/login",
+  loginLimiter,
   validateLogin,
   catchAsync(login)
 );
@@ -91,6 +96,7 @@ router.post(
  */
 router.post(
   "/forgot-password",
+  passwordResetLimiter,
   catchAsync(forgotPassword)
 );
 
@@ -120,5 +126,40 @@ router.post(
  * @access  Public
  */
 router.get("/health", healthCheck);
+
+/**
+ * @route   POST /api/v1/admin/users/create-organization-user
+ * @desc    Support admin creates an organization user and sends invite
+ * @access  Private (support admin only)
+ */
+router.post(
+  "/admin/users/create-organization-user",
+  authenticate,
+  requireSupportAdmin,
+  validateCreateOrganizationUser,
+  catchAsync(createOrganizationUser)
+);
+
+/**
+ * @route   POST /api/v1/auth/activate-and-set-password
+ * @desc    Organizational user activates account and sets password
+ * @access  Public
+ */
+router.post(
+  "/activate-and-set-password",
+  validatePasswordSetup,
+  catchAsync(activateAndSetPassword)
+);
+
+/**
+ * @route   POST /api/v1/auth/resend-verification
+ * @desc    Resend email verification link
+ * @access  Public
+ */
+router.post(
+  "/resend-verification",
+  resendVerificationLimiter,
+  catchAsync(resendVerificationEmail)
+);
 
 export default router;

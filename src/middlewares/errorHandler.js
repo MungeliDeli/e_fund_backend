@@ -201,6 +201,58 @@ const databaseErrorHandler = (error, req, res, next) => {
   next(error);
 };
 
+/**
+ * Rate limit logging middleware
+ * Intercepts rate limit responses and logs them with specific details
+ */
+const rateLimitLogger = (req, res, next) => {
+  // Store the original send function
+  const originalSend = res.send;
+  
+  // Override the send function to intercept responses
+  res.send = function(data) {
+    // Check if this is a rate limit response (429)
+    if (res.statusCode === 429) {
+      let responseData;
+      try {
+        responseData = typeof data === 'string' ? JSON.parse(data) : data;
+      } catch (e) {
+        responseData = { message: data };
+      }
+      
+      // Determine which rate limiter was triggered based on the endpoint
+      let rateLimiterType = 'UNKNOWN';
+      if (req.originalUrl.includes('/login')) {
+        rateLimiterType = 'LOGIN_RATE_LIMITER';
+      } else if (req.originalUrl.includes('/forgot-password')) {
+        rateLimiterType = 'PASSWORD_RESET_RATE_LIMITER';
+      } else if (req.originalUrl.includes('/resend-verification')) {
+        rateLimiterType = 'RESEND_VERIFICATION_RATE_LIMITER';
+      } else if (req.originalUrl.startsWith('/api/')) {
+        rateLimiterType = 'GLOBAL_API_RATE_LIMITER';
+      }
+      
+      logger.warn("Rate limit exceeded", {
+        ip: req.ip,
+        endpoint: req.originalUrl,
+        method: req.method,
+        userAgent: req.get("User-Agent"),
+        rateLimiterType: rateLimiterType,
+        errorCode: responseData.errorCode || "RATE_LIMIT_EXCEEDED",
+        message: responseData.message,
+        timestamp: new Date().toISOString(),
+        // Include email if available in request body (for email-based limiters)
+        email: req.body?.email?.toLowerCase()
+      });
+    }
+    
+    // Call the original send function
+    return originalSend.call(this, data);
+  };
+  
+  next();
+};
+
 export {
   errorHandler,
   catchAsync,
@@ -209,4 +261,5 @@ export {
   handleUnhandledRejection,
   validationErrorHandler,
   databaseErrorHandler,
+  rateLimitLogger,
 };

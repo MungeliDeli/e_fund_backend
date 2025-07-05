@@ -3,6 +3,16 @@
 import Joi from "joi";
 import { ValidationError } from "../../utils/appError.js";
 
+
+const strongPasswordRegex = new RegExp(
+  "^(?=.*[a-z])" + // At least one lowercase letter
+  "(?=.*[A-Z])" + // At least one uppercase letter
+  "(?=.*\\d)" +   // At least one digit
+  // Define allowed special characters. Remember to escape special regex characters like -, [, ], etc.
+  "(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\|,.<>/?`~])" + // At least one special character
+  // Allowed characters for the entire string, and length constraint
+  "[A-Za-z\\d!@#$%^&*()_+\\-=\\[\\]{};':\"\\|,.<>/?`~]{8,128}$"
+);
 /**
  * Validation schemas for authentication operations
  */
@@ -17,15 +27,11 @@ const registerSchema = Joi.object({
       "any.required": "Email is required",
     }),
   password: Joi.string()
-    .min(8)
-    .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .pattern(strongPasswordRegex)
     .required()
     .messages({
-      "string.min": "Password must be at least 8 characters long",
-      "string.max": "Password must not exceed 128 characters",
-      "string.pattern.base": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-      "any.required": "Password is required",
+      'string.pattern.base': 'Password must be 8-128 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g., !@#$%^&*).',
+      'any.required': 'Password is required.',
     }),
   confirmPassword: Joi.string()
     .valid(Joi.ref("password"))
@@ -57,7 +63,7 @@ const registerSchema = Joi.object({
       "any.required": "Last name is required",
     }),
   phoneNumber: Joi.string()
-    .pattern(/^\+?[1-9]\d{1,14}$/)
+    .pattern(/^\d{10,15}$/)
     .optional()
     .messages({
       "string.pattern.base": "Please provide a valid phone number",
@@ -114,6 +120,36 @@ const loginSchema = Joi.object({
     .messages({
       "any.required": "Password is required",
     }),
+});
+
+// Organization user creation schema (admin)
+const createOrganizationUserSchema = Joi.object({
+  email: Joi.string().email({ tlds: { allow: false } }).required(),
+  organizationName: Joi.string().min(2).max(255).required(),
+  organizationShortName: Joi.string().max(50).optional(),
+  organizationType: Joi.string().max(50).required(),
+  officialEmail: Joi.string().email({ tlds: { allow: false } }).optional(),
+  officialWebsiteUrl: Joi.string().uri().optional(),
+  profilePicture: Joi.string().optional(),
+  coverPicture: Joi.string().optional(),
+  address: Joi.string().max(255).optional(),
+  missionDescription: Joi.string().optional(),
+  establishmentDate: Joi.date().optional(),
+  campusAffiliationScope: Joi.string().max(50).optional(),
+  affiliatedSchoolsNames: Joi.string().optional(),
+  affiliatedDepartmentNames: Joi.string().optional(),
+  primaryContactPersonName: Joi.string().max(255).optional(),
+  primaryContactPersonEmail: Joi.string().email({ tlds: { allow: false } }).optional(),
+  primaryContactPersonPhone: Joi.string().optional()
+});
+
+// Password setup (activation) schema
+const passwordSetupSchema = Joi.object({
+  token: Joi.string().required(),
+  newPassword: Joi.string()
+    .pattern(strongPasswordRegex)
+    .required(),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required()
 });
 
 /**
@@ -188,7 +224,7 @@ export const validatePassword = (password) => {
   const passwordSchema = Joi.string()
     .min(8)
     .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/);
+    .pattern(strongPasswordRegex);
 
   const { error } = passwordSchema.validate(password);
   
@@ -198,4 +234,30 @@ export const validatePassword = (password) => {
   }
 
   return { isValid: true, errors: [] };
+};
+
+export const validateCreateOrganizationUser = (req, res, next) => {
+  const { error, value } = createOrganizationUserSchema.validate(req.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+  if (error) {
+    const errorMessage = error.details.map((detail) => detail.message).join(", ");
+    throw new ValidationError(errorMessage);
+  }
+  req.body = value;
+  next();
+};
+
+export const validatePasswordSetup = (req, res, next) => {
+  const { error, value } = passwordSetupSchema.validate(req.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+  if (error) {
+    const errorMessage = error.details.map((detail) => detail.message).join(", ");
+    throw new ValidationError(errorMessage);
+  }
+  req.body = value;
+  next();
 }; 
