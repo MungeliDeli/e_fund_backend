@@ -1,3 +1,67 @@
+/**
+ * Authentication Repository Module
+ * 
+ * This module handles all database operations related to authentication and user management.
+ * It serves as the data access layer that abstracts database interactions and provides
+ * a clean interface for the service layer to interact with the database.
+ * 
+ * DATABASE OPERATIONS:
+ * - User CRUD operations (Create, Read, Update)
+ * - Profile management for individual and organization users
+ * - Token management (verification, reset, refresh, setup tokens)
+ * - Email and phone number existence checks
+ * - Password updates and account status changes
+ * 
+ * TRANSACTION MANAGEMENT:
+ * - Atomic operations for user and profile creation
+ * - Rollback capabilities for failed operations
+ * - Data consistency maintenance
+ * 
+ * TOKEN MANAGEMENT:
+ * - Email verification tokens (24-hour expiry)
+ * - Password reset tokens (20-minute expiry)
+ * - Refresh tokens (30-day expiry)
+ * - Password setup tokens (48-hour expiry)
+ * - Token cleanup and invalidation
+ * 
+ * SECURITY FEATURES:
+ * - Token hashing using SHA-256
+ * - Secure token storage and retrieval
+ * - Token expiration validation
+ * - User status verification
+ * 
+ * DATA VALIDATION:
+ * - User existence checks
+ * - Email uniqueness validation
+ * - Phone number uniqueness validation
+ * - Official email uniqueness for organizations
+ * 
+ * ERROR HANDLING:
+ * - Database constraint violation handling
+ * - Custom error types for different scenarios
+ * - Comprehensive error logging
+ * - Graceful error propagation
+ * 
+ * TABLES INTERACTED:
+ * - users: Core user information
+ * - individual_profiles: Individual user profile data
+ * - organization_profiles: Organization user profile data
+ * - email_verification_tokens: Email verification tokens
+ * - password_reset_tokens: Password reset tokens
+ * - refresh_tokens: JWT refresh tokens
+ * - password_setup_tokens: Organization user setup tokens
+ * 
+ * DEPENDENCIES:
+ * - Database connection pool (pg)
+ * - Custom error classes (DatabaseError, ConflictError, NotFoundError)
+ * - Logger for operation tracking
+ * - Transaction utility for atomic operations
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import { query, transaction } from "../../db/index.js";
 import { DatabaseError, ConflictError, NotFoundError } from "../../utils/appError.js";
 import logger from "../../utils/logger.js";

@@ -1,3 +1,75 @@
+/**
+ * Error Handling Middleware Module
+ * 
+ * This module provides comprehensive error handling middleware for the Express application.
+ * It centralizes error processing, provides consistent error responses, and handles
+ * different types of errors with appropriate HTTP status codes and logging.
+ * 
+ * ERROR HANDLING FEATURES:
+ * - Centralized error processing
+ * - Custom error class handling
+ * - Environment-specific error responses
+ * - Comprehensive error logging
+ * - Async error handling wrapper
+ * 
+ * MIDDLEWARE FUNCTIONS:
+ * - catchAsync: Wrapper for async route handlers to catch errors
+ * - errorHandler: Main error handling middleware
+ * - notFound: 404 error handler for undefined routes
+ * - globalErrorHandler: Global error processing middleware
+ * 
+ * ERROR CATEGORIES:
+ * - Operational errors: Expected errors (validation, auth, etc.)
+ * - Programming errors: Unexpected errors (bugs, system errors)
+ * - Database errors: Database operation failures
+ * - Validation errors: Input validation failures
+ * - Authentication errors: Auth-related failures
+ * 
+ * ERROR RESPONSE FORMAT:
+ * - Development: Detailed error information with stack traces
+ * - Production: Sanitized error messages without sensitive data
+ * - Consistent response structure
+ * - Proper HTTP status codes
+ * - Error logging for monitoring
+ * 
+ * SECURITY FEATURES:
+ * - Error message sanitization in production
+ * - Stack trace hiding in production
+ * - Sensitive data protection
+ * - Error information filtering
+ * - Security event logging
+ * 
+ * LOGGING FEATURES:
+ * - Error severity classification
+ * - Request context logging
+ * - User information logging
+ * - Error stack trace logging
+ * - Performance impact logging
+ * 
+ * ENVIRONMENT HANDLING:
+ * - Development: Detailed error information
+ * - Production: Minimal error exposure
+ * - Testing: Error simulation support
+ * - Staging: Balanced error information
+ * 
+ * INTEGRATION:
+ * - Works with custom error classes
+ * - Compatible with Express.js
+ * - Supports monitoring tools
+ * - Enables debugging and troubleshooting
+ * 
+ * ERROR FLOW:
+ * - Error occurrence in route handler
+ * - catchAsync wrapper catches error
+ * - Error passed to error handler middleware
+ * - Error classification and processing
+ * - Response generation and logging
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import logger from "../utils/logger.js";
 import {
   AppError,

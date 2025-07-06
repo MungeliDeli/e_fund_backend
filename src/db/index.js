@@ -1,3 +1,90 @@
+/**
+ * Database Connection and Utilities Module
+ * 
+ * This module provides the core database connectivity and utilities for the application.
+ * It manages PostgreSQL connection pooling, query execution, transaction handling,
+ * and database lifecycle management using the 'pg' (node-postgres) library.
+ * 
+ * DATABASE FEATURES:
+ * - Connection pooling for efficient resource management
+ * - Query execution with parameterized statements
+ * - Transaction support with rollback capabilities
+ * - Connection lifecycle management
+ * - Graceful shutdown handling
+ * 
+ * CONNECTION POOL:
+ * - Configurable pool size and settings
+ * - Automatic connection management
+ * - Connection health monitoring
+ * - Pool event handling (connect, error)
+ * - Connection timeout management
+ * 
+ * QUERY EXECUTION:
+ * - Parameterized queries for SQL injection prevention
+ * - Query performance monitoring
+ * - Execution time tracking
+ * - Row count logging
+ * - Error handling and logging
+ * 
+ * TRANSACTION MANAGEMENT:
+ * - Atomic transaction support
+ * - Automatic rollback on errors
+ * - Transaction logging
+ * - Client acquisition and release
+ * - Nested transaction support
+ * 
+ * SECURITY FEATURES:
+ * - Parameterized queries prevent SQL injection
+ * - Connection string security
+ * - Environment-based configuration
+ * - Credential management
+ * - SSL/TLS support
+ * 
+ * MONITORING AND LOGGING:
+ * - Query execution time tracking
+ * - Database connection events
+ * - Error logging with context
+ * - Performance metrics
+ * - Connection pool statistics
+ * 
+ * ERROR HANDLING:
+ * - Connection error handling
+ * - Query execution errors
+ * - Transaction rollback on failure
+ * - Graceful error propagation
+ * - Detailed error logging
+ * 
+ * CONFIGURATION:
+ * - Environment-based database settings
+ * - Configurable connection parameters
+ * - Pool size optimization
+ * - Timeout settings
+ * - SSL configuration
+ * 
+ * LIFECYCLE MANAGEMENT:
+ * - Application startup connection
+ * - Graceful shutdown handling
+ * - Connection cleanup
+ * - Process signal handling
+ * - Resource deallocation
+ * 
+ * EXPORTED FUNCTIONS:
+ * - query: Execute parameterized queries
+ * - getClient: Get database client from pool
+ * - transaction: Execute transactions
+ * - pool: Access to connection pool
+ * 
+ * INTEGRATION:
+ * - Works with repository layer
+ * - Compatible with service layer
+ * - Supports migration system
+ * - Enables testing with separate database
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import pg from "pg";
 import config from "../config/index.js";
 import logger from "../utils/logger.js";

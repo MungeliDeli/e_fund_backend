@@ -1,3 +1,80 @@
+/**
+ * Authentication Validation Module
+ * 
+ * This module provides comprehensive input validation for all authentication-related
+ * operations using Joi validation schemas. It ensures data integrity, security,
+ * and proper formatting of user inputs before processing.
+ * 
+ * VALIDATION SCHEMAS:
+ * - registerSchema: Individual user registration validation
+ * - loginSchema: User login credentials validation
+ * - createOrganizationUserSchema: Organization user creation validation
+ * - passwordSetupSchema: Password setup/activation validation
+ * 
+ * VALIDATION FEATURES:
+ * - Email format validation with TLD checking
+ * - Strong password requirements with regex patterns
+ * - Password confirmation matching
+ * - Name format validation (letters, spaces, hyphens, apostrophes)
+ * - Phone number format validation (10-15 digits)
+ * - Gender selection validation
+ * - Date of birth validation (no future dates)
+ * - Address and location validation
+ * - Organization-specific field validation
+ * 
+ * PASSWORD SECURITY:
+ * - Minimum 8 characters, maximum 128 characters
+ * - At least one uppercase letter
+ * - At least one lowercase letter
+ * - At least one digit
+ * - At least one special character
+ * - Allowed special characters: !@#$%^&*()_+-=[]{};':"|,.<>/?`~
+ * 
+ * INPUT SANITIZATION:
+ * - String trimming and normalization
+ * - Email case normalization (lowercase)
+ * - Optional field handling
+ * - Unknown field stripping
+ * - Data type conversion
+ * 
+ * ERROR HANDLING:
+ * - Detailed error messages for each validation rule
+ * - Multiple error collection (abortEarly: false)
+ * - User-friendly error descriptions
+ * - Field-specific error messages
+ * 
+ * VALIDATION MIDDLEWARE:
+ * - validateRegistration: Registration data validation
+ * - validateLogin: Login data validation
+ * - validateCreateOrganizationUser: Organization user validation
+ * - validatePasswordSetup: Password setup validation
+ * - validateEmail: Email format validation utility
+ * - validatePassword: Password strength validation utility
+ * 
+ * SECURITY CONSIDERATIONS:
+ * - Input sanitization to prevent injection attacks
+ * - Strong password requirements
+ * - Email format validation
+ * - Phone number format validation
+ * - Name format restrictions
+ * 
+ * CUSTOM VALIDATION RULES:
+ * - Password strength regex pattern
+ * - Name format regex pattern
+ * - Phone number regex pattern
+ * - Email TLD validation
+ * - Date range validation
+ * 
+ * DEPENDENCIES:
+ * - Joi: For schema validation
+ * - appError: For custom error handling
+ * - Custom regex patterns for specific validations
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 // src/modules/auth/auth.validation.js
 
 import Joi from "joi";

@@ -1,3 +1,84 @@
+/**
+ * Rate Limiting Middleware Module
+ * 
+ * This module provides rate limiting functionality to protect the application
+ * from abuse, brute force attacks, and excessive resource consumption.
+ * It uses Express Rate Limit to implement different rate limiting strategies
+ * for various endpoints and user scenarios.
+ * 
+ * RATE LIMITING STRATEGIES:
+ * - loginLimiter: Protects login endpoints from brute force attacks
+ * - passwordResetLimiter: Limits password reset requests
+ * - resendVerificationLimiter: Limits verification email resends
+ * - generalLimiter: General API rate limiting
+ * - strictLimiter: Strict rate limiting for sensitive operations
+ * 
+ * PROTECTION FEATURES:
+ * - Brute force attack prevention
+ * - Email spam prevention
+ * - API abuse protection
+ * - Resource consumption control
+ * - DDoS attack mitigation
+ * 
+ * RATE LIMIT CONFIGURATIONS:
+ * - Window size: Time window for rate limiting
+ * - Max requests: Maximum requests per window
+ * - Skip successful requests: Whether to count successful requests
+ * - Skip failed requests: Whether to count failed requests
+ * - Standard headers: Rate limit headers in responses
+ * 
+ * LIMITER TYPES:
+ * - loginLimiter: 5 attempts per 15 minutes for login
+ * - passwordResetLimiter: 3 attempts per hour for password reset
+ * - resendVerificationLimiter: 3 attempts per hour for verification emails
+ * - generalLimiter: 100 requests per 15 minutes for general API
+ * - strictLimiter: 10 requests per 15 minutes for sensitive operations
+ * 
+ * RESPONSE HEADERS:
+ * - X-RateLimit-Limit: Maximum requests allowed
+ * - X-RateLimit-Remaining: Remaining requests in window
+ * - X-RateLimit-Reset: Time when limit resets
+ * - Retry-After: Time to wait before retrying
+ * 
+ * ERROR HANDLING:
+ * - Rate limit exceeded responses
+ * - Proper HTTP status codes (429)
+ * - Clear error messages
+ * - Retry-after information
+ * - Logging of rate limit violations
+ * 
+ * SECURITY FEATURES:
+ * - IP-based rate limiting
+ * - User-based rate limiting (when authenticated)
+ * - Dynamic rate limiting based on user type
+ * - Whitelist support for trusted IPs
+ * - Blacklist support for malicious IPs
+ * 
+ * MONITORING:
+ * - Rate limit violation logging
+ * - IP address tracking
+ * - User agent logging
+ * - Request pattern analysis
+ * - Security event recording
+ * 
+ * CONFIGURATION OPTIONS:
+ * - Environment-based rate limits
+ * - Configurable time windows
+ * - Adjustable request limits
+ * - Custom error messages
+ * - Header customization
+ * 
+ * INTEGRATION:
+ * - Works with Express.js middleware
+ * - Compatible with authentication system
+ * - Supports monitoring and alerting
+ * - Enables security analytics
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import rateLimit from 'express-rate-limit';
 import config from '../config/index.js';
 

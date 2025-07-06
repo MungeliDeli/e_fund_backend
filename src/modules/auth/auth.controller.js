@@ -1,3 +1,62 @@
+/**
+ * Authentication Controller Module
+ * 
+ * This module handles all HTTP requests and responses for authentication operations.
+ * It serves as the presentation layer that receives client requests, validates input,
+ * calls the appropriate service methods, and returns formatted responses.
+ * 
+ * CONTROLLER RESPONSIBILITIES:
+ * - Request validation and sanitization
+ * - Response formatting using ResponseFactory
+ * - Error handling and logging
+ * - HTTP status code management
+ * - Request/response logging for monitoring
+ * 
+ * ENDPOINTS HANDLED:
+ * - POST /register: Individual user registration
+ * - POST /login: User authentication
+ * - GET /profile: Get user profile
+ * - POST /verify-email: Email verification
+ * - POST /change-password: Password change for authenticated users
+ * - POST /forgot-password: Password reset initiation
+ * - POST /reset-password: Password reset completion
+ * - POST /logout: User logout
+ * - POST /refresh-token: Token refresh
+ * - POST /admin/users/create-organization-user: Admin creates org user
+ * - POST /activate-and-set-password: Org user activation
+ * - POST /resend-verification: Resend verification email
+ * - GET /health: Health check endpoint
+ * 
+ * SECURITY FEATURES:
+ * - Input validation through validation middleware
+ * - Rate limiting on sensitive endpoints
+ * - Authentication middleware for protected routes
+ * - Role-based access control
+ * 
+ * RESPONSE FORMATTING:
+ * - Consistent response structure using ResponseFactory
+ * - Proper HTTP status codes
+ * - Error message standardization
+ * - Success message formatting
+ * 
+ * LOGGING:
+ * - API request/response logging
+ * - Performance monitoring
+ * - Error tracking
+ * - Security event logging
+ * 
+ * DEPENDENCIES:
+ * - authService: For business logic operations
+ * - ResponseFactory: For standardized response formatting
+ * - logger: For application logging
+ * - Validation middleware: For input validation
+ * - Authentication middleware: For route protection
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 // src/modules/auth/auth.controller.js
 
 import authService from "./auth.service.js";

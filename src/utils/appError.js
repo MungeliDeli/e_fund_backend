@@ -1,4 +1,81 @@
 /**
+ * Application Error Handling Module
+ * 
+ * This module provides a comprehensive error handling system with custom error classes
+ * that extend the built-in Error class. It standardizes error responses across the
+ * application and provides detailed error information for debugging and logging.
+ * 
+ * CUSTOM ERROR CLASSES:
+ * - AppError: Base error class with common error properties
+ * - ValidationError: For input validation failures
+ * - AuthenticationError: For authentication-related errors
+ * - AuthorizationError: For authorization and permission errors
+ * - NotFoundError: For resource not found errors
+ * - ConflictError: For data conflict errors (duplicates, constraints)
+ * - DatabaseError: For database operation failures
+ * - EmailError: For email sending failures
+ * - JWTError: For JWT token-related errors
+ * - RateLimitError: For rate limiting violations
+ * 
+ * ERROR PROPERTIES:
+ * - message: Human-readable error message
+ * - statusCode: HTTP status code
+ * - status: Status text (fail/error)
+ * - isOperational: Indicates if error is operational or programming
+ * - stack: Error stack trace
+ * - timestamp: Error occurrence timestamp
+ * - path: Request path where error occurred
+ * - method: HTTP method of the request
+ * - userAgent: Client user agent
+ * - ip: Client IP address
+ * 
+ * ERROR CATEGORIES:
+ * - Client Errors (4xx): Validation, Authentication, Authorization, Not Found, Conflict
+ * - Server Errors (5xx): Database, Email, JWT, Rate Limit
+ * - Operational vs Programming: Distinguishes expected vs unexpected errors
+ * 
+ * ERROR HANDLING FEATURES:
+ * - Automatic status code assignment
+ * - Stack trace capture
+ * - Timestamp recording
+ * - Request context capture
+ * - Operational error flagging
+ * - Error inheritance chain
+ * 
+ * HTTP STATUS CODES:
+ * - 400: Bad Request (ValidationError)
+ * - 401: Unauthorized (AuthenticationError)
+ * - 403: Forbidden (AuthorizationError)
+ * - 404: Not Found (NotFoundError)
+ * - 409: Conflict (ConflictError)
+ * - 429: Too Many Requests (RateLimitError)
+ * - 500: Internal Server Error (DatabaseError, EmailError, JWTError)
+ * 
+ * USAGE PATTERNS:
+ * - throw new ValidationError("Invalid email format");
+ * - throw new AuthenticationError("Invalid credentials");
+ * - throw new NotFoundError("User");
+ * - throw new ConflictError("Email already exists");
+ * 
+ * ERROR CONTEXT:
+ * - Request information capture
+ * - User agent logging
+ * - IP address tracking
+ * - Request method and path
+ * - Timestamp for debugging
+ * 
+ * INTEGRATION:
+ * - Works with Express error handling middleware
+ * - Compatible with logging systems
+ * - Supports error monitoring tools
+ * - Enables structured error responses
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
+/**
  * Custom Application Error Class
  * Extends the native Error class to provide consistent error handling
  * across the entire application

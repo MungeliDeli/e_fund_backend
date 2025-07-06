@@ -1,3 +1,50 @@
+/**
+ * Authentication Service Module
+ * 
+ * This module contains the core business logic for all authentication and user management operations.
+ * It serves as the service layer between the controller and repository layers, handling:
+ * 
+ * USER REGISTRATION & VERIFICATION:
+ * - Individual user registration with email verification
+ * - Organization user creation by admin with invitation system
+ * - Email verification process with token-based activation
+ * - Account activation for organization users
+ * 
+ * AUTHENTICATION & SESSION MANAGEMENT:
+ * - User login with credential validation
+ * - JWT token generation and refresh token management
+ * - Password change functionality for authenticated users
+ * - Logout with token invalidation
+ * 
+ * PASSWORD MANAGEMENT:
+ * - Forgot password functionality with email reset
+ * - Password reset using secure tokens
+ * - Password setup for organization users during activation
+ * 
+ * SECURITY FEATURES:
+ * - Password hashing and verification
+ * - Token-based email verification
+ * - Secure password reset flow
+ * - Account status management (active/inactive)
+ * 
+ * EMAIL NOTIFICATIONS:
+ * - Verification email sending
+ * - Password reset email notifications
+ * - Organization setup invitation emails
+ * 
+ * DEPENDENCIES:
+ * - authRepository: For database operations
+ * - password.utils: For password hashing and comparison
+ * - jwt.utils: For JWT token operations
+ * - email.utils: For email sending functionality
+ * - appError: For custom error handling
+ * - logger: For application logging
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 // src/modules/auth/auth.service.js
 
 import authRepository from "./auth.repository.js";

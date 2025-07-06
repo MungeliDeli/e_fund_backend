@@ -1,3 +1,69 @@
+/**
+ * Authentication Middleware Module
+ * 
+ * This module provides middleware functions for authentication and authorization
+ * throughout the application. It handles JWT token verification, user authentication,
+ * role-based access control, and resource ownership validation.
+ * 
+ * MIDDLEWARE FUNCTIONS:
+ * - authenticate: Verifies JWT tokens and attaches user data to requests
+ * - requireEmailVerification: Ensures user has verified their email
+ * - restrictTo: Role-based access control for specific user types
+ * - requireIndividualUser: Restricts access to individual users only
+ * - requireOrganizationUser: Restricts access to organization users only
+ * - requireAdmin: Restricts access to admin users (super, support, moderator, financial)
+ * - requireSuperAdmin: Restricts access to super admin only
+ * - requireSupportAdmin: Restricts access to support admin only
+ * - optionalAuth: Optional authentication that doesn't fail if token is missing
+ * - requireOwnership: Ensures users can only access their own resources
+ * 
+ * AUTHENTICATION FLOW:
+ * - Token extraction from Authorization header
+ * - JWT token verification and decoding
+ * - User existence and status validation
+ * - User data attachment to request object
+ * - Security event logging
+ * 
+ * AUTHORIZATION FEATURES:
+ * - Role-based access control (RBAC)
+ * - Resource ownership validation
+ * - Email verification requirements
+ * - Account status checks
+ * - Privilege level enforcement
+ * 
+ * SECURITY FEATURES:
+ * - JWT token validation
+ * - User account status verification
+ * - IP address and user agent logging
+ * - Authentication failure handling
+ * - Token expiration checking
+ * 
+ * USER TYPES SUPPORTED:
+ * - individual_user: Regular individual users
+ * - organization_user: Organization representatives
+ * - super_admin: System super administrators
+ * - support_admin: Support team members
+ * - event_moderator: Event management staff
+ * - financial_admin: Financial management staff
+ * 
+ * ERROR HANDLING:
+ * - AuthenticationError: For invalid/missing tokens
+ * - AuthorizationError: For insufficient privileges
+ * - Graceful error propagation
+ * - Detailed error logging
+ * 
+ * DEPENDENCIES:
+ * - jwt.utils: For token verification
+ * - appError: For custom error classes
+ * - authRepository: For user data retrieval
+ * - errorHandler: For async error handling
+ * - logger: For security event logging
+ * 
+ * @author Your Name
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import { verifyToken } from "../utils/jwt.utils.js";
 import { AuthenticationError, AuthorizationError } from "../utils/appError.js";
 import authRepository from "../modules/auth/auth.repository.js";
