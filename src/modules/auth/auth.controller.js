@@ -135,6 +135,7 @@ export const login = async (req, res, next) => {
           createdAt: result.user.createdAt
         },
         token: result.token,
+
         refreshToken: result.refreshToken
       }
     );
@@ -143,6 +144,7 @@ export const login = async (req, res, next) => {
     next(error);
   }
 };
+lo
 
 /**
  * Gets the current user's profile
