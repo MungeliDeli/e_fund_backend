@@ -568,7 +568,7 @@ class AuthService {
    * @returns {Promise<Object>} Success message (do not reveal if email exists)
    */
   async forgotPassword(email) {
-    const user = await authRepository.findByEmail(email);
+    const user = await authRepository.findByEmail(email.toLowerCase().trim());
     if (user && user.isActive) {
       // Delete any existing password reset tokens for this user
       await authRepository.deletePasswordResetTokenByUserId(user.userId);

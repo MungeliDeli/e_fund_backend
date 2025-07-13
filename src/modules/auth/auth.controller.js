@@ -144,7 +144,6 @@ export const login = async (req, res, next) => {
     next(error);
   }
 };
-lo
 
 /**
  * Gets the current user's profile
