@@ -82,13 +82,18 @@
 import rateLimit from 'express-rate-limit';
 import config from '../config/index.js';
 
-// Login: 5 attempts per 10 minutes per IP
+// Login: 5 attempts per 10 minutes per (email + IP), only failed attempts counted
 export const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 5,
+  keyGenerator: (req) => {
+    const email = req.body?.email?.toLowerCase() || '';
+    return `${email}|${req.ip}`;
+  },
+  skipSuccessfulRequests: true, // Only count failed login attempts
   message: {
     success: false,
-    message: "Too many login attempts. Please try again later.",
+    message: "Too many failed login attempts. Please try again later.",
     errorCode: "LOGIN_RATE_LIMITED",
   },
   standardHeaders: true,
