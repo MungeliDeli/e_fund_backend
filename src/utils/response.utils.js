@@ -109,7 +109,8 @@ const sendSuccessResponse = (
 const STATUS_CODES = {
   OK: 200,
   CREATED: 201,
-  NO_CONTENT: 204, // Typically used with no data/message in response body
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
 };
 
 /**
@@ -123,7 +124,8 @@ const ResponseFactory = {
     sendSuccessResponse(res, STATUS_CODES.CREATED, message, data, meta),
   noContent: (res, message) =>
     sendSuccessResponse(res, STATUS_CODES.NO_CONTENT, message), // 204 typically has no body
-
+  badRequest: (res, message) =>
+    sendSuccessResponse(res, STATUS_CODES.BAD_REQUEST, message),
   // User-specific
   userRegistered: (res, userId) =>
     sendSuccessResponse(

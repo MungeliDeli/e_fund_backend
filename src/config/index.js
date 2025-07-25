@@ -98,7 +98,7 @@ const config = {
     port: process.env.DB_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.NODE_ENV === "development"? process.env.DB_NAME : process.env.DB_NAME_TEST,
+    database: process.env.DB_NAME,
   
   },
   cors:{

@@ -17,6 +17,7 @@ import { apiLimiter } from "./middlewares/rateLimiters.js";
 
 // Import routes
 import authRoutes from "./modules/auth/auth.routes.js";
+import userRoutes from "./modules/users/user.routes.js";
 
 /**
  * Express Application Setup
@@ -80,6 +81,7 @@ app.get("/health", (req, res) => {
 
 // API routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);

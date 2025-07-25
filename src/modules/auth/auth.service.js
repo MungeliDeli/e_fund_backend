@@ -1,48 +1,20 @@
 /**
- * Authentication Service Module
- * 
- * This module contains the core business logic for all authentication and user management operations.
- * It serves as the service layer between the controller and repository layers, handling:
- * 
- * USER REGISTRATION & VERIFICATION:
- * - Individual user registration with email verification
- * - Organization user creation by admin with invitation system
- * - Email verification process with token-based activation
- * - Account activation for organization users
- * 
- * AUTHENTICATION & SESSION MANAGEMENT:
- * - User login with credential validation
- * - JWT token generation and refresh token management
- * - Password change functionality for authenticated users
- * - Logout with token invalidation
- * 
- * PASSWORD MANAGEMENT:
- * - Forgot password functionality with email reset
- * - Password reset using secure tokens
- * - Password setup for organization users during activation
- * 
- * SECURITY FEATURES:
- * - Password hashing and verification
- * - Token-based email verification
- * - Secure password reset flow
- * - Account status management (active/inactive)
- * 
- * EMAIL NOTIFICATIONS:
- * - Verification email sending
- * - Password reset email notifications
- * - Organization setup invitation emails
- * 
- * DEPENDENCIES:
- * - authRepository: For database operations
- * - password.utils: For password hashing and comparison
- * - jwt.utils: For JWT token operations
- * - email.utils: For email sending functionality
- * - appError: For custom error handling
- * - logger: For application logging
- * 
- * @author Your Name
+ * Auth Service
+ *
+ * Contains core authentication logic for registration, login, email verification,
+ * password reset, token management, and user media (profile/cover image) handling.
+ * Implements business logic for both individual and organization users.
+ *
+ * Key Features:
+ * - User and organization registration
+ * - Login and JWT/refresh token management
+ * - Email verification and password reset flows
+ * - S3 media upload and media record management
+ * - Secure password hashing and validation
+ * - Error handling and transaction management
+ *
+ * @author FundFlow Team
  * @version 1.0.0
- * @since 2024
  */
 
 // src/modules/auth/auth.service.js
@@ -54,14 +26,16 @@ import {
   AuthenticationError, 
   ConflictError, 
   ValidationError,
-  NotFoundError 
+  NotFoundError,
+  DatabaseError
 } from "../../utils/appError.js";
 import logger from "../../utils/logger.js";
 import crypto from "crypto";
 import { createHash } from "crypto";
 import { sendVerificationEmail, sendPasswordResetEmail, sendSetupEmail } from "../../utils/email.utils.js";
-
-
+import { uploadFileToS3 } from '../../utils/s3.utils.js';
+import { v4 as uuidv4 } from 'uuid';
+import { transaction } from '../../db/index.js';
 
 
 /**
@@ -194,7 +168,6 @@ class AuthService {
       }
       await authRepository.updateEmailVerification(user.userId, true);
       await authRepository.updateUserStatus(user.userId, true);
-      // Delete all email verification tokens for this user (cleanup)
       await authRepository.deleteEmailVerificationTokenByUserId(user.userId);
   
       const token = signToken({
@@ -229,25 +202,50 @@ class AuthService {
 
   // ORGANIZATION USER CREATION
 
+  // Helper to handle S3 upload and media record construction
+  async _processMediaFile(mediaFile, description, createdById) {
+    if (!mediaFile) return { mediaId: null, mediaRecord: null };
+    try {
+      const s3Key = await uploadFileToS3({
+        fileBuffer: mediaFile.buffer,
+        fileName: mediaFile.originalname,
+        mimeType: mediaFile.mimetype,
+        folder: 'organization-profiles',
+      });
+      const mediaId = uuidv4();
+      return {
+        mediaId,
+        mediaRecord: {
+          mediaId,
+          entityType: 'organizationProfile',
+          mediaType: 'image',
+          fileName: s3Key,
+          fileSize: mediaFile.size,
+          description,
+          altText: '',
+          uploadedByUserId: createdById,
+        }
+      };
+    } catch (err) {
+      throw new ValidationError(`Failed to upload ${description} to S3: ` + err.message);
+    }
+  }
 
-   /**
+  /**
    * Admin creates an organization user and sends invite
    * @param {Object} userData
    * @param {Object} profileData
    * @returns {Promise<Object>} Created user, profile, and raw setup token
    */
-   async createOrganizationUserAndInvite(registrationData , createdByAdminId) {
+   async createOrganizationUserAndInvite(registrationData, createdByAdminId) {
  
 
     const { 
-      email,
       organizationName,
       organizationShortName,
       organizationType,
       officialEmail,
       officialWebsiteUrl,
-      profilePicture,
-      coverPicture,
       address,
       missionDescription,
       establishmentDate,
@@ -257,85 +255,115 @@ class AuthService {
       primaryContactPersonName,
       primaryContactPersonEmail,
       primaryContactPersonPhone,
+      profilePictureFile,
+      coverPictureFile,
     } = registrationData;
 
-
-
-    const emailExists = await authRepository.emailExists(email);
+    const emailExists = await authRepository.emailExists(officialEmail);
     if(emailExists){
       throw new ConflictError("Email address is alread registered")
     }
 
-    if(officialEmail){
-      const officialEmailExists = await authRepository.OfficialEmailExists(officialEmail);
-      if(officialEmailExists){
-        throw new ConflictError("Organizations officail Email already Exists")
+    // Use helper to process both media files
+    const { mediaId: profilePictureMediaId, mediaRecord: profilePictureMediaRecord } = await this._processMediaFile(profilePictureFile, 'Organization profile picture', createdByAdminId);
+    const { mediaId: coverPictureMediaId, mediaRecord: coverPictureMediaRecord } = await this._processMediaFile(coverPictureFile, 'Organization cover picture', createdByAdminId);
+
+    let orgResult;
+    await transaction(async (client) => {
+      // 1. Insert media records first (with entityId: null)
+      if (profilePictureMediaRecord) {
+        await authRepository.createMediaRecord({ ...profilePictureMediaRecord, entityId: null }, client);
       }
-    }
-    
+      if (coverPictureMediaRecord) {
+        await authRepository.createMediaRecord({ ...coverPictureMediaRecord, entityId: null }, client);
+      }
 
-    
+      // 2. Create org user and profile, referencing the media IDs
+      orgResult = await authRepository.createOrganizationUserAndProfile({
+        email: officialEmail.toLowerCase().trim(),
+        passwordHash: 'placeholder',
+        userType: 'organization_user',
+        isEmailVerified: false,
+        isActive: false
+      }, {
+        organizationName: organizationName.trim(),
+        organizationShortName: organizationShortName ? organizationShortName.trim() : null,
+        organizationType: organizationType.trim(),
+        officialEmail: officialEmail ? officialEmail.toLowerCase().trim() : null,
+        officialWebsiteUrl: officialWebsiteUrl ? officialWebsiteUrl.trim() : null,
+        profilePictureMediaId: profilePictureMediaId || null,
+        coverPictureMediaId: coverPictureMediaId || null,
+        address: address ? address.trim() : null,
+        missionDescription: missionDescription ? missionDescription.trim() : null,
+        establishmentDate: establishmentDate ? establishmentDate : null,
+        campusAffiliationScope: campusAffiliationScope ? campusAffiliationScope.trim() : null,
+        affiliatedSchoolsNames: affiliatedSchoolsNames ? affiliatedSchoolsNames.trim() : null,
+        affiliatedDepartmentNames: affiliatedDepartmentNames ? affiliatedDepartmentNames.trim() : null,
+        primaryContactPersonName: primaryContactPersonName ? primaryContactPersonName.trim() : null,
+        primaryContactPersonEmail: primaryContactPersonEmail ? primaryContactPersonEmail.trim() : null,
+        primaryContactPersonPhone: primaryContactPersonPhone ? primaryContactPersonPhone.trim() : null,
+        createdByAdminId: createdByAdminId
+      }, client);
 
-    // prepareing user data
-    const userData = {
-      email: email.toLowerCase().trim(),
-      passwordHash: 'placeholder', 
-      userType: 'organization_user',
-      isEmailVerified: false,
-      isActive: false
-    };
+      // 3. Update media records with the new entityId (userId)
+      if (profilePictureMediaRecord) {
+        await authRepository.updateMediaEntityId(profilePictureMediaId, orgResult.user.userId, client);
+      }
+      if (coverPictureMediaRecord) {
+        await authRepository.updateMediaEntityId(coverPictureMediaId, orgResult.user.userId, client);
+      }
+    });
 
-    // preparing profile data
-
-    const profileData = {
-      organizationName : organizationName.trim(),
-      organizationShortName: organizationShortName? organizationShortName.trim() : null,
-      organizationType: organizationType.trim(),
-      officialEmail: officialEmail? officialEmail.toLowerCase().trim() : null,
-      officialWebsiteUrl: officialWebsiteUrl? officialWebsiteUrl.trim() : null,
-      profilePicture: profilePicture? profilePicture.trim() : null,
-      coverPicture: coverPicture? coverPicture.trim() : null,
-      address: address? address.trim() : null,
-      missionDescription: missionDescription? missionDescription.trim() : null,
-      establishmentDate: establishmentDate? establishmentDate.trim() : null,
-      campusAffiliationScope: campusAffiliationScope? campusAffiliationScope.trim() : null,
-      affiliatedSchoolsNames: affiliatedSchoolsNames? affiliatedSchoolsNames.trim() : null,
-      affiliatedDepartmentNames: affiliatedDepartmentNames? affiliatedDepartmentNames.trim() : null,
-      primaryContactPersonName: primaryContactPersonName? primaryContactPersonName.trim() : null,
-      primaryContactPersonEmail: primaryContactPersonEmail? primaryContactPersonEmail.trim() : null,
-      primaryContactPersonPhone: primaryContactPersonPhone? primaryContactPersonPhone.trim() : null,
-      createdByAdminId: createdByAdminId
-    }
-    
-    const result = await authRepository.createOrganizationUserAndProfile(userData, profileData);
-    
+    // 4. Generate setup token and send email (after transaction is committed)
     const setupToken = crypto.randomBytes(48).toString('hex');
     const setupTokenHash = createHash('sha256').update(setupToken).digest('hex');
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
-    await authRepository.createPasswordSetupToken(result.user.userId, setupTokenHash, expiresAt);
-      
-    sendSetupEmail(userData.email, setupToken)
+    await authRepository.createPasswordSetupToken(orgResult.user.userId, setupTokenHash, expiresAt);
+    sendSetupEmail(orgResult.user.email, setupToken)
       .then(() => {
-        logger.info(`Setup email sent successfully to ${userData.email} in background.`);
+        logger.info(`Setup email sent successfully to ${orgResult.user.email} in background.`);
       })
       .catch(emailError => {
-        logger.error(`Failed to send setup email to ${userData.email} in background: ${emailError.message}`, {
-          userId: result.user.userId,
-
-        })
+        logger.error(`Failed to send setup email to ${orgResult.user.email} in background: ${emailError.message}`, {
+          userId: orgResult.user.userId,
+        });
       });
 
     logger.info(`Organization user created successfully (pending verification )`, {
-      userId: result.user.userId,
-      email: result.user.email,
-      organizationName: result.profile.organizationName,
-      
+      userId: orgResult.user.userId,
+      email: orgResult.user.email,
+      organizationName: orgResult.profile.organizationName,
     });
     return {
-      user: result.user,
-      profile: result.profile,
+      user: orgResult.user,
+      profile: orgResult.profile,
       setupToken // REMOVE in production
     };
+  }
+
+
+  async createMediaRecord(mediaRecord  , entityId){
+    try{
+      const {mediaId, entityType, mediaType, fileName, fileSize, description, altText, uploadedByUserId} = mediaRecord;
+      const mediaRecord = await authRepository.createMediaRecord({
+        mediaId,
+        entityType,
+        entityId,
+        mediaType,
+        fileName,
+        fileSize,
+        description,
+        altText,
+        uploadedByUserId
+      });
+      return mediaRecord;
+    } catch (error) {
+      logger.error("Failed to create media record", {
+        error: error.message,
+        mediaRecord
+      });
+      throw error;
+    }
   }
 
   /**
@@ -353,20 +381,7 @@ class AuthService {
     const newPasswordHash = await hashPassword(newPassword);
     await authRepository.updateUserPasswordAndActivate(user.userId, newPasswordHash);
     await authRepository.deletePasswordSetupToken(setupTokenHash);
-    // Issue JWT and refresh token for auto-login
-    const jwt = signToken({
-      userId: user.userId,
-      email: user.email,
-      userType: user.userType
-    });
-    const refreshToken = crypto.randomBytes(64).toString('hex');
-    const refreshTokenHash = createHash('sha256').update(refreshToken).digest('hex');
-    const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
-    return {
-      token: jwt,
-      refreshToken
-    };
+    return {message: "Password set successfully"}
   }
 
   /**
@@ -443,47 +458,6 @@ class AuthService {
   }
 
   /**
-   * Gets user profile by ID
-   * @param {string} userId - User's ID
-   * @returns {Promise<Object>} User with profile
-   */
-  async getUserProfile(userId) {
-    try {
-      const result = await authRepository.findByIdWithProfile(userId);
-      
-      if (!result) {
-        throw new NotFoundError("User");
-      }
-
-      return {
-        user: {
-          userId: result.user.userId,
-          email: result.user.email,
-          userType: result.user.userType,
-          isEmailVerified: result.user.isEmailVerified,
-          isActive: result.user.isActive,
-          createdAt: result.user.createdAt,
-          updatedAt: result.user.updatedAt
-        },
-        profile: result.profile
-      };
-    } catch (error) {
-      logger.error("Failed to get user profile", {
-        error: error.message,
-        userId
-      });
-
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-
-      throw error;
-    }
-  }
-
-  
-
-  /**
    * Changes user's password
    * @param {string} userId - User's ID
    * @param {string} currentPassword - Current password
@@ -533,6 +507,9 @@ class AuthService {
   async refreshToken(refreshToken) {
     try {
       const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      console.log("token recieved",refreshToken);
+      console.log("token recieved hash",refreshTokenHash);
+      
       const user = await authRepository.findRefreshToken(refreshTokenHash);
       if (!user) {
         throw new AuthenticationError("Invalid or expired refresh token");
@@ -548,6 +525,8 @@ class AuthService {
       const newRefreshTokenHash = createHash("sha256").update(newRefreshToken).digest("hex");
       const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); 
       await authRepository.createRefreshToken(user.userId, newRefreshTokenHash, refreshExpiresAt);
+       console.log("token recieved",newRefreshToken);
+      console.log("token recieved hash",newRefreshTokenHash);
       await authRepository.deleteRefreshToken(refreshTokenHash);
       logger.security.tokenGenerated(user.userId, "refresh");
       return { token, refreshToken: newRefreshToken };

@@ -107,3 +107,22 @@ export const verifyToken = (token) => {
     throw error;
   }
 };
+
+/**
+ * Verifies a JWT token for refresh purposes, ignoring expiration.
+ * @param {string} token - The JWT token to verify.
+ * @returns {object} The decoded payload if verification is successful.
+ * @throws {AuthenticationError} If the token is invalid (but not if expired).
+ */
+export const verifyTokenForRefresh = (token) => {
+  try {
+    return jwt.verify(token, config.jwt.secret, { ignoreExpiration: true });
+  } catch (error) {
+    // We expect expired tokens, but reject others (e.g., invalid signature)
+    if (error.name === 'JsonWebTokenError') {
+      throw new AuthenticationError('Invalid token provided for refresh');
+    }
+    // Re-throw other unexpected errors
+    throw error;
+  }
+};

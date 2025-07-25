@@ -1,60 +1,20 @@
 /**
- * Authentication Controller Module
- * 
- * This module handles all HTTP requests and responses for authentication operations.
- * It serves as the presentation layer that receives client requests, validates input,
- * calls the appropriate service methods, and returns formatted responses.
- * 
- * CONTROLLER RESPONSIBILITIES:
- * - Request validation and sanitization
- * - Response formatting using ResponseFactory
- * - Error handling and logging
- * - HTTP status code management
- * - Request/response logging for monitoring
- * 
- * ENDPOINTS HANDLED:
- * - POST /register: Individual user registration
- * - POST /login: User authentication
- * - GET /profile: Get user profile
- * - POST /verify-email: Email verification
- * - POST /change-password: Password change for authenticated users
- * - POST /forgot-password: Password reset initiation
- * - POST /reset-password: Password reset completion
- * - POST /logout: User logout
- * - POST /refresh-token: Token refresh
- * - POST /admin/users/create-organization-user: Admin creates org user
- * - POST /activate-and-set-password: Org user activation
- * - POST /resend-verification: Resend verification email
- * - GET /health: Health check endpoint
- * 
- * SECURITY FEATURES:
- * - Input validation through validation middleware
- * - Rate limiting on sensitive endpoints
- * - Authentication middleware for protected routes
- * - Role-based access control
- * 
- * RESPONSE FORMATTING:
- * - Consistent response structure using ResponseFactory
- * - Proper HTTP status codes
- * - Error message standardization
- * - Success message formatting
- * 
- * LOGGING:
- * - API request/response logging
- * - Performance monitoring
- * - Error tracking
- * - Security event logging
- * 
- * DEPENDENCIES:
- * - authService: For business logic operations
- * - ResponseFactory: For standardized response formatting
- * - logger: For application logging
- * - Validation middleware: For input validation
- * - Authentication middleware: For route protection
- * 
- * @author Your Name
+ * Auth Controller
+ *
+ * Handles HTTP requests for authentication, registration, email verification,
+ * password reset, token management, and user media endpoints. Delegates business
+ * logic to the Auth Service and formats API responses.
+ *
+ * Key Features:
+ * - User and organization registration endpoints
+ * - Login, logout, and token refresh endpoints
+ * - Email verification and password reset flows
+ * - Profile/cover image upload and retrieval endpoints
+ * - Consistent API response formatting
+ * - Error handling and validation
+ *
+ * @author FundFlow Team
  * @version 1.0.0
- * @since 2024
  */
 
 // src/modules/auth/auth.controller.js
@@ -62,6 +22,9 @@
 import authService from "./auth.service.js";
 import { ResponseFactory } from "../../utils/response.utils.js";
 import logger from "../../utils/logger.js";
+import { uploadFileToS3 } from '../../utils/s3.utils.js';
+import { v4 as uuidv4 } from 'uuid';
+import authRepository from './auth.repository.js';
 
 /**
  * Authentication Controller
@@ -139,35 +102,6 @@ export const login = async (req, res, next) => {
         refreshToken: result.refreshToken
       }
     );
-    logger.api.response(req.method, req.originalUrl, 200, Date.now() - req.startTime);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Gets the current user's profile
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
- */
-export const getProfile = async (req, res, next) => {
-  try {
-    const userId = req.user.userId;
-
-    // Get user profile
-    const result = await authService.getUserProfile(userId);
-
-    // Send success response
-    ResponseFactory.ok(
-      res,
-      "Profile retrieved successfully",
-      {
-        user: result.user,
-        profile: result.profile
-      }
-    );
-
     logger.api.response(req.method, req.originalUrl, 200, Date.now() - req.startTime);
   } catch (error) {
     next(error);
@@ -260,6 +194,7 @@ export const forgotPassword = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
   try {
     const { resetToken, newPassword } = req.body;
+    logger.info(resetToken, newPassword)
     const result = await authService.resetPassword(resetToken, newPassword);
     ResponseFactory.ok(res, "Password reset successfully", result);
   } catch (error) {
@@ -305,7 +240,29 @@ export const createOrganizationUser = async (req, res, next) => {
   try {
     const registrationData = req.body;
     const createdByAdminId = req.user.userId;
-    const result = await authService.createOrganizationUserAndInvite(registrationData, createdByAdminId);
+    const files = req.files || {};
+
+    // Prepare file metadata to pass to service (no mediaId generation here)
+    const profilePictureFile = files.profilePicture && files.profilePicture[0] ? {
+      buffer: files.profilePicture[0].buffer,
+      originalname: files.profilePicture[0].originalname,
+      mimetype: files.profilePicture[0].mimetype,
+      size: files.profilePicture[0].size
+    } : null;
+    const coverPictureFile = files.coverPicture && files.coverPicture[0] ? {
+      buffer: files.coverPicture[0].buffer,
+      originalname: files.coverPicture[0].originalname,
+      mimetype: files.coverPicture[0].mimetype,
+      size: files.coverPicture[0].size
+    } : null;
+
+    // Pass file metadata to service
+    const result = await authService.createOrganizationUserAndInvite({
+      ...registrationData,
+      profilePictureFile,
+      coverPictureFile,
+    }, createdByAdminId);
+
     ResponseFactory.created(
       res,
       "Organization user created and invitation sent.",
@@ -326,6 +283,7 @@ export const createOrganizationUser = async (req, res, next) => {
 export const activateAndSetPassword = async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
+    logger.info(token, newPassword)
     const result = await authService.activateAndSetPassword(token, newPassword);
     ResponseFactory.ok(res, "Account activated and password set successfully", result);
   } catch (error) {

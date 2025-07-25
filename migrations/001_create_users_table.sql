@@ -16,7 +16,8 @@ CREATE TABLE users(
     is_email_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMPTZ NULL -- Added for tracking last login
 );  
 
 -- Trigger function for updated_at 

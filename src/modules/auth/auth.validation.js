@@ -1,78 +1,18 @@
 /**
- * Authentication Validation Module
- * 
- * This module provides comprehensive input validation for all authentication-related
- * operations using Joi validation schemas. It ensures data integrity, security,
- * and proper formatting of user inputs before processing.
- * 
- * VALIDATION SCHEMAS:
- * - registerSchema: Individual user registration validation
- * - loginSchema: User login credentials validation
- * - createOrganizationUserSchema: Organization user creation validation
- * - passwordSetupSchema: Password setup/activation validation
- * 
- * VALIDATION FEATURES:
- * - Email format validation with TLD checking
- * - Strong password requirements with regex patterns
- * - Password confirmation matching
- * - Name format validation (letters, spaces, hyphens, apostrophes)
- * - Phone number format validation (10-15 digits)
- * - Gender selection validation
- * - Date of birth validation (no future dates)
- * - Address and location validation
- * - Organization-specific field validation
- * 
- * PASSWORD SECURITY:
- * - Minimum 8 characters, maximum 128 characters
- * - At least one uppercase letter
- * - At least one lowercase letter
- * - At least one digit
- * - At least one special character
- * - Allowed special characters: !@#$%^&*()_+-=[]{};':"|,.<>/?`~
- * 
- * INPUT SANITIZATION:
- * - String trimming and normalization
- * - Email case normalization (lowercase)
- * - Optional field handling
- * - Unknown field stripping
- * - Data type conversion
- * 
- * ERROR HANDLING:
- * - Detailed error messages for each validation rule
- * - Multiple error collection (abortEarly: false)
- * - User-friendly error descriptions
- * - Field-specific error messages
- * 
- * VALIDATION MIDDLEWARE:
- * - validateRegistration: Registration data validation
- * - validateLogin: Login data validation
- * - validateCreateOrganizationUser: Organization user validation
- * - validatePasswordSetup: Password setup validation
- * - validateEmail: Email format validation utility
- * - validatePassword: Password strength validation utility
- * 
- * SECURITY CONSIDERATIONS:
- * - Input sanitization to prevent injection attacks
- * - Strong password requirements
- * - Email format validation
- * - Phone number format validation
- * - Name format restrictions
- * 
- * CUSTOM VALIDATION RULES:
- * - Password strength regex pattern
- * - Name format regex pattern
- * - Phone number regex pattern
- * - Email TLD validation
- * - Date range validation
- * 
- * DEPENDENCIES:
- * - Joi: For schema validation
- * - appError: For custom error handling
- * - Custom regex patterns for specific validations
- * 
- * @author Your Name
+ * Auth Validation Schemas
+ *
+ * Defines Joi schemas and validation logic for all authentication and user management
+ * endpoints. Ensures input data is validated and sanitized before reaching controllers.
+ *
+ * Key Features:
+ * - Registration, login, and password validation
+ * - Email and token validation
+ * - Organization user and admin validation
+ * - Centralized schema management for all auth routes
+ * - Custom error messages and field requirements
+ *
+ * @author FundFlow Team
  * @version 1.0.0
- * @since 2024
  */
 
 // src/modules/auth/auth.validation.js
@@ -207,8 +147,8 @@ const createOrganizationUserSchema = Joi.object({
   organizationType: Joi.string().max(50).required(),
   officialEmail: Joi.string().email({ tlds: { allow: false } }).optional(),
   officialWebsiteUrl: Joi.string().uri().optional(),
-  profilePicture: Joi.string().optional(),
-  coverPicture: Joi.string().optional(),
+  profilePictureMediaId: Joi.string().optional(),
+  coverPictureMediaId: Joi.string().optional(),
   address: Joi.string().max(255).optional(),
   missionDescription: Joi.string().optional(),
   establishmentDate: Joi.date().optional(),
@@ -221,12 +161,11 @@ const createOrganizationUserSchema = Joi.object({
 });
 
 // Password setup (activation) schema
-const passwordSetupSchema = Joi.object({
+const passwordSchema = Joi.object({
   token: Joi.string().required(),
   newPassword: Joi.string()
     .pattern(strongPasswordRegex)
     .required(),
-  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required()
 });
 
 /**
@@ -292,26 +231,7 @@ export const validateEmail = (email) => {
   return !error;
 };
 
-/**
- * Validates password strength
- * @param {string} password - Password to validate
- * @returns {Object} - Validation result with isValid and errors
- */
-export const validatePassword = (password) => {
-  const passwordSchema = Joi.string()
-    .min(8)
-    .max(128)
-    .pattern(strongPasswordRegex);
 
-  const { error } = passwordSchema.validate(password);
-  
-  if (error) {
-    const errors = error.details.map((detail) => detail.message);
-    return { isValid: false, errors };
-  }
-
-  return { isValid: true, errors: [] };
-};
 
 export const validateCreateOrganizationUser = (req, res, next) => {
   const { error, value } = createOrganizationUserSchema.validate(req.body, {
@@ -326,7 +246,7 @@ export const validateCreateOrganizationUser = (req, res, next) => {
   next();
 };
 
-export const validatePasswordSetup = (req, res, next) => {
+export const validatePassword = (req, res, next) => {
   const { error, value } = passwordSetupSchema.validate(req.body, {
     abortEarly: false,
     stripUnknown: true,

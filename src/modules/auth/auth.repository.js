@@ -1,65 +1,18 @@
 /**
- * Authentication Repository Module
- * 
- * This module handles all database operations related to authentication and user management.
- * It serves as the data access layer that abstracts database interactions and provides
- * a clean interface for the service layer to interact with the database.
- * 
- * DATABASE OPERATIONS:
- * - User CRUD operations (Create, Read, Update)
- * - Profile management for individual and organization users
- * - Token management (verification, reset, refresh, setup tokens)
- * - Email and phone number existence checks
- * - Password updates and account status changes
- * 
- * TRANSACTION MANAGEMENT:
- * - Atomic operations for user and profile creation
- * - Rollback capabilities for failed operations
- * - Data consistency maintenance
- * 
- * TOKEN MANAGEMENT:
- * - Email verification tokens (24-hour expiry)
- * - Password reset tokens (20-minute expiry)
- * - Refresh tokens (30-day expiry)
- * - Password setup tokens (48-hour expiry)
- * - Token cleanup and invalidation
- * 
- * SECURITY FEATURES:
- * - Token hashing using SHA-256
- * - Secure token storage and retrieval
- * - Token expiration validation
- * - User status verification
- * 
- * DATA VALIDATION:
- * - User existence checks
- * - Email uniqueness validation
- * - Phone number uniqueness validation
- * - Official email uniqueness for organizations
- * 
- * ERROR HANDLING:
- * - Database constraint violation handling
- * - Custom error types for different scenarios
- * - Comprehensive error logging
- * - Graceful error propagation
- * 
- * TABLES INTERACTED:
- * - users: Core user information
- * - individual_profiles: Individual user profile data
- * - organization_profiles: Organization user profile data
- * - email_verification_tokens: Email verification tokens
- * - password_reset_tokens: Password reset tokens
- * - refresh_tokens: JWT refresh tokens
- * - password_setup_tokens: Organization user setup tokens
- * 
- * DEPENDENCIES:
- * - Database connection pool (pg)
- * - Custom error classes (DatabaseError, ConflictError, NotFoundError)
- * - Logger for operation tracking
- * - Transaction utility for atomic operations
- * 
- * @author Your Name
+ * Auth Repository
+ *
+ * Handles all database operations for authentication, user, token, and media management.
+ * Provides a data access layer for the Auth Service, abstracting SQL queries and transactions.
+ *
+ * Key Features:
+ * - User and organization CRUD operations
+ * - Token creation, validation, and revocation
+ * - Media record creation and lookup
+ * - Transaction support for multi-step operations
+ * - Error handling and logging
+ *
+ * @author FundFlow Team
  * @version 1.0.0
- * @since 2024
  */
 
 import { query, transaction } from "../../db/index.js";
@@ -101,10 +54,10 @@ class AuthRepository {
         // Insert into individual_profiles table
         const profileQuery = `
           INSERT INTO individual_profiles (
-            user_id, first_name, last_name, phone_number, gender, 
+            user_id, first_name, last_name, phone_number, profile_picture_media_id, cover_picture_media_id, gender, 
             date_of_birth, country, city, address
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *
         `;
 
@@ -113,6 +66,8 @@ class AuthRepository {
           profileData.firstName,
           profileData.lastName,
           profileData.phoneNumber || null,
+          null, // profile_picture_media_id - not included during registration
+          null, // cover_picture_media_id - not included during registration
           profileData.gender || null,
           profileData.dateOfBirth || null,
           profileData.country || null,
@@ -176,68 +131,74 @@ class AuthRepository {
    * @param {Object} profileData
    * @returns {Promise<Object>} Created user and profile
    */
-  async createOrganizationUserAndProfile(userData, profileData) {
+  async createOrganizationUserAndProfile(userData, profileData, client = null) {
     try {
-      const result = await transaction(async (client) => {
-        // Insert into users table
-        const userQuery = `
-          INSERT INTO users (email, password_hash, user_type, is_email_verified, is_active)
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING user_id, email, user_type, is_email_verified, is_active, created_at
-        `;
-        const userValues = [
-          userData.email,
-          userData.passwordHash,
-          userData.userType,
-          userData.isEmailVerified,
-          userData.isActive
-        ];
-        const userResult = await client.query(userQuery, userValues);
-        const user = userResult.rows[0];
-        // Insert into organization_profiles table
-        const profileQuery = `
-          INSERT INTO organization_profiles (
-            user_id, organization_name, organization_short_name, organization_type, official_email, official_website_url, profile_picture, cover_picture, address, mission_description, establishment_date, campus_affiliation_scope, affiliated_schools_names, affiliated_department_names, primary_contact_person_name, primary_contact_person_email, primary_contact_person_phone, created_by_admin_id
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
-          ) RETURNING *
-        `;
-        const profileValues = [
-          user.user_id,
-          profileData.organizationName,
-          profileData.organizationShortName,
-          profileData.organizationType,
-          profileData.officialEmail,
-          profileData.officialWebsiteUrl,
-          profileData.profilePicture,
-          profileData.coverPicture,
-          profileData.address,
-          profileData.missionDescription,
-          profileData.establishmentDate,
-          profileData.campusAffiliationScope,
-          profileData.affiliatedSchoolsNames,
-          profileData.affiliatedDepartmentNames,
-          profileData.primaryContactPersonName,
-          profileData.primaryContactPersonEmail,
-          profileData.primaryContactPersonPhone,
-          profileData.createdByAdminId
-        ];
-        const profileResult = await client.query(profileQuery, profileValues);
-        const profile = profileResult.rows[0];
-        return {
-          user: {
-            userId: user.user_id,
-            email: user.email,
-            userType: user.user_type,
-            isEmailVerified: user.is_email_verified,
-            isActive: user.is_active,
-            createdAt: user.created_at
-          },
-          profile
-        };
-      });
-      return result;
+      const executor = client ? client : { query };
+      // Insert into users table
+      const userQuery = `
+        INSERT INTO users (email, password_hash, user_type, is_email_verified, is_active)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING user_id, email, user_type, is_email_verified, is_active, created_at
+      `;
+      const userValues = [
+        userData.email,
+        userData.passwordHash,
+        userData.userType,
+        userData.isEmailVerified,
+        userData.isActive
+      ];
+      const userResult = await executor.query(userQuery, userValues);
+      const user = userResult.rows[0];
+      // Insert into organization_profiles table
+      const profileQuery = `
+        INSERT INTO organization_profiles (
+          user_id, organization_name, organization_short_name, organization_type, official_email, official_website_url, profile_picture_media_id, cover_picture_media_id, address, mission_description, establishment_date, campus_affiliation_scope, affiliated_schools_names, affiliated_department_names, primary_contact_person_name, primary_contact_person_email, primary_contact_person_phone, created_by_admin_id
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+        ) RETURNING *
+      `;
+      const profileValues = [
+        user.user_id,
+        profileData.organizationName,
+        profileData.organizationShortName,
+        profileData.organizationType,
+        profileData.officialEmail,
+        profileData.officialWebsiteUrl,
+        profileData.profilePictureMediaId || null,
+        profileData.coverPictureMediaId || null,
+        profileData.address,
+        profileData.missionDescription,
+        profileData.establishmentDate,
+        profileData.campusAffiliationScope,
+        profileData.affiliatedSchoolsNames,
+        profileData.affiliatedDepartmentNames,
+        profileData.primaryContactPersonName,
+        profileData.primaryContactPersonEmail,
+        profileData.primaryContactPersonPhone,
+        profileData.createdByAdminId
+      ];
+      const profileResult = await executor.query(profileQuery, profileValues);
+      const profile = profileResult.rows[0];
+      return {
+        user: {
+          userId: user.user_id,
+          email: user.email,
+          userType: user.user_type,
+          isEmailVerified: user.is_email_verified,
+          isActive: user.is_active,
+          createdAt: user.created_at
+        },
+        profile
+      };
     } catch (error) {
+       logger.error("Database error in createOrganizationUserAndProfile", {
+        message: error.message,
+        detail: error.detail, // Provides specific error info from Postgres
+        code: error.code,     // SQLSTATE error code
+        constraint: error.constraint, // Name of the constraint that was violated
+        stack: error.stack,
+        profileData: profileData // Log the data that was being inserted
+      });
       throw new DatabaseError("Failed to create organization user and profile", error);
     }
   }
@@ -326,65 +287,6 @@ class AuthRepository {
       logger.error("Failed to find user by email", {
         error: error.message,
         email
-      });
-      throw new DatabaseError("Failed to find user", error);
-    }
-  }
-
-  /**
-   * Finds a user by ID with their individual profile
-   * @param {string} userId - User's ID
-   * @returns {Promise<Object|null>} User with profile or null if not found
-   */
-  async findByIdWithProfile(userId) {
-    try {
-      const queryText = `
-        SELECT 
-          u.user_id, u.email, u.user_type, u.is_email_verified, 
-          u.is_active, u.created_at, u.updated_at,
-          ip.first_name, ip.last_name, ip.phone_number, ip.gender,
-          ip.date_of_birth, ip.country, ip.city, ip.address,
-          ip.created_at as profile_created_at, ip.updated_at as profile_updated_at
-        FROM users u
-        LEFT JOIN individual_profiles ip ON u.user_id = ip.user_id
-        WHERE u.user_id = $1
-      `;
-
-      const result = await query(queryText, [userId]);
-
-      if (result.rowCount === 0) {
-        return null;
-      }
-
-      const row = result.rows[0];
-      return {
-        user: {
-          userId: row.user_id,
-          email: row.email,
-          userType: row.user_type,
-          isEmailVerified: row.is_email_verified,
-          isActive: row.is_active,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        },
-        profile: row.first_name ? {
-          userId: row.user_id,
-          firstName: row.first_name,
-          lastName: row.last_name,
-          phoneNumber: row.phone_number,
-          gender: row.gender,
-          dateOfBirth: row.date_of_birth,
-          country: row.country,
-          city: row.city,
-          address: row.address,
-          createdAt: row.profile_created_at,
-          updatedAt: row.profile_updated_at
-        } : null
-      };
-    } catch (error) {
-      logger.error("Failed to find user by ID with profile", {
-        error: error.message,
-        userId
       });
       throw new DatabaseError("Failed to find user", error);
     }
@@ -495,24 +397,6 @@ class AuthRepository {
     }
   }
 
- /**
-   * Checks if official email already exists
-   * @param {string} email - Email to check
-   * @returns {Promise<boolean>} True if email exists, false otherwise
-   */
- async OfficialEmailExists(email) {
-  try {
-    const queryText = "SELECT 1 FROM organization_profiles WHERE email = $1";
-    const result = await query(queryText, [email]);
-    return result.rowCount > 0;
-  } catch (error) {
-    logger.error("Failed to check email existence", {
-      error: error.message,
-      email
-    });
-    throw new DatabaseError("Failed to check email existence", error);
-  }
-}
 
 
   /**
@@ -907,6 +791,58 @@ class AuthRepository {
       throw new DatabaseError("Failed to update user password and activate", error);
     }
   }
+
+  /**
+   * Creates a media record in the media table
+   * @param {Object} mediaData
+   * @returns {Promise<void>}
+   */
+  async createMediaRecord({ mediaId, entityType, entityId, mediaType, fileName, fileSize, description, altText, uploadedByUserId }, client = null) {
+    try {
+      const executor = client ? client : { query };
+      const queryText = `
+        INSERT INTO media (media_id, entity_type, entity_id, media_type, file_name, file_size, description, alt_text, uploaded_by_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `;
+      await executor.query(queryText, [
+        mediaId,
+        entityType,
+        entityId,
+        mediaType,
+        fileName,
+        fileSize,
+        description,
+        altText,
+        uploadedByUserId
+      ]);
+    } catch (error) {
+      logger.error('Failed to create media record', { error: error.message });
+      throw new DatabaseError('Failed to create media record', error);
+    }
+  }
+
+  /**
+   * Updates the entityId of a media record (used after org user creation)
+   * @param {string} mediaId
+   * @param {string} entityId
+   * @param {object} client - DB client (transaction)
+   * @returns {Promise<void>}
+   */
+  async updateMediaEntityId(mediaId, entityId, client = null) {
+    try {
+      const executor = client ? client : { query };
+      const queryText = `
+        UPDATE media
+        SET entity_id = $1
+        WHERE media_id = $2
+      `;
+      await executor.query(queryText, [entityId, mediaId]);
+    } catch (error) {
+      logger.error('Failed to update media entityId', { error: error.message, mediaId, entityId });
+      throw new DatabaseError('Failed to update media entityId', error);
+    }
+  }
 }
 
 export default new AuthRepository();
+ 

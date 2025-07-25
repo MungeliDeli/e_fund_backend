@@ -1,84 +1,30 @@
 /**
- * Authentication Routes Module
- * 
- * This module defines all the HTTP routes for authentication and user management
- * operations. It sets up the Express router with proper middleware chains,
- * validation, rate limiting, and access control for each endpoint.
- * 
- * ROUTE STRUCTURE:
- * All routes are prefixed with /api/v1/auth/ and organized by functionality:
- * 
- * PUBLIC ENDPOINTS (No authentication required):
- * - POST /register: Individual user registration
- * - POST /login: User authentication
- * - POST /verify-email: Email verification
- * - POST /forgot-password: Password reset initiation
- * - POST /reset-password: Password reset completion
- * - POST /activate-and-set-password: Organization user activation
- * - POST /resend-verification: Resend verification email
- * - GET /health: Health check endpoint
- * 
- * PROTECTED ENDPOINTS (Authentication required):
- * - POST /logout: User logout
- * - POST /refresh-token: Token refresh
- * - GET /profile: Get user profile
- * - POST /change-password: Change user password
- * 
- * ADMIN ENDPOINTS (Admin authentication required):
- * - POST /admin/users/create-organization-user: Create organization user
- * 
- * MIDDLEWARE CHAINS:
- * - Validation: Input validation using Joi schemas
- * - Rate Limiting: Protection against brute force attacks
- * - Authentication: JWT token verification
- * - Authorization: Role-based access control
- * - Error Handling: Centralized error processing
- * 
- * SECURITY FEATURES:
- * - Rate limiting on sensitive endpoints (login, password reset, verification)
- * - Input validation and sanitization
- * - Authentication middleware for protected routes
- * - Role-based access control for admin routes
- * - CORS handling through Express
- * 
- * RATE LIMITING:
- * - loginLimiter: Limits login attempts
- * - passwordResetLimiter: Limits password reset requests
- * - resendVerificationLimiter: Limits verification email resends
- * 
- * VALIDATION SCHEMAS:
- * - validateRegistration: Individual user registration validation
- * - validateLogin: Login credentials validation
- * - validateCreateOrganizationUser: Organization user creation validation
- * - validatePasswordSetup: Password setup validation
- * 
- * ERROR HANDLING:
- * - catchAsync wrapper for async route handlers
- * - Centralized error processing
- * - Proper HTTP status codes
- * - Consistent error response format
- * 
- * DEPENDENCIES:
- * - Express router for route definition
- * - Authentication middleware for route protection
- * - Validation middleware for input validation
- * - Rate limiting middleware for security
- * - Controller functions for request handling
- * - Error handling middleware
- * 
- * @author Your Name
+ * Auth Routes
+ *
+ * Defines all authentication and user management API endpoints for the FundFlow backend.
+ * Maps HTTP routes to controller actions, applies middleware for validation and authentication,
+ * and organizes endpoints for registration, login, token, email, password, and media operations.
+ *
+ * Key Features:
+ * - User and organization registration routes
+ * - Login, logout, and token refresh routes
+ * - Email verification and password reset routes
+ * - Profile/cover image upload and retrieval routes
+ * - Middleware integration for validation and authentication
+ * - RESTful route organization
+ *
+ * @author FundFlow Team
  * @version 1.0.0
- * @since 2024
  */
 
-import express from "express";
+import {Router} from "express";
+import { logRequestCount } from '../../middlewares/requestLogger.middleware.js';
 import { catchAsync } from "../../middlewares/errorHandler.js";
-import { authenticate, requireEmailVerification, requireSupportAdmin } from "../../middlewares/auth.middleware.js";
-import { validateRegistration, validateLogin, validateCreateOrganizationUser, validatePasswordSetup } from "./auth.validation.js";
+import { authenticate, requireEmailVerification, requireSupportAdmin, verifyAccessTokenForRefresh } from "../../middlewares/auth.middleware.js";
+import { validateRegistration, validateLogin, validateCreateOrganizationUser, validatePassword } from "./auth.validation.js";
 import {
   register,
   login,
-  getProfile,
   verifyEmail,
   healthCheck,
   changePassword,
@@ -91,8 +37,14 @@ import {
   resendVerificationEmail
 } from "./auth.controller.js";
 import { loginLimiter, passwordResetLimiter, resendVerificationLimiter } from '../../middlewares/rateLimiters.js';
+import multer from 'multer';
 
-const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+const router = Router();
+
+// Apply request logger to all auth routes
+router.use(logRequestCount);
 
 /**
  * @route   POST /api/v1/auth/register
@@ -135,19 +87,8 @@ router.post(
  */
 router.post(
   "/refresh-token",
-  authenticate,
+  verifyAccessTokenForRefresh,
   catchAsync(refreshToken)
-);
-
-/**
- * @route   GET /api/v1/auth/profile
- * @desc    Get current user's profile
- * @access  Private (requires authentication)
- */
-router.get(
-  "/profile",
-  authenticate,
-  catchAsync(getProfile)
 );
 
 /**
@@ -206,9 +147,13 @@ router.get("/health", healthCheck);
  * @access  Private (support admin only)
  */
 router.post(
-  "/admin/users/create-organization-user",
+  "/create-organization-user",
   authenticate,
   requireSupportAdmin,
+  upload.fields([
+    { name: 'profilePicture', maxCount: 1 },
+    { name: 'coverPicture', maxCount: 1 }
+  ]),
   validateCreateOrganizationUser,
   catchAsync(createOrganizationUser)
 );
@@ -220,7 +165,7 @@ router.post(
  */
 router.post(
   "/activate-and-set-password",
-  validatePasswordSetup,
+  validatePassword,
   catchAsync(activateAndSetPassword)
 );
 

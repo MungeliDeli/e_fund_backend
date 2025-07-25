@@ -64,7 +64,7 @@
  * @since 2024
  */
 
-import { verifyToken } from "../utils/jwt.utils.js";
+import { verifyToken, verifyTokenForRefresh } from "../utils/jwt.utils.js";
 import { AuthenticationError, AuthorizationError } from "../utils/appError.js";
 import authRepository from "../modules/auth/auth.repository.js";
 import { catchAsync } from "./errorHandler.js";
@@ -119,6 +119,37 @@ export const authenticate = catchAsync(async (req, res, next) => {
     userAgent: req.get('User-Agent')
   });
 
+  next();
+});
+
+
+export const verifyAccessTokenForRefresh = catchAsync(async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AuthenticationError('Access token is required for refresh request.');
+  }
+
+  const token = authHeader.substring(7);
+
+  const decoded = verifyTokenForRefresh(token);
+
+  // Get user from database to ensure they still exist and are active
+  const user = await authRepository.findById(decoded.userId);
+
+  if (!user || !user.isActive) {
+    throw new AuthenticationError('User not found or account deactivated');
+  }
+
+  req.user = {
+    userId: user.userId,
+    email: user.email,
+    userType: user.userType,
+    isEmailVerified: user.isEmailVerified,
+    isActive: user.isActive
+  };
+
+  logger.debug('User identified for token refresh', { userId: user.userId });
   next();
 });
 
@@ -192,7 +223,7 @@ export const requireSuperAdmin = restrictTo('super_admin');
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
-export const requireSupportAdmin = restrictTo('support_admin');
+export const requireSupportAdmin = restrictTo('support_admin', 'super_admin');
 
 /**
  * Optional authentication middleware
