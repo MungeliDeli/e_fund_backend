@@ -41,13 +41,13 @@ const router = Router();
 // Apply request logger to all auth routes
 router.use(logRequestCount);
 // Public profile (anyone)
-router.get("/:userId/profile", getUserProfile);
+router.get("/:userId/profile", catchAsync(getUserProfile));
 // Private profile (owner only)
-router.get("/me", authenticate, getMyProfile);
+router.get("/me", authenticate, catchAsync(getMyProfile));
 // Public: Get all organizers (with optional filters)
-router.get("/organizers", getOrganizers);
+router.get("/organizers", catchAsync(getOrganizers));
 // Get signed URL for media file
-router.get("/media/:mediaId/url", getMediaUrl);
+router.get("/media/:mediaId/url", catchAsync(getMediaUrl));
 // Update profile/cover photo
 router.patch(
   "/me/profile-image",
