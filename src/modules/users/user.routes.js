@@ -15,43 +15,51 @@
  * @version 1.0.0
  */
 
-import { Router } from 'express';
-import { getUserProfile, getMyProfile, getOrganizers } from './user.controller.js';
-import { authenticate } from '../../middlewares/auth.middleware.js';
-import multer from 'multer';
-import { logRequestCount } from '../../middlewares/requestLogger.middleware.js';
-import { catchAsync } from '../../middlewares/errorHandler.js';
-import { updateProfileImage, getMediaUrl, updateUserProfile } from './user.controller.js';
+import { Router } from "express";
+import {
+  getUserProfile,
+  getMyProfile,
+  getOrganizers,
+} from "./user.controller.js";
+import { authenticate } from "../../middlewares/auth.middleware.js";
+import multer from "multer";
+import { logRequestCount } from "../../middlewares/requestLogger.middleware.js";
+import { catchAsync } from "../../middlewares/errorHandler.js";
+import {
+  updateProfileImage,
+  getMediaUrl,
+  updateUserProfile,
+} from "./user.controller.js";
 
 // Enforce 2MB file size limit per image
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 } // 2MB
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
 });
 
 const router = Router();
 // Apply request logger to all auth routes
 router.use(logRequestCount);
 // Public profile (anyone)
-router.get('/:userId/profile', getUserProfile);
+router.get("/:userId/profile", getUserProfile);
 // Private profile (owner only)
-router.get('/me', authenticate, getMyProfile);
+router.get("/me", authenticate, getMyProfile);
 // Public: Get all organizers (with optional filters)
-router.get('/organizers', getOrganizers);
+router.get("/organizers", getOrganizers);
 // Get signed URL for media file
-router.get('/media/:mediaId/url', getMediaUrl);
+router.get("/media/:mediaId/url", getMediaUrl);
 // Update profile/cover photo
 router.patch(
-  '/me/profile-image',
+  "/me/profile-image",
   authenticate,
   upload.fields([
-    { name: 'profilePicture', maxCount: 1 },
-    { name: 'coverPicture', maxCount: 1 }
+    { name: "profilePicture", maxCount: 1 },
+    { name: "coverPicture", maxCount: 1 },
   ]),
   catchAsync(updateProfileImage)
 );
 
 // Update profile information
-router.put('/me/profile', authenticate, catchAsync(updateUserProfile));
+router.put("/me/profile", authenticate, catchAsync(updateUserProfile));
 
-export default router; 
+export default router;
