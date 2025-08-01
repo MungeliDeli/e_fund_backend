@@ -1,0 +1,397 @@
+/**
+ * Campaign Service
+ *
+ * Contains business logic for campaign management, including creating, updating,
+ * and fetching campaigns. Handles campaign-category relationships and provides
+ * formatted data for API responses.
+ *
+ * Key Features:
+ * - Campaign creation and updates
+ * - Campaign-category relationship management
+ * - Campaign data formatting for API responses
+ * - Transaction management for atomic operations
+ * - Error handling and logging
+ *
+ * @author FundFlow Team
+ * @version 1.0.0
+ */
+
+import campaignRepository from "./campaign.repository.js";
+import {
+  NotFoundError,
+  DatabaseError,
+  AuthorizationError,
+} from "../../../utils/appError.js";
+import { transaction } from "../../../db/index.js";
+import logger from "../../../utils/logger.js";
+import { v4 as uuidv4 } from "uuid";
+
+/**
+ * Format campaign data for API response
+ * @param {Object} campaign - Raw campaign data from database
+ * @returns {Object} Formatted campaign object
+ */
+function formatCampaign(campaign) {
+  return {
+    campaignId: campaign.campaign_id,
+    organizerId: campaign.organizer_id,
+    title: campaign.title,
+    description: campaign.description,
+    goalAmount: parseFloat(campaign.goal_amount),
+    currentRaisedAmount: parseFloat(campaign.current_raised_amount),
+    startDate: campaign.start_date,
+    endDate: campaign.end_date,
+    status: campaign.status,
+    mainMediaId: campaign.main_media_id,
+    campaignLogoMediaId: campaign.campaign_logo_media_id,
+    customPageSettings: campaign.custom_page_settings,
+    shareLink: campaign.share_link,
+    approvedByUserId: campaign.approved_by_user_id,
+    approvedAt: campaign.approved_at,
+    templateId: campaign.template_id,
+    createdAt: campaign.created_at,
+    updatedAt: campaign.updated_at,
+    // Related data
+    organizerEmail: campaign.organizer_email,
+    organizerType: campaign.organizer_type,
+    organizerName: campaign.organizer_name,
+    mainMediaFileName: campaign.main_media_file_name,
+    logoMediaFileName: campaign.logo_media_file_name,
+  };
+}
+
+/**
+ * Generate a unique share link for a campaign
+ * @param {string} campaignId - Campaign ID
+ * @returns {string} Share link
+ */
+function generateShareLink(campaignId) {
+  const shortId = campaignId.substring(0, 8);
+  return `FR-CO-${shortId.toUpperCase()}`;
+}
+
+/**
+ * Create a new campaign
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} campaignData - Campaign data
+ * @param {Array<string>} categoryIds - Array of category IDs
+ * @returns {Promise<Object>} Created campaign
+ */
+export const createCampaign = async (
+  organizerId,
+  campaignData,
+  categoryIds = []
+) => {
+  try {
+    logger.info("Creating new campaign", {
+      organizerId,
+      title: campaignData.title,
+    });
+
+    // Generate share link
+    const shareLink = generateShareLink(uuidv4());
+
+    const campaignRecord = {
+      ...campaignData,
+      organizerId,
+      shareLink,
+      status: campaignData.status || "draft",
+    };
+
+    // Use transaction for atomic operation
+    const result = await transaction(async (client) => {
+      // Create campaign
+      const campaign = await campaignRepository.createCampaign(
+        campaignRecord,
+        client
+      );
+
+      // Add categories if provided
+      if (categoryIds.length > 0) {
+        await campaignRepository.addCampaignCategories(
+          campaign.campaign_id,
+          categoryIds,
+          client
+        );
+      }
+
+      return campaign;
+    });
+
+    // Fetch complete campaign data with categories
+    const completeCampaign = await getCampaignById(result.campaign_id);
+
+    logger.info("Campaign created successfully", {
+      campaignId: result.campaign_id,
+      organizerId,
+      status: result.status,
+    });
+
+    return completeCampaign;
+  } catch (error) {
+    logger.error("Failed to create campaign", {
+      error: error.message,
+      organizerId,
+    });
+    if (error instanceof DatabaseError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to create campaign", error);
+  }
+};
+
+/**
+ * Update an existing campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for ownership verification)
+ * @param {Object} updateData - Data to update
+ * @param {Array<string>} categoryIds - Array of category IDs (optional)
+ * @returns {Promise<Object>} Updated campaign
+ */
+export const updateCampaign = async (
+  campaignId,
+  organizerId,
+  updateData,
+  categoryIds = null
+) => {
+  try {
+    logger.info("Updating campaign", { campaignId, organizerId });
+
+    // Verify ownership
+    const isOwner = await campaignRepository.isCampaignOwner(
+      campaignId,
+      organizerId
+    );
+    if (!isOwner) {
+      throw new AuthorizationError("You can only update your own campaigns");
+    }
+
+    // Use transaction for atomic operation
+    const result = await transaction(async (client) => {
+      // Update campaign
+      const campaign = await campaignRepository.updateCampaign(
+        campaignId,
+        updateData,
+        client
+      );
+
+      // Update categories if provided
+      if (categoryIds !== null) {
+        await campaignRepository.removeCampaignCategories(campaignId, client);
+        if (categoryIds.length > 0) {
+          await campaignRepository.addCampaignCategories(
+            campaignId,
+            categoryIds,
+            client
+          );
+        }
+      }
+
+      return campaign;
+    });
+
+    // Fetch complete campaign data with categories
+    const completeCampaign = await getCampaignById(campaignId);
+
+    logger.info("Campaign updated successfully", { campaignId, organizerId });
+    return completeCampaign;
+  } catch (error) {
+    logger.error("Failed to update campaign", {
+      error: error.message,
+      campaignId,
+      organizerId,
+    });
+    if (error instanceof AuthorizationError || error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to update campaign", error);
+  }
+};
+
+/**
+ * Get a campaign by ID with categories
+ * @param {string} campaignId - Campaign ID
+ * @returns {Promise<Object>} Campaign with categories
+ */
+export const getCampaignById = async (campaignId) => {
+  try {
+    const campaign = await campaignRepository.findCampaignById(campaignId);
+    const categories = await campaignRepository.getCampaignCategories(
+      campaignId
+    );
+
+    const formattedCampaign = formatCampaign(campaign);
+    formattedCampaign.categories = categories.map((cat) => ({
+      categoryId: cat.category_id,
+      name: cat.name,
+      description: cat.description,
+    }));
+
+    return formattedCampaign;
+  } catch (error) {
+    logger.error("Failed to get campaign by ID", {
+      error: error.message,
+      campaignId,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to get campaign", error);
+  }
+};
+
+/**
+ * Get campaigns by organizer with optional filters
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} filters - Optional filters (status, limit, offset)
+ * @returns {Promise<Array>} List of campaigns
+ */
+export const getCampaignsByOrganizer = async (organizerId, filters = {}) => {
+  try {
+    const campaigns = await campaignRepository.findCampaignsByOrganizer(
+      organizerId,
+      filters
+    );
+
+    // Get categories for each campaign
+    const campaignsWithCategories = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const categories = await campaignRepository.getCampaignCategories(
+          campaign.campaign_id
+        );
+        const formattedCampaign = formatCampaign(campaign);
+        formattedCampaign.categories = categories.map((cat) => ({
+          categoryId: cat.category_id,
+          name: cat.name,
+          description: cat.description,
+        }));
+        return formattedCampaign;
+      })
+    );
+
+    return campaignsWithCategories;
+  } catch (error) {
+    logger.error("Failed to get campaigns by organizer", {
+      error: error.message,
+      organizerId,
+    });
+    throw new DatabaseError("Failed to get campaigns", error);
+  }
+};
+
+/**
+ * Save campaign as draft (create or update)
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} campaignData - Campaign data including customPageSettings
+ * @param {string} [campaignId] - Existing campaign ID for updates
+ * @returns {Promise<Object>} Saved campaign
+ */
+export const saveCampaignDraft = async (
+  organizerId,
+  campaignData,
+  campaignId = null
+) => {
+  try {
+    const { categoryIds = [], ...campaignFields } = campaignData;
+
+    if (campaignId) {
+      // Update existing draft
+      return await updateCampaign(
+        campaignId,
+        organizerId,
+        {
+          ...campaignFields,
+          status: "draft",
+        },
+        categoryIds
+      );
+    } else {
+      // Create new draft
+      return await createCampaign(
+        organizerId,
+        {
+          ...campaignFields,
+          status: "draft",
+        },
+        categoryIds
+      );
+    }
+  } catch (error) {
+    logger.error("Failed to save campaign draft", {
+      error: error.message,
+      organizerId,
+      campaignId,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Submit campaign for approval
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<Object>} Updated campaign
+ */
+export const submitCampaignForApproval = async (campaignId, organizerId) => {
+  try {
+    logger.info("Submitting campaign for approval", {
+      campaignId,
+      organizerId,
+    });
+
+    // Verify ownership
+    const isOwner = await campaignRepository.isCampaignOwner(
+      campaignId,
+      organizerId
+    );
+    if (!isOwner) {
+      throw new AuthorizationError("You can only submit your own campaigns");
+    }
+
+    // Update status to pendingApproval
+    const updatedCampaign = await updateCampaign(campaignId, organizerId, {
+      status: "pendingApproval",
+    });
+
+    logger.info("Campaign submitted for approval successfully", {
+      campaignId,
+      organizerId,
+    });
+    return updatedCampaign;
+  } catch (error) {
+    logger.error("Failed to submit campaign for approval", {
+      error: error.message,
+      campaignId,
+      organizerId,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Check if user can edit campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<boolean>} True if user can edit
+ */
+export const canEditCampaign = async (campaignId, organizerId) => {
+  try {
+    const isOwner = await campaignRepository.isCampaignOwner(
+      campaignId,
+      organizerId
+    );
+    if (!isOwner) return false;
+
+    // Check if campaign is in editable state
+    const campaign = await campaignRepository.findCampaignById(campaignId);
+    const editableStatuses = ["draft", "rejected"];
+    return editableStatuses.includes(campaign.status);
+  } catch (error) {
+    logger.error("Failed to check campaign edit permission", {
+      error: error.message,
+      campaignId,
+      organizerId,
+    });
+    return false;
+  }
+};

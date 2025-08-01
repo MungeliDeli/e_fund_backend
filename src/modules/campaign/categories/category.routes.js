@@ -29,10 +29,7 @@ import {
 } from "../../../middlewares/auth.middleware.js";
 import { logRequestCount } from "../../../middlewares/requestLogger.middleware.js";
 import { catchAsync } from "../../../middlewares/errorHandler.js";
-import {
-  validateCategory,
-  validateCategoryId,
-} from "./category.validation.js";
+import { validateCategory, validateCategoryId } from "./category.validation.js";
 
 const router = Router();
 
@@ -47,7 +44,11 @@ router.use(requireAdmin);
 router.post("/categories", validateCategory, catchAsync(createCategory));
 router.get("/categories", catchAsync(getCategories));
 router.get("/categories/stats", catchAsync(getCategoryStats));
-router.get("/categories/:categoryId", validateCategoryId, catchAsync(getCategoryById));
+router.get(
+  "/categories/:categoryId",
+  validateCategoryId,
+  catchAsync(getCategoryById)
+);
 router.put(
   "/categories/:categoryId",
   validateCategoryId,
