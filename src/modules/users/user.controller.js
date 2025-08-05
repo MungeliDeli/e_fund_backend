@@ -126,6 +126,9 @@ export const getOrganizers = async (req, res) => {
   if (req.query.active !== undefined) {
     filters.active = req.query.active === "true";
   }
+  if (req.query.search) {
+    filters.search = req.query.search;
+  }
   const organizers = await userService.getOrganizers(filters);
   ResponseFactory.ok(res, "Organizers fetched successfully", organizers);
 };

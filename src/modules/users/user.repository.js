@@ -50,7 +50,10 @@ export const getUserWithProfileById = async (userId) => {
     }
     return { user, profile };
   } catch (error) {
-    logger.error("Failed to fetch user/profile", { error: error.message, userId });
+    logger.error("Failed to fetch user/profile", {
+      error: error.message,
+      userId,
+    });
     throw new DatabaseError("Failed to fetch user/profile", error);
   }
 };
@@ -65,14 +68,30 @@ const userRepository = {
   async createMediaRecord(mediaRecord, client) {
     const executor = client || { query };
     const {
-      mediaId, entityType, entityId, mediaType, fileName, fileSize, description, altText, uploadedByUserId
+      mediaId,
+      entityType,
+      entityId,
+      mediaType,
+      fileName,
+      fileSize,
+      description,
+      altText,
+      uploadedByUserId,
     } = mediaRecord;
     const queryText = `
       INSERT INTO media (media_id, entity_type, entity_id, media_type, file_name, file_size, description, alt_text, uploaded_by_user_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
     await executor.query(queryText, [
-      mediaId, entityType, entityId, mediaType, fileName, fileSize, description, altText, uploadedByUserId
+      mediaId,
+      entityType,
+      entityId,
+      mediaType,
+      fileName,
+      fileSize,
+      description,
+      altText,
+      uploadedByUserId,
     ]);
   },
   /**
@@ -124,7 +143,7 @@ const userRepository = {
     values.push(userId);
     const queryText = `
       UPDATE individual_profiles
-      SET ${setClauses.join(', ')}
+      SET ${setClauses.join(", ")}
       WHERE user_id = $${valueIndex}
       RETURNING *;
     `;
@@ -132,15 +151,18 @@ const userRepository = {
     try {
       const result = await query(queryText, values);
       if (result.rowCount === 0) {
-        throw new NotFoundError('Profile not found for the given user ID.');
+        throw new NotFoundError("Profile not found for the given user ID.");
       }
       return result.rows[0];
     } catch (error) {
-      logger.error('Failed to update user profile in repository', { error: error.message, userId });
+      logger.error("Failed to update user profile in repository", {
+        error: error.message,
+        userId,
+      });
       if (error instanceof NotFoundError) {
         throw error;
       }
-      throw new DatabaseError('Failed to update user profile.', error);
+      throw new DatabaseError("Failed to update user profile.", error);
     }
   },
 
@@ -151,11 +173,11 @@ const userRepository = {
         FROM media WHERE media_id = $1
       `;
       const result = await query(queryText, [mediaId]);
-      
+
       if (result.rowCount === 0) {
         return null;
       }
-      
+
       const row = result.rows[0];
       return {
         mediaId: row.media_id,
@@ -167,17 +189,20 @@ const userRepository = {
         description: row.description,
         altText: row.alt_text,
         uploadedByUserId: row.uploaded_by_user_id,
-        createdAt: row.created_at
+        createdAt: row.created_at,
       };
     } catch (error) {
-      logger.error("Failed to get media record", { error: error.message, mediaId });
+      logger.error("Failed to get media record", {
+        error: error.message,
+        mediaId,
+      });
       throw new DatabaseError("Failed to get media record", error);
     }
   },
 
   /**
    * Fetch a list of organization users (organizers) with optional filters
-   * @param {Object} filters - { verified, active }
+   * @param {Object} filters - { verified, active, search }
    * @returns {Promise<Array>} List of organizers with user and profile info
    */
   async findOrganizers(filters = {}) {
@@ -193,7 +218,19 @@ const userRepository = {
         whereClauses.push(`u.is_active = $${idx++}`);
         values.push(filters.active);
       }
-      const where = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
+      if (filters.search) {
+        whereClauses.push(`(
+          p.organization_name ILIKE $${idx} OR 
+          p.organization_short_name ILIKE $${idx} OR 
+          p.official_email ILIKE $${idx} OR 
+          u.email ILIKE $${idx}
+        )`);
+        values.push(`%${filters.search}%`);
+        idx++;
+      }
+      const where = whereClauses.length
+        ? "WHERE " + whereClauses.join(" AND ")
+        : "";
       const queryText = `
         SELECT 
           u.user_id, u.email, u.is_email_verified, u.is_active, u.created_at,
@@ -209,10 +246,13 @@ const userRepository = {
       const result = await query(queryText, values);
       return result.rows;
     } catch (error) {
-      logger.error('Failed to fetch organizers', { error: error.message, filters });
-      throw new DatabaseError('Failed to fetch organizers', error);
+      logger.error("Failed to fetch organizers", {
+        error: error.message,
+        filters,
+      });
+      throw new DatabaseError("Failed to fetch organizers", error);
     }
-  }
+  },
 };
 
 export default userRepository;

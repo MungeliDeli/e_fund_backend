@@ -38,7 +38,12 @@ export const createCampaign = async (req, res) => {
     categoryIds || []
   );
 
-  ResponseFactory.created(res, "Campaign created successfully", campaign);
+  const message =
+    campaignData.status === "pending"
+      ? "Campaign submitted for approval successfully"
+      : "Campaign created successfully";
+
+  ResponseFactory.created(res, message, campaign);
 };
 
 /**
@@ -59,7 +64,12 @@ export const updateCampaign = async (req, res) => {
     categoryIds
   );
 
-  ResponseFactory.ok(res, "Campaign updated successfully", campaign);
+  const message =
+    updateData.status === "pending"
+      ? "Campaign submitted for approval successfully"
+      : "Campaign updated successfully";
+
+  ResponseFactory.ok(res, message, campaign);
 };
 
 /**
@@ -92,6 +102,18 @@ export const getCampaignsByOrganizer = async (req, res) => {
 };
 
 /**
+ * Get all campaigns with optional filters (for admin)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const getAllCampaigns = async (req, res) => {
+  const campaigns = await campaignService.getAllCampaigns(req.query);
+
+  ResponseFactory.ok(res, "All campaigns fetched successfully", campaigns);
+};
+
+/**
  * Save campaign as draft
  * @param {import('express').Request} req - Express request object
  * @param {import('express').Response} res - Express response object
@@ -121,28 +143,6 @@ export const saveCampaignDraft = async (req, res) => {
   }
 
   ResponseFactory.ok(res, "Campaign draft saved successfully", campaign);
-};
-
-/**
- * Submit campaign for approval
- * @param {import('express').Request} req - Express request object
- * @param {import('express').Response} res - Express response object
- * @returns {Promise<void>}
- */
-export const submitCampaignForApproval = async (req, res) => {
-  const { campaignId } = req.params;
-  const organizerId = req.user.userId;
-
-  const campaign = await campaignService.submitCampaignForApproval(
-    campaignId,
-    organizerId
-  );
-
-  ResponseFactory.ok(
-    res,
-    "Campaign submitted for approval successfully",
-    campaign
-  );
 };
 
 /**

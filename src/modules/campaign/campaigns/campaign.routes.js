@@ -22,8 +22,8 @@ import {
   updateCampaign,
   getCampaignById,
   getCampaignsByOrganizer,
+  getAllCampaigns,
   saveCampaignDraft,
-  submitCampaignForApproval,
   canEditCampaign,
   getCampaignByShareLink,
 } from "./campaign.controller.js";
@@ -53,6 +53,7 @@ router.use(authenticate);
 // Campaign CRUD operations
 router.post("/", validateCreateCampaign, catchAsync(createCampaign));
 router.get("/my-campaigns", catchAsync(getCampaignsByOrganizer));
+router.get("/all", catchAsync(getAllCampaigns)); // Admin endpoint
 router.get("/:campaignId", validateCampaignId, catchAsync(getCampaignById));
 router.put(
   "/:campaignId",
@@ -61,18 +62,12 @@ router.put(
   catchAsync(updateCampaign)
 );
 
-// Draft and submission operations
+// Draft operations
 router.post("/draft", validateSaveDraft, catchAsync(saveCampaignDraft));
 router.put(
   "/draft/:campaignId",
-  validateCampaignId,
   validateSaveDraft,
   catchAsync(saveCampaignDraft)
-);
-router.post(
-  "/:campaignId/submit",
-  validateCampaignId,
-  catchAsync(submitCampaignForApproval)
 );
 
 // Utility endpoints

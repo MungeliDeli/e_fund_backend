@@ -68,20 +68,45 @@ export const createCampaign = async (campaignData, client) => {
       status,
       mainMediaId,
       campaignLogoMediaId,
-      customPageSettings,
+      // Handle JSON field - stringify if it's an object
+      customPageSettings && typeof customPageSettings === "object"
+        ? JSON.stringify(customPageSettings)
+        : customPageSettings,
       shareLink,
       templateId,
     ];
 
     const result = await executor.query(queryText, values);
 
+    const createdCampaign = result.rows[0];
+
+    // Parse JSON fields if they exist and are strings
+    if (
+      createdCampaign.custom_page_settings &&
+      typeof createdCampaign.custom_page_settings === "string"
+    ) {
+      try {
+        createdCampaign.custom_page_settings = JSON.parse(
+          createdCampaign.custom_page_settings
+        );
+      } catch (parseError) {
+        logger.warn(
+          "Failed to parse custom_page_settings JSON in create result",
+          {
+            campaignId: createdCampaign.campaign_id,
+            error: parseError.message,
+          }
+        );
+      }
+    }
+
     logger.info("Campaign created successfully", {
-      campaignId: result.rows[0].campaign_id,
+      campaignId: createdCampaign.campaign_id,
       organizerId,
       status,
     });
 
-    return result.rows[0];
+    return createdCampaign;
   } catch (error) {
     logger.error("Failed to create campaign", {
       error: error.message,
@@ -101,35 +126,51 @@ export const createCampaign = async (campaignData, client) => {
 export const updateCampaign = async (campaignId, updateData, client) => {
   const executor = client || { query };
 
-  const allowedFields = [
-    "title",
-    "description",
-    "goal_amount",
-    "start_date",
-    "end_date",
-    "status",
-    "main_media_id",
-    "campaign_logo_media_id",
-    "custom_page_settings",
-    "share_link",
-    "template_id",
-    "approved_by_user_id",
-    "approved_at",
-  ];
+  const allowedFields = {
+    title: "title",
+    description: "description",
+    goalAmount: "goal_amount",
+    startDate: "start_date",
+    endDate: "end_date",
+    status: "status",
+    mainMediaId: "main_media_id",
+    campaignLogoMediaId: "campaign_logo_media_id",
+    customPageSettings: "custom_page_settings",
+    shareLink: "share_link",
+    templateId: "template_id",
+    approvedByUserId: "approved_by_user_id",
+    approvedAt: "approved_at",
+  };
 
   const setClauses = [];
   const values = [];
   let valueIndex = 1;
 
   for (const [key, value] of Object.entries(updateData)) {
-    if (allowedFields.includes(key) && value !== undefined) {
-      setClauses.push(`${key} = $${valueIndex++}`);
-      values.push(value);
+    const dbColumnName = allowedFields[key];
+
+    if (dbColumnName && value !== undefined) {
+      setClauses.push(`${dbColumnName} = $${valueIndex++}`);
+
+      // Handle JSON fields that need to be stringified
+      if (
+        key === "customPageSettings" &&
+        typeof value === "object" &&
+        value !== null
+      ) {
+        values.push(JSON.stringify(value));
+      } else {
+        values.push(value);
+      }
     }
   }
 
   if (setClauses.length === 0) {
     throw new Error("No valid fields to update");
+    logger.error("No valid fields to update", {
+      campaignId,
+      updateData,
+    });
   }
 
   values.push(campaignId);
@@ -147,8 +188,30 @@ export const updateCampaign = async (campaignId, updateData, client) => {
       throw new NotFoundError("Campaign not found");
     }
 
+    const updatedCampaign = result.rows[0];
+
+    // Parse JSON fields if they exist and are strings
+    if (
+      updatedCampaign.custom_page_settings &&
+      typeof updatedCampaign.custom_page_settings === "string"
+    ) {
+      try {
+        updatedCampaign.custom_page_settings = JSON.parse(
+          updatedCampaign.custom_page_settings
+        );
+      } catch (parseError) {
+        logger.warn(
+          "Failed to parse custom_page_settings JSON in update result",
+          {
+            campaignId,
+            error: parseError.message,
+          }
+        );
+      }
+    }
+
     logger.info("Campaign updated successfully", { campaignId });
-    return result.rows[0];
+    return updatedCampaign;
   } catch (error) {
     logger.error("Failed to update campaign", {
       error: error.message,
@@ -190,7 +253,26 @@ export const findCampaignById = async (campaignId) => {
       throw new NotFoundError("Campaign not found");
     }
 
-    return result.rows[0];
+    const campaign = result.rows[0];
+
+    // Parse JSON fields if they exist and are strings
+    if (
+      campaign.custom_page_settings &&
+      typeof campaign.custom_page_settings === "string"
+    ) {
+      try {
+        campaign.custom_page_settings = JSON.parse(
+          campaign.custom_page_settings
+        );
+      } catch (parseError) {
+        logger.warn("Failed to parse custom_page_settings JSON", {
+          campaignId,
+          error: parseError.message,
+        });
+      }
+    }
+
+    return campaign;
   } catch (error) {
     logger.error("Failed to find campaign by ID", {
       error: error.message,
@@ -206,7 +288,7 @@ export const findCampaignById = async (campaignId) => {
 /**
  * Find campaigns by organizer ID with optional filters
  * @param {string} organizerId - Organizer ID
- * @param {Object} filters - Optional filters (status, limit, offset)
+ * @param {Object} filters - Optional filters (status, search, limit, offset)
  * @returns {Promise<Array>} List of campaigns
  */
 export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
@@ -215,9 +297,20 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
     let values = [organizerId];
     let valueIndex = 2;
 
+    // Status filter
     if (filters.status) {
       whereClauses.push(`c.status = $${valueIndex++}`);
       values.push(filters.status);
+    }
+
+    // Search filter - search in title and description
+    if (filters.search && filters.search.trim()) {
+      whereClauses.push(`(
+        c.title ILIKE $${valueIndex} OR 
+        c.description ILIKE $${valueIndex}
+      )`);
+      values.push(`%${filters.search.trim()}%`);
+      valueIndex++;
     }
 
     const limit = filters.limit || 50;
@@ -239,7 +332,27 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
     values.push(limit, offset);
     const result = await query(queryText, values);
 
-    return result.rows;
+    // Parse JSON fields for each campaign
+    const campaigns = result.rows.map((campaign) => {
+      if (
+        campaign.custom_page_settings &&
+        typeof campaign.custom_page_settings === "string"
+      ) {
+        try {
+          campaign.custom_page_settings = JSON.parse(
+            campaign.custom_page_settings
+          );
+        } catch (parseError) {
+          logger.warn("Failed to parse custom_page_settings JSON", {
+            campaignId: campaign.campaign_id,
+            error: parseError.message,
+          });
+        }
+      }
+      return campaign;
+    });
+
+    return campaigns;
   } catch (error) {
     logger.error("Failed to find campaigns by organizer", {
       error: error.message,
@@ -368,11 +481,90 @@ export const isCampaignOwner = async (campaignId, organizerId) => {
   }
 };
 
+/**
+ * Find all campaigns with optional filters (for admin)
+ * @param {Object} filters - Optional filters (status, search, limit, offset)
+ * @returns {Promise<Array>} List of campaigns
+ */
+export const findAllCampaigns = async (filters = {}) => {
+  try {
+    let whereClauses = [];
+    let values = [];
+    let valueIndex = 1;
+
+    // Status filter
+    if (filters.status) {
+      whereClauses.push(`c.status = $${valueIndex++}`);
+      values.push(filters.status);
+    }
+
+    // Search filter - search in title and description
+    if (filters.search && filters.search.trim()) {
+      whereClauses.push(`(
+        c.title ILIKE $${valueIndex} OR 
+        c.description ILIKE $${valueIndex}
+      )`);
+      values.push(`%${filters.search.trim()}%`);
+      valueIndex++;
+    }
+
+    const limit = filters.limit || 50;
+    const offset = filters.offset || 0;
+
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+    const queryText = `
+      SELECT 
+        c.*,
+        u.email as organizer_email,
+        op.organization_name as organizer_name
+      FROM campaigns c
+      JOIN users u ON c.organizer_id = u.user_id
+      LEFT JOIN organization_profiles op ON u.user_id = op.user_id
+      ${whereClause}
+      ORDER BY c.created_at DESC
+      LIMIT $${valueIndex++} OFFSET $${valueIndex++}
+    `;
+
+    values.push(limit, offset);
+    const result = await query(queryText, values);
+
+    // Parse JSON fields for each campaign
+    const campaigns = result.rows.map((campaign) => {
+      if (
+        campaign.custom_page_settings &&
+        typeof campaign.custom_page_settings === "string"
+      ) {
+        try {
+          campaign.custom_page_settings = JSON.parse(
+            campaign.custom_page_settings
+          );
+        } catch (parseError) {
+          logger.warn("Failed to parse custom_page_settings JSON", {
+            campaignId: campaign.campaign_id,
+            error: parseError.message,
+          });
+        }
+      }
+      return campaign;
+    });
+
+    return campaigns;
+  } catch (error) {
+    logger.error("Failed to find all campaigns", {
+      error: error.message,
+    });
+    throw new DatabaseError("Failed to find campaigns", error);
+  }
+};
+
 export default {
   createCampaign,
   updateCampaign,
   findCampaignById,
   findCampaignsByOrganizer,
+  findAllCampaigns,
   addCampaignCategories,
   removeCampaignCategories,
   getCampaignCategories,

@@ -86,6 +86,7 @@ export const createCampaign = async (
     logger.info("Creating new campaign", {
       organizerId,
       title: campaignData.title,
+      status: campaignData.status,
     });
 
     // Generate share link
@@ -169,6 +170,7 @@ export const updateCampaign = async (
     // Use transaction for atomic operation
     const result = await transaction(async (client) => {
       // Update campaign
+
       const campaign = await campaignRepository.updateCampaign(
         campaignId,
         updateData,
@@ -265,6 +267,9 @@ export const getCampaignsByOrganizer = async (organizerId, filters = {}) => {
           name: cat.name,
           description: cat.description,
         }));
+        // Add categoryName for backward compatibility
+        formattedCampaign.categoryName =
+          categories.length > 0 ? categories[0].name : "No category";
         return formattedCampaign;
       })
     );
@@ -327,44 +332,39 @@ export const saveCampaignDraft = async (
 };
 
 /**
- * Submit campaign for approval
- * @param {string} campaignId - Campaign ID
- * @param {string} organizerId - Organizer ID
- * @returns {Promise<Object>} Updated campaign
+ * Get all campaigns with optional filters (for admin)
+ * @param {Object} filters - Optional filters (status, search, limit, offset)
+ * @returns {Promise<Array>} List of campaigns
  */
-export const submitCampaignForApproval = async (campaignId, organizerId) => {
+export const getAllCampaigns = async (filters = {}) => {
   try {
-    logger.info("Submitting campaign for approval", {
-      campaignId,
-      organizerId,
-    });
+    const campaigns = await campaignRepository.findAllCampaigns(filters);
 
-    // Verify ownership
-    const isOwner = await campaignRepository.isCampaignOwner(
-      campaignId,
-      organizerId
+    // Get categories for each campaign
+    const campaignsWithCategories = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const categories = await campaignRepository.getCampaignCategories(
+          campaign.campaign_id
+        );
+        const formattedCampaign = formatCampaign(campaign);
+        formattedCampaign.categories = categories.map((cat) => ({
+          categoryId: cat.category_id,
+          name: cat.name,
+          description: cat.description,
+        }));
+        // Add categoryName for backward compatibility
+        formattedCampaign.categoryName =
+          categories.length > 0 ? categories[0].name : "No category";
+        return formattedCampaign;
+      })
     );
-    if (!isOwner) {
-      throw new AuthorizationError("You can only submit your own campaigns");
-    }
 
-    // Update status to pendingApproval
-    const updatedCampaign = await updateCampaign(campaignId, organizerId, {
-      status: "pendingApproval",
-    });
-
-    logger.info("Campaign submitted for approval successfully", {
-      campaignId,
-      organizerId,
-    });
-    return updatedCampaign;
+    return campaignsWithCategories;
   } catch (error) {
-    logger.error("Failed to submit campaign for approval", {
+    logger.error("Failed to get all campaigns", {
       error: error.message,
-      campaignId,
-      organizerId,
     });
-    throw error;
+    throw new DatabaseError("Failed to get campaigns", error);
   }
 };
 
