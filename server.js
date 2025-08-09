@@ -1,6 +1,7 @@
 import app from "./src/app.js";
 import config from "./src/config/index.js";
 import logger from "./src/utils/logger.js";
+import notificationService from "./src/modules/notifications/notification.service.js";
 
 /**
  * Server Startup
@@ -14,17 +15,31 @@ const server = app.listen(PORT, () => {
   logger.info(`📊 Environment: ${config.env}`);
   logger.info(`🔗 API Base URL: http://localhost:${PORT}/api/v1`);
   logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
-  logger.info(config.env)
-  logger.info(config.db.database)
+  logger.info(config.env);
+  logger.info(config.db.database);
   if (config.env === "development") {
-    logger.info(`📝 API Documentation: http://localhost:${PORT}/api/v1/auth/health`);
+    logger.info(
+      `📝 API Documentation: http://localhost:${PORT}/api/v1/auth/health`
+    );
   }
+  // Start tiny retry loop for failed/pending email notifications
+  const intervalMs = Number(
+    process.env.NOTIFICATION_RETRY_INTERVAL_MS || 300000
+  ); // 5 min default
+  setInterval(() => {
+    notificationService
+      .retryFailedEmails()
+      .then(() => logger.debug("Notification retry job ran"))
+      .catch((err) =>
+        logger.warn("Notification retry job error", { error: err.message })
+      );
+  }, intervalMs);
 });
 
 // Graceful shutdown
 const gracefulShutdown = (signal) => {
   logger.info(`🛑 Received ${signal}. Starting graceful shutdown...`);
-  
+
   server.close(() => {
     logger.info("✅ HTTP server closed");
     process.exit(0);
@@ -32,7 +47,9 @@ const gracefulShutdown = (signal) => {
 
   // Force close after 10 seconds
   setTimeout(() => {
-    logger.error("❌ Could not close connections in time, forcefully shutting down");
+    logger.error(
+      "❌ Could not close connections in time, forcefully shutting down"
+    );
     process.exit(1);
   }, 10000);
 };
@@ -48,4 +65,3 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 export default server;
-
