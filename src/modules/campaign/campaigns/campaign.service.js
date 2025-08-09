@@ -11,6 +11,7 @@
  * - Campaign data formatting for API responses
  * - Transaction management for atomic operations
  * - Error handling and logging
+ * - Image metadata handling for campaign images
  *
  * @author FundFlow Team
  * @version 1.0.0
@@ -25,6 +26,7 @@ import {
 import { transaction } from "../../../db/index.js";
 import logger from "../../../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
+import notificationService from "../../notifications/notification.service.js";
 
 /**
  * Format campaign data for API response
@@ -68,6 +70,58 @@ function formatCampaign(campaign) {
 function generateShareLink(campaignId) {
   const shortId = campaignId.substring(0, 8);
   return `FR-CO-${shortId.toUpperCase()}`;
+}
+
+/**
+ * Create media records for campaign images
+ * @param {Object} imageMetadata - Image metadata from frontend
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} client - Database client for transaction
+ * @returns {Promise<Object>} Created media records
+ */
+async function createCampaignMediaRecords(
+  imageMetadata,
+  campaignId,
+  organizerId,
+  client
+) {
+  const mediaRecords = {};
+
+  for (const [field, metadata] of Object.entries(imageMetadata)) {
+    if (metadata && metadata.key) {
+      const mediaId = uuidv4();
+
+      // Determine entity type based on field
+      let entityType = "campaign";
+      let description = metadata.description || `${field} for campaign`;
+
+      // Create media record
+      const mediaRecord = {
+        mediaId,
+        entityType,
+        entityId: campaignId,
+        mediaType: "image",
+        fileName: metadata.key,
+        fileSize: metadata.fileSize,
+        description,
+        altText: metadata.altText || "",
+        uploadedByUserId: organizerId,
+      };
+
+      await campaignRepository.createMediaRecord(mediaRecord, client);
+      mediaRecords[field] = mediaId;
+
+      logger.info("Campaign media record created", {
+        mediaId,
+        field,
+        campaignId,
+        fileName: metadata.key,
+      });
+    }
+  }
+
+  return mediaRecords;
 }
 
 /**
@@ -169,8 +223,6 @@ export const updateCampaign = async (
 
     // Use transaction for atomic operation
     const result = await transaction(async (client) => {
-      // Update campaign
-
       const campaign = await campaignRepository.updateCampaign(
         campaignId,
         updateData,
@@ -196,6 +248,77 @@ export const updateCampaign = async (
     const completeCampaign = await getCampaignById(campaignId);
 
     logger.info("Campaign updated successfully", { campaignId, organizerId });
+
+    // Simple notification triggers for status changes
+    try {
+      if (updateData.status === "active") {
+        const titleInApp = "Campaign approved";
+        const messageInApp = `Your campaign "${completeCampaign.title}" has been approved and is now active.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "in_app",
+          category: "campaign",
+          priority: "high",
+          title: titleInApp,
+          message: messageInApp,
+          data: { campaignId, status: "active" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.approved.v1",
+        });
+
+        const titleEmail = "Your campaign has been approved";
+        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" has been approved and is now live.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "email",
+          category: "campaign",
+          priority: "high",
+          title: titleEmail,
+          message: messageEmail,
+          data: { campaignId, status: "active" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.approved.v1",
+        });
+      } else if (updateData.status === "rejected") {
+        const titleInApp = "Campaign rejected";
+        const messageInApp = `Your campaign "${completeCampaign.title}" was rejected.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "in_app",
+          category: "campaign",
+          priority: "high",
+          title: titleInApp,
+          message: messageInApp,
+          data: { campaignId, status: "rejected" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.rejected.v1",
+        });
+
+        const titleEmail = "Your campaign was rejected";
+        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" was rejected.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "email",
+          category: "campaign",
+          priority: "high",
+          title: titleEmail,
+          message: messageEmail,
+          data: { campaignId, status: "rejected" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.rejected.v1",
+        });
+      }
+    } catch (notifyError) {
+      logger.warn("Campaign status notification failed", {
+        campaignId,
+        organizerId,
+        error: notifyError.message,
+      });
+    }
     return completeCampaign;
   } catch (error) {
     logger.error("Failed to update campaign", {
@@ -287,7 +410,7 @@ export const getCampaignsByOrganizer = async (organizerId, filters = {}) => {
 /**
  * Save campaign as draft (create or update)
  * @param {string} organizerId - Organizer ID
- * @param {Object} campaignData - Campaign data including customPageSettings
+ * @param {Object} campaignData - Campaign data including customPageSettings and imageMetadata
  * @param {string} [campaignId] - Existing campaign ID for updates
  * @returns {Promise<Object>} Saved campaign
  */

@@ -14,11 +14,15 @@
  * @version 1.0.0
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
-import dotenv from 'dotenv';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import dotenv from "dotenv";
 dotenv.config();
 
 // Initialize S3 client with credentials from environment variables
@@ -32,8 +36,6 @@ const s3 = new S3Client({
   },
 });
 
-
-
 /**
  * Upload a file buffer to S3 with a unique key
  * @param {Object} params
@@ -43,9 +45,14 @@ const s3 = new S3Client({
  * @param {string} [params.folder] - Optional folder prefix
  * @returns {Promise<string>} S3 key of the uploaded file
  */
-export async function uploadFileToS3({ fileBuffer, fileName, mimeType, folder = '' }) {
+export async function uploadFileToS3({
+  fileBuffer,
+  fileName,
+  mimeType,
+  folder = "",
+}) {
   const ext = path.extname(fileName);
-  const key = `${folder ? folder + '/' : ''}${uuidv4()}${ext}`;
+  const key = `${folder ? folder + "/" : ""}${uuidv4()}${ext}`;
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
@@ -68,7 +75,7 @@ export async function getSignedS3Url(key, expiresIn = 60 * 60) {
     Key: key,
   });
   return getSignedUrl(s3, command, { expiresIn });
-} 
+}
 
 /**
  * GENERATE PUBLIC URL FOR S3 OBJECTS

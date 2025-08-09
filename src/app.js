@@ -20,6 +20,9 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 import categoryRoutes from "./modules/campaign/categories/category.routes.js";
 import campaignRoutes from "./modules/campaign/campaigns/campaign.routes.js";
+import segmentRoutes from "./modules/Outreach/segments/segment.routes.js";
+import contactRoutes from "./modules/Outreach/contacts/contact.routes.js";
+import notificationRoutes from "./modules/notifications/notification.routes.js";
 
 /**
  * Express Application Setup
@@ -90,6 +93,9 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1", categoryRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
+app.use("/api/v1/outreach/segments", segmentRoutes);
+app.use("/api/v1/outreach/contacts", contactRoutes);
+app.use("/api/v1", notificationRoutes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);

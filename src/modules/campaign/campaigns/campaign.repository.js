@@ -11,6 +11,7 @@
  * - Manage campaign-category relationships
  * - Handle campaign status updates
  * - Error handling and logging
+ * - Media record management for campaign images
  *
  * @author FundFlow Team
  * @version 1.0.0
@@ -37,8 +38,6 @@ export const createCampaign = async (campaignData, client) => {
     startDate,
     endDate,
     status = "draft",
-    mainMediaId,
-    campaignLogoMediaId,
     customPageSettings,
     shareLink,
     templateId,
@@ -51,10 +50,9 @@ export const createCampaign = async (campaignData, client) => {
     const queryText = `
       INSERT INTO campaigns (
         organizer_id, title, description, goal_amount, start_date, end_date,
-        status, main_media_id, campaign_logo_media_id, custom_page_settings,
-        share_link, template_id
+        status, custom_page_settings, share_link, template_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -66,8 +64,6 @@ export const createCampaign = async (campaignData, client) => {
       startDate,
       endDate,
       status,
-      mainMediaId,
-      campaignLogoMediaId,
       // Handle JSON field - stringify if it's an object
       customPageSettings && typeof customPageSettings === "object"
         ? JSON.stringify(customPageSettings)
@@ -133,8 +129,6 @@ export const updateCampaign = async (campaignId, updateData, client) => {
     startDate: "start_date",
     endDate: "end_date",
     status: "status",
-    mainMediaId: "main_media_id",
-    campaignLogoMediaId: "campaign_logo_media_id",
     customPageSettings: "custom_page_settings",
     shareLink: "share_link",
     templateId: "template_id",
