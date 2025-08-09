@@ -55,13 +55,15 @@ export const createCampaign = async (req, res) => {
 export const updateCampaign = async (req, res) => {
   const { campaignId } = req.params;
   const organizerId = req.user.userId;
+  const actorUserType = req.user.userType;
   const { categoryIds, ...updateData } = req.body;
 
   const campaign = await campaignService.updateCampaign(
     campaignId,
     organizerId,
     updateData,
-    categoryIds
+    categoryIds,
+    actorUserType
   );
 
   const message =

@@ -207,25 +207,52 @@ export const updateCampaign = async (
   campaignId,
   organizerId,
   updateData,
-  categoryIds = null
+  categoryIds = null,
+  actorUserType = null
 ) => {
   try {
-    logger.info("Updating campaign", { campaignId, organizerId });
-
-    // Verify ownership
-    const isOwner = await campaignRepository.isCampaignOwner(
+    logger.info("Updating campaign", {
       campaignId,
-      organizerId
+      organizerId,
+      actorUserType,
+    });
+
+    const ADMIN_ROLES = [
+      "super_admin",
+      "support_admin",
+      "event_moderator",
+      "financial_admin",
+    ];
+    const isAdminActor = ADMIN_ROLES.includes(
+      (actorUserType || "").toLowerCase()
     );
-    if (!isOwner) {
-      throw new AuthorizationError("You can only update your own campaigns");
+
+    // Verify ownership unless admin actor
+    if (!isAdminActor) {
+      const isOwner = await campaignRepository.isCampaignOwner(
+        campaignId,
+        organizerId
+      );
+      if (!isOwner) {
+        throw new AuthorizationError("You can only update your own campaigns");
+      }
     }
 
     // Use transaction for atomic operation
     const result = await transaction(async (client) => {
+      // If admin is approving/rejecting, stamp approver fields
+      const updatePayload = { ...updateData };
+      if (
+        isAdminActor &&
+        (updateData.status === "active" || updateData.status === "rejected")
+      ) {
+        updatePayload.approvedByUserId = organizerId;
+        updatePayload.approvedAt = new Date();
+      }
+
       const campaign = await campaignRepository.updateCampaign(
         campaignId,
-        updateData,
+        updatePayload,
         client
       );
 
