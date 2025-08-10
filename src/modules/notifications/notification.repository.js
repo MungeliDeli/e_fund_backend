@@ -59,7 +59,7 @@ export const listForUser = async (
   userId,
   { unreadOnly = false, limit = 50, offset = 0 } = {}
 ) => {
-  const where = ["user_id = $1"];
+  const where = ["user_id = $1", "type = 'in_app'"];
   const values = [userId];
   let idx = 2;
   if (unreadOnly) {

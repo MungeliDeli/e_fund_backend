@@ -54,6 +54,12 @@ class NotificationService {
         const subject = title;
         const html = `<p>${message}</p>`;
         await sendGenericEmail(to, subject, html);
+        console.log("Email sent", {
+          notificationId: row.notification_id,
+          to,
+          subject,
+          html,
+        });
         await query(
           `UPDATE notifications SET delivery_status = 'sent', sent_at = NOW() WHERE notification_id = $1`,
           [row.notification_id]
