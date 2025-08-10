@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
+import { catchAsync } from "../../middlewares/errorHandler.js";
 import {
   listMyNotifications,
   markNotificationRead,
@@ -8,7 +9,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
-router.get("/notifications", listMyNotifications);
-router.patch("/notifications/:id/read", markNotificationRead);
+router.get("/notifications", catchAsync(listMyNotifications));
+router.patch("/notifications/:id/read", catchAsync(markNotificationRead));
 
 export default router;

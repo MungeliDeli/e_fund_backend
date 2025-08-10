@@ -77,8 +77,50 @@ export const listForUser = async (
   return res.rows;
 };
 
+// Update delivery status helpers
+export const setDelivered = async (notificationId) => {
+  const text = `UPDATE notifications SET delivery_status = 'delivered' WHERE notification_id = $1`;
+  await query(text, [notificationId]);
+};
+
+export const setSent = async (notificationId) => {
+  const text = `UPDATE notifications SET delivery_status = 'sent', sent_at = NOW() WHERE notification_id = $1`;
+  await query(text, [notificationId]);
+};
+
+export const setFailedWithError = async (notificationId, errorMessage) => {
+  const text = `UPDATE notifications SET delivery_status = 'failed', attempts = attempts + 1, last_error = $2 WHERE notification_id = $1`;
+  await query(text, [notificationId, errorMessage]);
+};
+
+export const selectEmailByUserId = async (userId) => {
+  const { rows } = await query(`SELECT email FROM users WHERE user_id = $1`, [
+    userId,
+  ]);
+  return rows[0]?.email || null;
+};
+
+export const selectEmailRetryBatch = async ({ batchSize = 20 } = {}) => {
+  const { rows } = await query(
+    `SELECT notification_id, user_id, title, message
+       FROM notifications
+       WHERE type = 'email'
+         AND delivery_status IN ('failed','pending')
+         AND attempts < 3
+       ORDER BY updated_at ASC
+       LIMIT $1`,
+    [batchSize]
+  );
+  return rows;
+};
+
 export default {
   createNotification,
   markAsRead,
   listForUser,
+  setDelivered,
+  setSent,
+  setFailedWithError,
+  selectEmailByUserId,
+  selectEmailRetryBatch,
 };
