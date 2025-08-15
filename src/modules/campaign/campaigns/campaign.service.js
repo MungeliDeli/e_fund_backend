@@ -27,6 +27,8 @@ import { transaction } from "../../../db/index.js";
 import logger from "../../../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
 import notificationService from "../../notifications/notification.service.js";
+import { logCampaignEvent } from "../../audit/audit.utils.js";
+import { CAMPAIGN_ACTIONS } from "../../audit/audit.constants.js";
 
 /**
  * Format campaign data for API response
@@ -181,6 +183,21 @@ export const createCampaign = async (
       organizerId,
       status: result.status,
     });
+
+    // Log audit event for campaign creation
+    if (global.req) {
+      await logCampaignEvent(
+        global.req,
+        CAMPAIGN_ACTIONS.CAMPAIGN_CREATED,
+        result.campaignId,
+        {
+          organizerId,
+          title: campaignData.title,
+          status: result.status,
+          categoryCount: categoryIds.length,
+        }
+      );
+    }
 
     return completeCampaign;
   } catch (error) {
@@ -346,6 +363,33 @@ export const updateCampaign = async (
         error: notifyError.message,
       });
     }
+
+    // Log audit event for campaign update
+    if (global.req) {
+      let actionType = CAMPAIGN_ACTIONS.CAMPAIGN_UPDATED;
+
+      // Determine specific action type based on status change
+      if (updateData.status === "active") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_APPROVED;
+      } else if (updateData.status === "rejected") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_REJECTED;
+      } else if (updateData.status === "published") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED;
+      } else if (updateData.status === "paused") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PAUSED;
+      } else if (updateData.status === "draft") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_RESUMED;
+      }
+
+      await logCampaignEvent(global.req, actionType, campaignId, {
+        organizerId,
+        actorUserType,
+        previousStatus: completeCampaign.status,
+        newStatus: updateData.status,
+        isAdminAction: isAdminActor,
+      });
+    }
+
     return completeCampaign;
   } catch (error) {
     logger.error("Failed to update campaign", {

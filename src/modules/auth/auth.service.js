@@ -22,30 +22,33 @@
 import authRepository from "./auth.repository.js";
 import { hashPassword, comparePasswords } from "../../utils/password.utils.js";
 import { signToken } from "../../utils/jwt.utils.js";
-import { 
-  AuthenticationError, 
-  ConflictError, 
+import {
+  AuthenticationError,
+  ConflictError,
   ValidationError,
   NotFoundError,
-  DatabaseError
+  DatabaseError,
 } from "../../utils/appError.js";
 import logger from "../../utils/logger.js";
 import crypto from "crypto";
 import { createHash } from "crypto";
-import { sendVerificationEmail, sendPasswordResetEmail, sendSetupEmail } from "../../utils/email.utils.js";
-import { uploadFileToS3 } from '../../utils/s3.utils.js';
-import { v4 as uuidv4 } from 'uuid';
-import { transaction } from '../../db/index.js';
-
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendSetupEmail,
+} from "../../utils/email.utils.js";
+import { uploadFileToS3 } from "../../utils/s3.utils.js";
+import { v4 as uuidv4 } from "uuid";
+import { transaction } from "../../db/index.js";
+import { logAuthEvent, logUserAction } from "../audit/audit.utils.js";
+import { AUTH_ACTIONS, USER_ACTIONS } from "../audit/audit.constants.js";
 
 /**
  * Authentication Service
  * Contains business logic for authentication and user management
  */
 class AuthService {
-
-
-// INDIVIDUAL USER CREATION
+  // INDIVIDUAL USER CREATION
 
   /**
    * Registers a new individual user
@@ -64,16 +67,14 @@ class AuthService {
         dateOfBirth,
         country,
         city,
-        address
+        address,
       } = registrationData;
 
-      
       const emailExists = await authRepository.emailExists(email);
       if (emailExists) {
         throw new ConflictError("Email address is already registered");
       }
 
-      
       if (phoneNumber) {
         const phoneExists = await authRepository.phoneNumberExists(phoneNumber);
         if (phoneExists) {
@@ -81,19 +82,16 @@ class AuthService {
         }
       }
 
-      
       const passwordHash = await hashPassword(password);
 
-      
       const userData = {
         email: email.toLowerCase().trim(),
         passwordHash,
         userType: "individualUser",
         isEmailVerified: false,
-        isActive: false
+        isActive: false,
       };
 
-      
       const profileData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -102,38 +100,59 @@ class AuthService {
         dateOfBirth: dateOfBirth || null,
         country: country ? country.trim() : null,
         city: city ? city.trim() : null,
-        address: address ? address.trim() : null
+        address: address ? address.trim() : null,
       };
 
-      
-      const result = await authRepository.createUserAndProfile(userData, profileData);
+      const result = await authRepository.createUserAndProfile(
+        userData,
+        profileData
+      );
 
-      
       const verificationToken = crypto.randomBytes(32).toString("hex");
-      const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-      await authRepository.createEmailVerificationToken(result.user.userId, verificationTokenHash, expiresAt);
+      const verificationTokenHash = createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await authRepository.createEmailVerificationToken(
+        result.user.userId,
+        verificationTokenHash,
+        expiresAt
+      );
 
-       
       sendVerificationEmail(email, verificationToken)
         .then(() => {
-          logger.info(`Verification email sent successfully to ${email} in background.`);
+          logger.info(
+            `Verification email sent successfully to ${email} in background.`
+          );
         })
-        .catch(emailError => {
-          logger.error(`Failed to send verification email to ${email} in background: ${emailError.message}`, {
-            userId: result.user.userId,
-            email: result.user.email,
-            error: emailError
-          });
-          
-          
+        .catch((emailError) => {
+          logger.error(
+            `Failed to send verification email to ${email} in background: ${emailError.message}`,
+            {
+              userId: result.user.userId,
+              email: result.user.email,
+              error: emailError,
+            }
+          );
         });
 
-      logger.info("Individual user registered successfully (pending email verification) - Email sending initiated in background.", {
-        userId: result.user.userId,
-        email: result.user.email
-      });
+      logger.info(
+        "Individual user registered successfully (pending email verification) - Email sending initiated in background.",
+        {
+          userId: result.user.userId,
+          email: result.user.email,
+        }
+      );
 
+      // Log audit event for user registration
+      if (global.req) {
+        await logAuthEvent(global.req, AUTH_ACTIONS.USER_REGISTERED, {
+          userId: result.user.userId,
+          email: result.user.email,
+          userType: result.user.userType,
+          registrationMethod: "individual",
+        });
+      }
 
       return {
         user: result.user,
@@ -142,7 +161,7 @@ class AuthService {
     } catch (error) {
       logger.error("Failed to register individual user", {
         error: error.message,
-        email: registrationData.email
+        email: registrationData.email,
       });
 
       if (error instanceof ConflictError || error instanceof ValidationError) {
@@ -153,7 +172,6 @@ class AuthService {
     }
   }
 
-
   /**
    * Verifies user's email using a verification token
    * @param {string} verificationToken
@@ -161,44 +179,64 @@ class AuthService {
    */
   async verifyEmail(verificationToken) {
     try {
-      const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
-      const user = await authRepository.findEmailVerificationToken(verificationTokenHash);
+      const verificationTokenHash = createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
+      const user = await authRepository.findEmailVerificationToken(
+        verificationTokenHash
+      );
       if (!user) {
         throw new AuthenticationError("Invalid or expired verification token");
       }
       await authRepository.updateEmailVerification(user.userId, true);
       await authRepository.updateUserStatus(user.userId, true);
       await authRepository.deleteEmailVerificationTokenByUserId(user.userId);
-  
+
       const token = signToken({
         userId: user.userId,
         email: user.email,
-        userType: user.userType
+        userType: user.userType,
       });
       const refreshToken = crypto.randomBytes(64).toString("hex");
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshTokenHash = createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
       const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
+      await authRepository.createRefreshToken(
+        user.userId,
+        refreshTokenHash,
+        refreshExpiresAt
+      );
       logger.info("Email verified and account activated", {
         userId: user.userId,
-        email: user.email
+        email: user.email,
       });
+
+      // Log audit event for email verification
+      if (global.req) {
+        await logAuthEvent(global.req, AUTH_ACTIONS.EMAIL_VERIFIED, {
+          userId: user.userId,
+          email: user.email,
+          userType: user.userType,
+          accountActivated: true,
+        });
+      }
+
       return {
         userId: user.userId,
         email: user.email,
         isEmailVerified: true,
         isActive: true,
         token,
-        refreshToken
+        refreshToken,
       };
     } catch (error) {
       logger.error("Failed to verify email", {
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
   }
-
 
   // ORGANIZATION USER CREATION
 
@@ -210,24 +248,26 @@ class AuthService {
         fileBuffer: mediaFile.buffer,
         fileName: mediaFile.originalname,
         mimeType: mediaFile.mimetype,
-        folder: 'organization-profiles',
+        folder: "organization-profiles",
       });
       const mediaId = uuidv4();
       return {
         mediaId,
         mediaRecord: {
           mediaId,
-          entityType: 'organizationProfile',
-          mediaType: 'image',
+          entityType: "organizationProfile",
+          mediaType: "image",
           fileName: s3Key,
           fileSize: mediaFile.size,
           description,
-          altText: '',
+          altText: "",
           uploadedByUserId: createdById,
-        }
+        },
       };
     } catch (err) {
-      throw new ValidationError(`Failed to upload ${description} to S3: ` + err.message);
+      throw new ValidationError(
+        `Failed to upload ${description} to S3: ` + err.message
+      );
     }
   }
 
@@ -237,10 +277,8 @@ class AuthService {
    * @param {Object} profileData
    * @returns {Promise<Object>} Created user, profile, and raw setup token
    */
-   async createOrganizationUserAndInvite(registrationData, createdByAdminId) {
- 
-
-    const { 
+  async createOrganizationUserAndInvite(registrationData, createdByAdminId) {
+    const {
       organizationName,
       organizationShortName,
       organizationType,
@@ -260,91 +298,165 @@ class AuthService {
     } = registrationData;
 
     const emailExists = await authRepository.emailExists(officialEmail);
-    if(emailExists){
-      throw new ConflictError("Email address is alread registered")
+    if (emailExists) {
+      throw new ConflictError("Email address is alread registered");
     }
 
     // Use helper to process both media files
-    const { mediaId: profilePictureMediaId, mediaRecord: profilePictureMediaRecord } = await this._processMediaFile(profilePictureFile, 'Organization profile picture', createdByAdminId);
-    const { mediaId: coverPictureMediaId, mediaRecord: coverPictureMediaRecord } = await this._processMediaFile(coverPictureFile, 'Organization cover picture', createdByAdminId);
+    const {
+      mediaId: profilePictureMediaId,
+      mediaRecord: profilePictureMediaRecord,
+    } = await this._processMediaFile(
+      profilePictureFile,
+      "Organization profile picture",
+      createdByAdminId
+    );
+    const {
+      mediaId: coverPictureMediaId,
+      mediaRecord: coverPictureMediaRecord,
+    } = await this._processMediaFile(
+      coverPictureFile,
+      "Organization cover picture",
+      createdByAdminId
+    );
 
     let orgResult;
     await transaction(async (client) => {
       // 1. Insert media records first (with entityId: null)
       if (profilePictureMediaRecord) {
-        await authRepository.createMediaRecord({ ...profilePictureMediaRecord, entityId: null }, client);
+        await authRepository.createMediaRecord(
+          { ...profilePictureMediaRecord, entityId: null },
+          client
+        );
       }
       if (coverPictureMediaRecord) {
-        await authRepository.createMediaRecord({ ...coverPictureMediaRecord, entityId: null }, client);
+        await authRepository.createMediaRecord(
+          { ...coverPictureMediaRecord, entityId: null },
+          client
+        );
       }
 
       // 2. Create org user and profile, referencing the media IDs
-      orgResult = await authRepository.createOrganizationUserAndProfile({
-        email: officialEmail.toLowerCase().trim(),
-        passwordHash: 'placeholder',
-        userType: 'organizationUser',
-        isEmailVerified: false,
-        isActive: false
-      }, {
-        organizationName: organizationName.trim(),
-        organizationShortName: organizationShortName ? organizationShortName.trim() : null,
-        organizationType: organizationType.trim(),
-        officialEmail: officialEmail ? officialEmail.toLowerCase().trim() : null,
-        officialWebsiteUrl: officialWebsiteUrl ? officialWebsiteUrl.trim() : null,
-        profilePictureMediaId: profilePictureMediaId || null,
-        coverPictureMediaId: coverPictureMediaId || null,
-        address: address ? address.trim() : null,
-        missionDescription: missionDescription ? missionDescription.trim() : null,
-        establishmentDate: establishmentDate ? establishmentDate : null,
-        campusAffiliationScope: campusAffiliationScope ? campusAffiliationScope.trim() : null,
-        affiliatedSchoolsNames: affiliatedSchoolsNames ? affiliatedSchoolsNames.trim() : null,
-        affiliatedDepartmentNames: affiliatedDepartmentNames ? affiliatedDepartmentNames.trim() : null,
-        primaryContactPersonName: primaryContactPersonName ? primaryContactPersonName.trim() : null,
-        primaryContactPersonEmail: primaryContactPersonEmail ? primaryContactPersonEmail.trim() : null,
-        primaryContactPersonPhone: primaryContactPersonPhone ? primaryContactPersonPhone.trim() : null,
-        createdByAdminId: createdByAdminId
-      }, client);
+      orgResult = await authRepository.createOrganizationUserAndProfile(
+        {
+          email: officialEmail.toLowerCase().trim(),
+          passwordHash: "placeholder",
+          userType: "organizationUser",
+          isEmailVerified: false,
+          isActive: false,
+        },
+        {
+          organizationName: organizationName.trim(),
+          organizationShortName: organizationShortName
+            ? organizationShortName.trim()
+            : null,
+          organizationType: organizationType.trim(),
+          officialEmail: officialEmail
+            ? officialEmail.toLowerCase().trim()
+            : null,
+          officialWebsiteUrl: officialWebsiteUrl
+            ? officialWebsiteUrl.trim()
+            : null,
+          profilePictureMediaId: profilePictureMediaId || null,
+          coverPictureMediaId: coverPictureMediaId || null,
+          address: address ? address.trim() : null,
+          missionDescription: missionDescription
+            ? missionDescription.trim()
+            : null,
+          establishmentDate: establishmentDate ? establishmentDate : null,
+          campusAffiliationScope: campusAffiliationScope
+            ? campusAffiliationScope.trim()
+            : null,
+          affiliatedSchoolsNames: affiliatedSchoolsNames
+            ? affiliatedSchoolsNames.trim()
+            : null,
+          affiliatedDepartmentNames: affiliatedDepartmentNames
+            ? affiliatedDepartmentNames.trim()
+            : null,
+          primaryContactPersonName: primaryContactPersonName
+            ? primaryContactPersonName.trim()
+            : null,
+          primaryContactPersonEmail: primaryContactPersonEmail
+            ? primaryContactPersonEmail.trim()
+            : null,
+          primaryContactPersonPhone: primaryContactPersonPhone
+            ? primaryContactPersonPhone.trim()
+            : null,
+          createdByAdminId: createdByAdminId,
+        },
+        client
+      );
 
       // 3. Update media records with the new entityId (userId)
       if (profilePictureMediaRecord) {
-        await authRepository.updateMediaEntityId(profilePictureMediaId, orgResult.user.userId, client);
+        await authRepository.updateMediaEntityId(
+          profilePictureMediaId,
+          orgResult.user.userId,
+          client
+        );
       }
       if (coverPictureMediaRecord) {
-        await authRepository.updateMediaEntityId(coverPictureMediaId, orgResult.user.userId, client);
+        await authRepository.updateMediaEntityId(
+          coverPictureMediaId,
+          orgResult.user.userId,
+          client
+        );
       }
     });
 
     // 4. Generate setup token and send email (after transaction is committed)
-    const setupToken = crypto.randomBytes(48).toString('hex');
-    const setupTokenHash = createHash('sha256').update(setupToken).digest('hex');
+    const setupToken = crypto.randomBytes(48).toString("hex");
+    const setupTokenHash = createHash("sha256")
+      .update(setupToken)
+      .digest("hex");
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
-    await authRepository.createPasswordSetupToken(orgResult.user.userId, setupTokenHash, expiresAt);
+    await authRepository.createPasswordSetupToken(
+      orgResult.user.userId,
+      setupTokenHash,
+      expiresAt
+    );
     sendSetupEmail(orgResult.user.email, setupToken)
       .then(() => {
-        logger.info(`Setup email sent successfully to ${orgResult.user.email} in background.`);
+        logger.info(
+          `Setup email sent successfully to ${orgResult.user.email} in background.`
+        );
       })
-      .catch(emailError => {
-        logger.error(`Failed to send setup email to ${orgResult.user.email} in background: ${emailError.message}`, {
-          userId: orgResult.user.userId,
-        });
+      .catch((emailError) => {
+        logger.error(
+          `Failed to send setup email to ${orgResult.user.email} in background: ${emailError.message}`,
+          {
+            userId: orgResult.user.userId,
+          }
+        );
       });
 
-    logger.info(`Organization user created successfully (pending verification )`, {
-      userId: orgResult.user.userId,
-      email: orgResult.user.email,
-      organizationName: orgResult.profile.organizationName,
-    });
+    logger.info(
+      `Organization user created successfully (pending verification )`,
+      {
+        userId: orgResult.user.userId,
+        email: orgResult.user.email,
+        organizationName: orgResult.profile.organizationName,
+      }
+    );
     return {
       user: orgResult.user,
       profile: orgResult.profile,
-      setupToken // REMOVE in production
+      setupToken, // REMOVE in production
     };
   }
 
-
-  async createMediaRecord(mediaRecord  , entityId){
-    try{
-      const {mediaId, entityType, mediaType, fileName, fileSize, description, altText, uploadedByUserId} = mediaRecord;
+  async createMediaRecord(mediaRecord, entityId) {
+    try {
+      const {
+        mediaId,
+        entityType,
+        mediaType,
+        fileName,
+        fileSize,
+        description,
+        altText,
+        uploadedByUserId,
+      } = mediaRecord;
       const mediaRecord = await authRepository.createMediaRecord({
         mediaId,
         entityType,
@@ -354,13 +466,13 @@ class AuthService {
         fileSize,
         description,
         altText,
-        uploadedByUserId
+        uploadedByUserId,
       });
       return mediaRecord;
     } catch (error) {
       logger.error("Failed to create media record", {
         error: error.message,
-        mediaRecord
+        mediaRecord,
       });
       throw error;
     }
@@ -373,15 +485,20 @@ class AuthService {
    * @returns {Promise<Object>} JWT and refreshToken for auto-login
    */
   async activateAndSetPassword(token, newPassword) {
-    const setupTokenHash = createHash('sha256').update(token).digest('hex');
+    const setupTokenHash = createHash("sha256").update(token).digest("hex");
     const user = await authRepository.findPasswordSetupToken(setupTokenHash);
     if (!user || user.isEmailVerified || user.isActive) {
-      throw new AuthenticationError('Activation link is invalid or has expired. Please contact your administrator.');
+      throw new AuthenticationError(
+        "Activation link is invalid or has expired. Please contact your administrator."
+      );
     }
     const newPasswordHash = await hashPassword(newPassword);
-    await authRepository.updateUserPasswordAndActivate(user.userId, newPasswordHash);
+    await authRepository.updateUserPasswordAndActivate(
+      user.userId,
+      newPasswordHash
+    );
     await authRepository.deletePasswordSetupToken(setupTokenHash);
-    return {message: "Password set successfully"}
+    return { message: "Password set successfully" };
   }
 
   /**
@@ -397,26 +514,48 @@ class AuthService {
         throw new AuthenticationError("Invalid email or password");
       }
       if (!user.isEmailVerified) {
-        throw new AuthenticationError("Please verify your email to activate your account.");
+        throw new AuthenticationError(
+          "Please verify your email to activate your account."
+        );
       }
       if (!user.isActive) {
         throw new AuthenticationError("Account is not active. Contact admin.");
       }
-      const isPasswordValid = await comparePasswords(password, user.passwordHash);
+      const isPasswordValid = await comparePasswords(
+        password,
+        user.passwordHash
+      );
       if (!isPasswordValid) {
         throw new AuthenticationError("Invalid email or password");
       }
       const token = signToken({
         userId: user.userId,
         email: user.email,
-        userType: user.userType
+        userType: user.userType,
       });
-     
+
       const refreshToken = crypto.randomBytes(64).toString("hex");
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshTokenHash = createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
       const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      await authRepository.createRefreshToken(user.userId, refreshTokenHash, refreshExpiresAt);
+      await authRepository.createRefreshToken(
+        user.userId,
+        refreshTokenHash,
+        refreshExpiresAt
+      );
       logger.security.loginAttempt(email, "N/A", true);
+
+      // Log audit event for successful login
+      if (global.req) {
+        await logAuthEvent(global.req, AUTH_ACTIONS.USER_LOGIN, {
+          userId: user.userId,
+          email: user.email,
+          userType: user.userType,
+          success: true,
+        });
+      }
+
       return {
         user: {
           userId: user.userId,
@@ -424,10 +563,10 @@ class AuthService {
           userType: user.userType,
           isEmailVerified: user.isEmailVerified,
           isActive: user.isActive,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
         },
         token,
-        refreshToken 
+        refreshToken,
       };
     } catch (error) {
       logger.security.loginAttempt(email, "N/A", false);
@@ -436,24 +575,36 @@ class AuthService {
       }
       logger.error("Authentication failed", {
         error: error.message,
-        email
+        email,
       });
       throw new AuthenticationError("Authentication failed");
     }
   }
 
-
-  
   /**
    * Logs out a user (deletes refresh token)
    * @param {string} refreshToken
    * @returns {Promise<Object>} Success message
    */
   async logout(refreshToken) {
+    let user = null;
     if (refreshToken) {
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+      const refreshTokenHash = createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+      user = await authRepository.findRefreshToken(refreshTokenHash);
       await authRepository.deleteRefreshToken(refreshTokenHash);
     }
+
+    // Log audit event for logout
+    if (global.req && user) {
+      await logAuthEvent(global.req, AUTH_ACTIONS.USER_LOGOUT, {
+        userId: user.userId,
+        email: user.email,
+        userType: user.userType,
+      });
+    }
+
     return { message: "Logged out successfully." };
   }
 
@@ -471,27 +622,39 @@ class AuthService {
         throw new NotFoundError("User");
       }
 
-     
-      const isCurrentPasswordValid = await comparePasswords(currentPassword, user.passwordHash);
+      const isCurrentPasswordValid = await comparePasswords(
+        currentPassword,
+        user.passwordHash
+      );
       if (!isCurrentPasswordValid) {
         throw new AuthenticationError("Current password is incorrect");
       }
 
-
       const newPasswordHash = await hashPassword(newPassword);
 
-      await authRepository.updatePassword(user.userId , newPasswordHash)
+      await authRepository.updatePassword(user.userId, newPasswordHash);
 
-      return {message: "Password change successfully"}
+      // Log audit event for password change
+      if (global.req) {
+        await logAuthEvent(global.req, AUTH_ACTIONS.PASSWORD_CHANGED, {
+          userId: user.userId,
+          email: user.email,
+          userType: user.userType,
+          changedBy: "user",
+        });
+      }
 
-
+      return { message: "Password change successfully" };
     } catch (error) {
       logger.error("Failed to change password", {
         error: error.message,
-        userId
+        userId,
       });
 
-      if (error instanceof NotFoundError || error instanceof AuthenticationError) {
+      if (
+        error instanceof NotFoundError ||
+        error instanceof AuthenticationError
+      ) {
         throw error;
       }
 
@@ -500,39 +663,47 @@ class AuthService {
   }
 
   /**
-   * Refreshes user's authentication token using a refresh token includes rotating it 
+   * Refreshes user's authentication token using a refresh token includes rotating it
    * @param {string} refreshToken
    * @returns {Promise<Object>} New JWT and refresh token
    */
   async refreshToken(refreshToken) {
     try {
-      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
-      console.log("token recieved",refreshToken);
-      console.log("token recieved hash",refreshTokenHash);
-      
+      const refreshTokenHash = createHash("sha256")
+        .update(refreshToken)
+        .digest("hex");
+      console.log("token recieved", refreshToken);
+      console.log("token recieved hash", refreshTokenHash);
+
       const user = await authRepository.findRefreshToken(refreshTokenHash);
       if (!user) {
         throw new AuthenticationError("Invalid or expired refresh token");
       }
-     
+
       const token = signToken({
         userId: user.userId,
         email: user.email,
-        userType: user.userType
+        userType: user.userType,
       });
-    
+
       const newRefreshToken = crypto.randomBytes(64).toString("hex");
-      const newRefreshTokenHash = createHash("sha256").update(newRefreshToken).digest("hex");
-      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); 
-      await authRepository.createRefreshToken(user.userId, newRefreshTokenHash, refreshExpiresAt);
-       console.log("token recieved",newRefreshToken);
-      console.log("token recieved hash",newRefreshTokenHash);
+      const newRefreshTokenHash = createHash("sha256")
+        .update(newRefreshToken)
+        .digest("hex");
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await authRepository.createRefreshToken(
+        user.userId,
+        newRefreshTokenHash,
+        refreshExpiresAt
+      );
+      console.log("token recieved", newRefreshToken);
+      console.log("token recieved hash", newRefreshTokenHash);
       await authRepository.deleteRefreshToken(refreshTokenHash);
       logger.security.tokenGenerated(user.userId, "refresh");
       return { token, refreshToken: newRefreshToken };
     } catch (error) {
       logger.error("Failed to refresh token", {
-        error: error.message
+        error: error.message,
       });
       if (error instanceof AuthenticationError) {
         throw error;
@@ -551,25 +722,51 @@ class AuthService {
     if (user && user.isActive) {
       // Delete any existing password reset tokens for this user
       await authRepository.deletePasswordResetTokenByUserId(user.userId);
-      
+
       const resetToken = crypto.randomBytes(32).toString("hex");
-      const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
+      const resetTokenHash = createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
       const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min
-      await authRepository.createPasswordResetToken(user.userId, resetTokenHash, expiresAt);
-    
+      await authRepository.createPasswordResetToken(
+        user.userId,
+        resetTokenHash,
+        expiresAt
+      );
+
       sendPasswordResetEmail(email, resetToken)
         .then(() => {
           logger.info(`Password Reset email sent successfully to ${email}`);
+
+          // Log audit event for password reset request
+          if (global.req) {
+            logAuthEvent(global.req, AUTH_ACTIONS.PASSWORD_RESET_REQUESTED, {
+              userId: user.userId,
+              email: user.email,
+              userType: user.userType,
+            }).catch((error) => {
+              logger.error(
+                "Failed to log password reset request audit event:",
+                error
+              );
+            });
+          }
         })
-        .catch(emailError => {
-          logger.error(`Failed to send password reset email to ${email}: ${emailError.message}`, {
-            userId: user.userId,
-            email: user.email,
-            error: emailError
-          });
+        .catch((emailError) => {
+          logger.error(
+            `Failed to send password reset email to ${email}: ${emailError.message}`,
+            {
+              userId: user.userId,
+              email: user.email,
+              error: emailError,
+            }
+          );
         });
     }
-    return { message: "If the email exists, password reset instructions have been sent." };
+    return {
+      message:
+        "If the email exists, password reset instructions have been sent.",
+    };
   }
 
   /**
@@ -579,7 +776,9 @@ class AuthService {
    * @returns {Promise<Object>} Success message
    */
   async resetPassword(resetToken, newPassword) {
-    const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
+    const resetTokenHash = createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
     const user = await authRepository.findPasswordResetToken(resetTokenHash);
     if (!user) {
       throw new AuthenticationError("Invalid or expired reset token");
@@ -588,6 +787,17 @@ class AuthService {
     await authRepository.updatePassword(user.userId, newPasswordHash);
     // Delete all password reset tokens for this user (cleanup)
     await authRepository.deletePasswordResetTokenByUserId(user.userId);
+
+    // Log audit event for password reset completion
+    if (global.req) {
+      await logAuthEvent(global.req, AUTH_ACTIONS.PASSWORD_RESET_COMPLETED, {
+        userId: user.userId,
+        email: user.email,
+        userType: user.userType,
+        resetMethod: "email_token",
+      });
+    }
+
     return { message: "Password has been reset successfully." };
   }
 
@@ -605,17 +815,25 @@ class AuthService {
     }
     // Generate new verification token
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenHash = createHash("sha256").update(verificationToken).digest("hex");
+    const verificationTokenHash = createHash("sha256")
+      .update(verificationToken)
+      .digest("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     // Remove any existing token for this user (optional, for safety)
     await authRepository.deleteEmailVerificationTokenByUserId(user.userId);
     // Insert new token
-    await authRepository.createEmailVerificationToken(user.userId, verificationTokenHash, expiresAt);
+    await authRepository.createEmailVerificationToken(
+      user.userId,
+      verificationTokenHash,
+      expiresAt
+    );
     // Send email
     await sendVerificationEmail(user.email, verificationToken);
-    logger.info("Resent verification email", { userId: user.userId, email: user.email });
+    logger.info("Resent verification email", {
+      userId: user.userId,
+      email: user.email,
+    });
   }
-
 }
 
-export default new AuthService(); 
+export default new AuthService();

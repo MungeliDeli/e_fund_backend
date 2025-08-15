@@ -24,6 +24,8 @@ import userRepository from "./user.repository.js";
 import logger from "../../utils/logger.js";
 import { query, transaction } from "../../db/index.js";
 import sharp from "sharp";
+import { logUserAction } from "../audit/audit.utils.js";
+import { USER_ACTIONS } from "../audit/audit.constants.js";
 
 const MAX_IMAGE_DIMENSION = 1024;
 const JPEG_QUALITY = 80;
@@ -128,6 +130,19 @@ export const updateUserProfile = async (userId, profileData) => {
     const { user, profile } = await getUserWithProfileById(userId);
     // isOwner is true since the user is updating their own profile
     const formattedProfile = formatProfile(user, profile, true);
+
+    // Log audit event for profile update
+    if (global.req) {
+      await logUserAction(
+        global.req,
+        USER_ACTIONS.USER_PROFILE_UPDATED,
+        userId,
+        {
+          userType: user.userType,
+          updatedFields: Object.keys(profileData),
+        }
+      );
+    }
 
     return formattedProfile;
   } catch (error) {
