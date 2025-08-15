@@ -88,7 +88,7 @@ class AuthService {
       const userData = {
         email: email.toLowerCase().trim(),
         passwordHash,
-        userType: "individual_user",
+        userType: "individualUser",
         isEmailVerified: false,
         isActive: false
       };
@@ -282,7 +282,7 @@ class AuthService {
       orgResult = await authRepository.createOrganizationUserAndProfile({
         email: officialEmail.toLowerCase().trim(),
         passwordHash: 'placeholder',
-        userType: 'organization_user',
+        userType: 'organizationUser',
         isEmailVerified: false,
         isActive: false
       }, {

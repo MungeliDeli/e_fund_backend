@@ -48,9 +48,9 @@ export const createCampaign = async (campaignData, client) => {
 
   try {
     const queryText = `
-      INSERT INTO campaigns (
-        organizer_id, title, description, goal_amount, start_date, end_date,
-        status, custom_page_settings, share_link, template_id
+      INSERT INTO "campaigns" (
+        "organizerId", title, description, "goalAmount", "startDate", "endDate",
+        status, "customPageSettings", "shareLink", "templateId"
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
@@ -78,18 +78,18 @@ export const createCampaign = async (campaignData, client) => {
 
     // Parse JSON fields if they exist and are strings
     if (
-      createdCampaign.custom_page_settings &&
-      typeof createdCampaign.custom_page_settings === "string"
+      createdCampaign.customPageSettings &&
+      typeof createdCampaign.customPageSettings === "string"
     ) {
       try {
-        createdCampaign.custom_page_settings = JSON.parse(
-          createdCampaign.custom_page_settings
+        createdCampaign.customPageSettings = JSON.parse(
+          createdCampaign.customPageSettings
         );
       } catch (parseError) {
         logger.warn(
-          "Failed to parse custom_page_settings JSON in create result",
+          "Failed to parse customPageSettings JSON in create result",
           {
-            campaignId: createdCampaign.campaign_id,
+            campaignId: createdCampaign.campaignId,
             error: parseError.message,
           }
         );
@@ -97,7 +97,7 @@ export const createCampaign = async (campaignData, client) => {
     }
 
     logger.info("Campaign created successfully", {
-      campaignId: createdCampaign.campaign_id,
+      campaignId: createdCampaign.campaignId,
       organizerId,
       status,
     });
@@ -125,15 +125,15 @@ export const updateCampaign = async (campaignId, updateData, client) => {
   const allowedFields = {
     title: "title",
     description: "description",
-    goalAmount: "goal_amount",
-    startDate: "start_date",
-    endDate: "end_date",
+    goalAmount: "goalAmount",
+    startDate: "startDate",
+    endDate: "endDate",
     status: "status",
-    customPageSettings: "custom_page_settings",
-    shareLink: "share_link",
-    templateId: "template_id",
-    approvedByUserId: "approved_by_user_id",
-    approvedAt: "approved_at",
+    customPageSettings: "customPageSettings",
+    shareLink: "shareLink",
+    templateId: "templateId",
+    approvedByUserId: "approvedByUserId",
+    approvedAt: "approvedAt",
   };
 
   const setClauses = [];
@@ -144,7 +144,7 @@ export const updateCampaign = async (campaignId, updateData, client) => {
     const dbColumnName = allowedFields[key];
 
     if (dbColumnName && value !== undefined) {
-      setClauses.push(`${dbColumnName} = $${valueIndex++}`);
+      setClauses.push(`"${dbColumnName}" = $${valueIndex++}`);
 
       // Handle JSON fields that need to be stringified
       if (
@@ -169,9 +169,9 @@ export const updateCampaign = async (campaignId, updateData, client) => {
 
   values.push(campaignId);
   const queryText = `
-    UPDATE campaigns
+    UPDATE "campaigns"
     SET ${setClauses.join(", ")}
-    WHERE campaign_id = $${valueIndex}
+    WHERE "campaignId" = $${valueIndex}
     RETURNING *
   `;
 
@@ -186,16 +186,16 @@ export const updateCampaign = async (campaignId, updateData, client) => {
 
     // Parse JSON fields if they exist and are strings
     if (
-      updatedCampaign.custom_page_settings &&
-      typeof updatedCampaign.custom_page_settings === "string"
+      updatedCampaign.customPageSettings &&
+      typeof updatedCampaign.customPageSettings === "string"
     ) {
       try {
-        updatedCampaign.custom_page_settings = JSON.parse(
-          updatedCampaign.custom_page_settings
+        updatedCampaign.customPageSettings = JSON.parse(
+          updatedCampaign.customPageSettings
         );
       } catch (parseError) {
         logger.warn(
-          "Failed to parse custom_page_settings JSON in update result",
+          "Failed to parse customPageSettings JSON in update result",
           {
             campaignId,
             error: parseError.message,
@@ -228,17 +228,17 @@ export const findCampaignById = async (campaignId) => {
     const queryText = `
       SELECT 
         c.*,
-        u.email as organizer_email,
-        u.user_type as organizer_type,
-        op.organization_name as organizer_name,
-        m1.file_name as main_media_file_name,
-        m2.file_name as logo_media_file_name
-      FROM campaigns c
-      JOIN users u ON c.organizer_id = u.user_id
-      LEFT JOIN organization_profiles op ON u.user_id = op.user_id
-      LEFT JOIN media m1 ON c.main_media_id = m1.media_id
-      LEFT JOIN media m2 ON c.campaign_logo_media_id = m2.media_id
-      WHERE c.campaign_id = $1
+        u.email as organizerEmail,
+        u."userType" as organizerType,
+        op."organizationName" as organizerName,
+        m1."fileName" as "mainMediaFileName",
+        m2."fileName" as "logoMediaFileName"
+      FROM "campaigns" c
+      JOIN "users" u ON c."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      LEFT JOIN "media" m1 ON c."mainMediaId" = m1."mediaId"
+      LEFT JOIN "media" m2 ON c."campaignLogoMediaId" = m2."mediaId"
+      WHERE c."campaignId" = $1
     `;
 
     const result = await query(queryText, [campaignId]);
@@ -251,15 +251,13 @@ export const findCampaignById = async (campaignId) => {
 
     // Parse JSON fields if they exist and are strings
     if (
-      campaign.custom_page_settings &&
-      typeof campaign.custom_page_settings === "string"
+      campaign.customPageSettings &&
+      typeof campaign.customPageSettings === "string"
     ) {
       try {
-        campaign.custom_page_settings = JSON.parse(
-          campaign.custom_page_settings
-        );
+        campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
       } catch (parseError) {
-        logger.warn("Failed to parse custom_page_settings JSON", {
+        logger.warn("Failed to parse customPageSettings JSON", {
           campaignId,
           error: parseError.message,
         });
@@ -287,7 +285,7 @@ export const findCampaignById = async (campaignId) => {
  */
 export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
   try {
-    let whereClauses = ["c.organizer_id = $1"];
+    let whereClauses = [`c."organizerId" = $1`];
     let values = [organizerId];
     let valueIndex = 2;
 
@@ -313,13 +311,13 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
     const queryText = `
       SELECT 
         c.*,
-        u.email as organizer_email,
-        op.organization_name as organizer_name
-      FROM campaigns c
-      JOIN users u ON c.organizer_id = u.user_id
-      LEFT JOIN organization_profiles op ON u.user_id = op.user_id
+        u.email as organizerEmail,
+        op."organizationName" as organizerName
+      FROM "campaigns"   c
+      JOIN "users" u ON c."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
       WHERE ${whereClauses.join(" AND ")}
-      ORDER BY c.created_at DESC
+      ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}
     `;
 
@@ -329,16 +327,14 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
     // Parse JSON fields for each campaign
     const campaigns = result.rows.map((campaign) => {
       if (
-        campaign.custom_page_settings &&
-        typeof campaign.custom_page_settings === "string"
+        campaign.customPageSettings &&
+        typeof campaign.customPageSettings === "string"
       ) {
         try {
-          campaign.custom_page_settings = JSON.parse(
-            campaign.custom_page_settings
-          );
+          campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
         } catch (parseError) {
-          logger.warn("Failed to parse custom_page_settings JSON", {
-            campaignId: campaign.campaign_id,
+          logger.warn("Failed to parse customPageSettings JSON", {
+            campaignId: campaign.campaignId,
             error: parseError.message,
           });
         }
@@ -378,9 +374,9 @@ export const addCampaignCategories = async (
       .join(", ");
 
     const queryText = `
-      INSERT INTO campaign_categories (campaign_id, category_id)
+      INSERT INTO "campaignCategories" ("campaignId", "categoryId")
       VALUES ${values}
-      ON CONFLICT (campaign_id, category_id) DO NOTHING
+      ON CONFLICT ("campaignId", "categoryId") DO NOTHING
     `;
 
     await executor.query(queryText, [campaignId, ...categoryIds]);
@@ -409,7 +405,7 @@ export const removeCampaignCategories = async (campaignId, client) => {
 
   try {
     const queryText = `
-      DELETE FROM campaign_categories WHERE campaign_id = $1
+      DELETE FROM "campaignCategories" WHERE "campaignId" = $1
     `;
 
     await executor.query(queryText, [campaignId]);
@@ -433,9 +429,9 @@ export const getCampaignCategories = async (campaignId) => {
   try {
     const queryText = `
       SELECT c.*
-      FROM categories c
-      JOIN campaign_categories cc ON c.category_id = cc.category_id
-      WHERE cc.campaign_id = $1
+      FROM "categories" c
+      JOIN "campaignCategories" cc ON c."categoryId" = cc."categoryId"
+      WHERE cc."campaignId" = $1
       ORDER BY c.name
     `;
 
@@ -459,8 +455,8 @@ export const getCampaignCategories = async (campaignId) => {
 export const isCampaignOwner = async (campaignId, organizerId) => {
   try {
     const queryText = `
-      SELECT 1 FROM campaigns 
-      WHERE campaign_id = $1 AND organizer_id = $2
+      SELECT 1 FROM "campaigns" 
+      WHERE "campaignId" = $1 AND "organizerId" = $2
     `;
 
     const result = await query(queryText, [campaignId, organizerId]);
@@ -511,13 +507,13 @@ export const findAllCampaigns = async (filters = {}) => {
     const queryText = `
       SELECT 
         c.*,
-        u.email as organizer_email,
-        op.organization_name as organizer_name
-      FROM campaigns c
-      JOIN users u ON c.organizer_id = u.user_id
-      LEFT JOIN organization_profiles op ON u.user_id = op.user_id
+        u.email as organizerEmail,
+        op."organizationName" as organizerName
+      FROM "campaigns" c
+      JOIN "users" u ON c."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
       ${whereClause}
-      ORDER BY c.created_at DESC
+      ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}
     `;
 
@@ -527,16 +523,14 @@ export const findAllCampaigns = async (filters = {}) => {
     // Parse JSON fields for each campaign
     const campaigns = result.rows.map((campaign) => {
       if (
-        campaign.custom_page_settings &&
-        typeof campaign.custom_page_settings === "string"
+        campaign.customPageSettings &&
+        typeof campaign.customPageSettings === "string"
       ) {
         try {
-          campaign.custom_page_settings = JSON.parse(
-            campaign.custom_page_settings
-          );
+          campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
         } catch (parseError) {
-          logger.warn("Failed to parse custom_page_settings JSON", {
-            campaignId: campaign.campaign_id,
+          logger.warn("Failed to parse customPageSettings JSON", {
+            campaignId: campaign.campaignId,
             error: parseError.message,
           });
         }
@@ -553,6 +547,42 @@ export const findAllCampaigns = async (filters = {}) => {
   }
 };
 
+/**
+ * Create a media record in the media table
+ * @param {Object} mediaRecord - Media record data
+ * @param {Object} [client] - Optional DB client for transaction
+ * @returns {Promise<void>}
+ */
+export const createMediaRecord = async (mediaRecord, client) => {
+  const executor = client || { query };
+  const {
+    mediaId,
+    entityType,
+    entityId,
+    mediaType,
+    fileName,
+    fileSize,
+    description,
+    altText,
+    uploadedByUserId,
+  } = mediaRecord;
+  const queryText = `
+    INSERT INTO "media" ("mediaId", "entityType", "entityId", "mediaType", "fileName", "fileSize", description, "altText", "uploadedByUserId")
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+  `;
+  await executor.query(queryText, [
+    mediaId,
+    entityType,
+    entityId,
+    mediaType,
+    fileName,
+    fileSize,
+    description,
+    altText,
+    uploadedByUserId,
+  ]);
+};
+
 export default {
   createCampaign,
   updateCampaign,
@@ -563,4 +593,5 @@ export default {
   removeCampaignCategories,
   getCampaignCategories,
   isCampaignOwner,
+  createMediaRecord,
 };

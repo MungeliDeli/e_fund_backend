@@ -51,7 +51,7 @@ export const createSegment = async (segmentData, organizerId) => {
     );
 
     logger.info("Segment created successfully", {
-      segmentId: segment.segment_id,
+      segmentId: segment.segmentId,
       name: segment.name,
       organizerId,
     });
@@ -222,7 +222,7 @@ export const deleteSegment = async (segmentId, organizerId) => {
     }
 
     // Check if segment has contacts
-    if (parseInt(existingSegment.contact_count) > 0) {
+    if (parseInt(existingSegment.contactCount) > 0) {
       throw new ValidationError("Cannot delete segment with existing contacts");
     }
 

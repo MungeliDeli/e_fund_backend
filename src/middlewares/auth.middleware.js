@@ -39,12 +39,12 @@
  * - Token expiration checking
  *
  * USER TYPES SUPPORTED:
- * - individual_user: Regular individual users
- * - organization_user: Organization representatives
- * - super_admin: System super administrators
- * - support_admin: Support team members
- * - event_moderator: Event management staff
- * - financial_admin: Financial management staff
+ * - individualUser: Regular individual users
+ * - organizationUser: Organization representatives
+ * - superAdmin: System super administrators
+ * - supportAdmin: Support team members
+ * - eventModerator: Event management staff
+ * - financialAdmin: Financial management staff
  *
  * ERROR HANDLING:
  * - AuthenticationError: For invalid/missing tokens
@@ -193,7 +193,7 @@ export const restrictTo = (...allowedUserTypes) => {
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
-export const requireIndividualUser = restrictTo("individual_user");
+export const requireIndividualUser = restrictTo("individualUser");
 
 /**
  * Middleware to restrict access to organization users only
@@ -202,9 +202,9 @@ export const requireIndividualUser = restrictTo("individual_user");
  * @param {Function} next - Express next function
  */
 export const requireOrganizationUser = restrictTo(
-  "organization_user",
-  "super_admin",
-  "event_moderator"
+  "organizationUser",
+  "superAdmin",
+  "eventModerator"
 );
 
 /**
@@ -214,12 +214,12 @@ export const requireOrganizationUser = restrictTo(
  * @param {Function} next - Express next function
  */
 export const requireAdmin = restrictTo(
-  "super_admin",
-  "support_admin",
-  "event_moderator",
-  "financial_admin",
-  "organization_user",
-  "individual_user"
+  "superAdmin",
+  "supportAdmin",
+  "eventModerator",
+  "financialAdmin",
+  "organizationUser",
+  "individualUser"
 );
 
 /**
@@ -228,7 +228,7 @@ export const requireAdmin = restrictTo(
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
-export const requireSuperAdmin = restrictTo("super_admin");
+export const requireSuperAdmin = restrictTo("superAdmin");
 
 /**
  * Middleware to restrict access to support admin only
@@ -236,7 +236,7 @@ export const requireSuperAdmin = restrictTo("super_admin");
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
-export const requireSupportAdmin = restrictTo("support_admin", "super_admin");
+export const requireSupportAdmin = restrictTo("supportAdmin", "superAdmin");
 
 /**
  * Optional authentication middleware

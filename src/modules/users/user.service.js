@@ -31,61 +31,61 @@ const JPEG_QUALITY = 80;
 // Helper to filter fields for public/private view
 function formatProfile(user, profile, isOwner) {
   if (!user || !profile) return null;
-  if (user.user_type === "individual_user") {
+  if (user.userType === "individualUser") {
     // Individual user profile
     const publicFields = {
-      userId: user.user_id,
-      userType: user.user_type,
-      firstName: profile.first_name,
-      lastName: profile.last_name,
+      userId: user.userId,
+      userType: user.userType,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
       gender: profile.gender,
       country: profile.country,
       city: profile.city,
-      profilePictureMediaId: profile.profile_picture_media_id,
-      coverPictureMediaId: profile.cover_picture_media_id,
-      createdAt: profile.created_at,
+      profilePictureMediaId: profile.profilePictureMediaId,
+      coverPictureMediaId: profile.coverPictureMediaId,
+      createdAt: profile.createdAt,
     };
     if (isOwner) {
       return {
         ...publicFields,
         email: user.email,
-        phoneNumber: profile.phone_number,
-        dateOfBirth: profile.date_of_birth,
+        phoneNumber: profile.phoneNumber,
+        dateOfBirth: profile.dateOfBirth,
         address: profile.address,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
       };
     }
     return publicFields;
-  } else if (user.user_type === "organization_user") {
+  } else if (user.userType === "organizationUser") {
     // Organization user profile
     const publicFields = {
-      userId: user.user_id,
-      userType: user.user_type,
-      organizationName: profile.organization_name,
-      organizationShortName: profile.organization_short_name,
-      organizationType: profile.organization_type,
-      officialWebsiteUrl: profile.official_website_url,
-      profilePictureMediaId: profile.profile_picture_media_id,
-      coverPictureMediaId: profile.cover_picture_media_id,
+      userId: user.userId,
+      userType: user.userType,
+      organizationName: profile.organizationName,
+      organizationShortName: profile.organizationShortName,
+      organizationType: profile.organizationType,
+      officialWebsiteUrl: profile.officialWebsiteUrl,
+      profilePictureMediaId: profile.profilePictureMediaId,
+      coverPictureMediaId: profile.coverPictureMediaId,
       address: profile.address,
-      missionDescription: profile.mission_description,
-      establishmentDate: profile.establishment_date,
-      campusAffiliationScope: profile.campus_affiliation_scope,
-      affiliatedSchoolsNames: profile.affiliated_schools_names,
-      affiliatedDepartmentNames: profile.affiliated_department_names,
-      createdAt: profile.created_at,
+      missionDescription: profile.missionDescription,
+      establishmentDate: profile.establishmentDate,
+      campusAffiliationScope: profile.campusAffiliationScope,
+      affiliatedSchoolsNames: profile.affiliatedSchoolsNames,
+      affiliatedDepartmentNames: profile.affiliatedDepartmentNames,
+      createdAt: profile.createdAt,
     };
     if (isOwner) {
       return {
         ...publicFields,
         email: user.email,
-        officialEmail: profile.official_email,
-        primaryContactPersonName: profile.primary_contact_person_name,
-        primaryContactPersonEmail: profile.primary_contact_person_email,
-        primaryContactPersonPhone: profile.primary_contact_person_phone,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
+        officialEmail: profile.officialEmail,
+        primaryContactPersonName: profile.primaryContactPersonName,
+        primaryContactPersonEmail: profile.primaryContactPersonEmail,
+        primaryContactPersonPhone: profile.primaryContactPersonPhone,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
       };
     }
     return publicFields;
@@ -158,7 +158,7 @@ export const updateProfileImage = async (
   // Only for individual users for now
   const { user, profile } = await getUserWithProfileById(userId);
   if (!user || !profile) throw new NotFoundError("User/profile not found");
-  if (user.user_type !== "individual_user")
+  if (user.userType !== "individualUser")
     throw new DatabaseError("Only individual users can update profile images");
 
   let profilePictureMediaId = null;
@@ -257,7 +257,7 @@ export const updateProfileImage = async (
       await userRepository.createMediaRecord(profilePictureMediaRecord, client);
       await userRepository.updateProfileMediaId(
         userId,
-        "profile_picture_media_id",
+        "profilePictureMediaId",
         profilePictureMediaId,
         client
       );
@@ -273,7 +273,7 @@ export const updateProfileImage = async (
       await userRepository.createMediaRecord(coverPictureMediaRecord, client);
       await userRepository.updateProfileMediaId(
         userId,
-        "cover_picture_media_id",
+        "coverPictureMediaId",
         coverPictureMediaId,
         client
       );
@@ -346,21 +346,21 @@ export const getOrganizers = async (filters = {}) => {
   // Format for frontend table (add status, active, logoImageUrl, etc.)
   return organizers.map((org) => {
     let logoImageUrl = null;
-    if (org.profile_picture_file_name) {
-      logoImageUrl = getPublicS3Url(org.profile_picture_file_name);
+    if (org.profilePictureFileName) {
+      logoImageUrl = getPublicS3Url(org.profilePictureFileName);
     }
     return {
-      userId: org.user_id,
-      organizationName: org.organization_name,
-      organizationShortName: org.organization_short_name,
-      organizationType: org.organization_type,
-      email: org.official_email || org.email,
-      status: org.is_email_verified ? "VERIFIED" : "PENDING",
-      active: !!org.is_active,
-      profilePictureMediaId: org.profile_picture_media_id,
-      coverPictureMediaId: org.cover_picture_media_id,
-      createdAt: org.created_at,
-      officialWebsiteUrl: org.official_website_url,
+      userId: org.userId,
+      organizationName: org.organizationName,
+      organizationShortName: org.organizationShortName,
+      organizationType: org.organizationType,
+      email: org.officialEmail || org.email,
+      status: org.isEmailVerified ? "VERIFIED" : "PENDING",
+      active: !!org.isActive,
+      profilePictureMediaId: org.profilePictureMediaId,
+      coverPictureMediaId: org.coverPictureMediaId,
+      createdAt: org.createdAt,
+      officialWebsiteUrl: org.officialWebsiteUrl,
       logoImageUrl,
     };
   });

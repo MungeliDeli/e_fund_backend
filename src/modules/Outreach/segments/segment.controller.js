@@ -39,11 +39,11 @@ export const createSegment = async (req, res) => {
   );
 
   ResponseFactory.created(res, "Segment created successfully", {
-    segmentId: segment.segment_id,
+    segmentId: segment.segmentId,
     name: segment.name,
     description: segment.description,
-    contactCount: segment.contact_count || 0,
-    createdAt: segment.created_at,
+    contactCount: segment.contactCount || 0,
+    createdAt: segment.createdAt,
   });
 };
 
@@ -59,7 +59,7 @@ export const getSegments = async (req, res) => {
   logger.info("Getting segments request", { organizerId });
 
   const segments = await segmentService.getSegmentsByOrganizer(organizerId);
-
+  console.log("segments", segments);
   ResponseFactory.ok(res, "Segments retrieved successfully", segments);
 };
 
@@ -77,12 +77,12 @@ export const getSegmentById = async (req, res) => {
   const segment = await segmentService.getSegmentById(segmentId, organizerId);
 
   ResponseFactory.ok(res, "Segment retrieved successfully", {
-    segmentId: segment.segment_id,
+    segmentId: segment.segmentId,
     name: segment.name,
     description: segment.description,
-    contactCount: segment.contact_count || 0,
-    createdAt: segment.created_at,
-    updatedAt: segment.updated_at,
+    contactCount: segment.contactCount || 0,
+    createdAt: segment.createdAt,
+    updatedAt: segment.updatedAt,
   });
 };
 
@@ -109,11 +109,11 @@ export const updateSegment = async (req, res) => {
   );
 
   ResponseFactory.ok(res, "Segment updated successfully", {
-    segmentId: updatedSegment.segment_id,
+    segmentId: updatedSegment.segmentId,
     name: updatedSegment.name,
     description: updatedSegment.description,
-    contactCount: updatedSegment.contact_count || 0,
-    updatedAt: updatedSegment.updated_at,
+    contactCount: updatedSegment.contactCount || 0,
+    updatedAt: updatedSegment.updatedAt,
   });
 };
 

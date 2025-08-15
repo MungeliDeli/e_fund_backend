@@ -28,7 +28,7 @@
  * TOKEN PAYLOAD:
  * - userId: Unique user identifier
  * - email: User's email address
- * - userType: User role/type (individual_user, organization_user, admin, etc.)
+ * - userType: User role/type (individualUser, organizationUser, admin, etc.)
  * - iat: Issued at timestamp
  * - exp: Expiration timestamp
  * 

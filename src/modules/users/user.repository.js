@@ -29,21 +29,21 @@ export const getUserWithProfileById = async (userId) => {
     logger.info("Fetching user/profile by ID", { userId });
     // Fetch user
     const userResult = await query(
-      `SELECT user_id, email, user_type, is_email_verified, is_active, created_at FROM users WHERE user_id = $1`,
+      `SELECT "userId", email, "userType", "isEmailVerified", "isActive", "createdAt" FROM "users" WHERE "userId" = $1`,
       [userId]
     );
     if (userResult.rowCount === 0) throw new NotFoundError("User not found");
     const user = userResult.rows[0];
     let profile = null;
-    if (user.user_type === "individual_user") {
+    if (user.userType === "individualUser") {
       const profileResult = await query(
-        `SELECT first_name, last_name, phone_number, gender, date_of_birth, country, city, address, profile_picture_media_id, cover_picture_media_id, created_at FROM individual_profiles WHERE user_id = $1`,
+        `SELECT "firstName", "lastName", "phoneNumber", gender, "dateOfBirth", country, city, address, "profilePictureMediaId", "coverPictureMediaId", "createdAt" FROM "individualProfiles" WHERE "userId" = $1`,
         [userId]
       );
       profile = profileResult.rows[0] || null;
-    } else if (user.user_type === "organization_user") {
+    } else if (user.userType === "organizationUser") {
       const profileResult = await query(
-        `SELECT organization_name, organization_short_name, organization_type, official_email, official_website_url, profile_picture_media_id, cover_picture_media_id, address, mission_description, establishment_date, campus_affiliation_scope, affiliated_schools_names, affiliated_department_names, primary_contact_person_name, primary_contact_person_email, primary_contact_person_phone, created_by_admin_id, created_at FROM organization_profiles WHERE user_id = $1`,
+        `SELECT "organizationName", "organizationShortName", "organizationType", "officialEmail", "officialWebsiteUrl", "profilePictureMediaId", "coverPictureMediaId", address, "missionDescription", "establishmentDate", "campusAffiliationScope", "affiliatedSchoolsNames", "affiliatedDepartmentNames", "primaryContactPersonName", "primaryContactPersonEmail", "primaryContactPersonPhone", "createdByAdminId", "createdAt" FROM "organizationProfiles" WHERE "userId" = $1`,
         [userId]
       );
       profile = profileResult.rows[0] || null;
@@ -79,7 +79,7 @@ const userRepository = {
       uploadedByUserId,
     } = mediaRecord;
     const queryText = `
-      INSERT INTO media (media_id, entity_type, entity_id, media_type, file_name, file_size, description, alt_text, uploaded_by_user_id)
+      INSERT INTO "media" ("mediaId", "entityType", "entityId", "mediaType", "fileName", "fileSize", description, "altText", "uploadedByUserId")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
     await executor.query(queryText, [
@@ -95,7 +95,7 @@ const userRepository = {
     ]);
   },
   /**
-   * Update the profile's media ID field (profile_picture_media_id or cover_picture_media_id)
+   * Update the profile's media ID field (profilePictureMediaId or coverPictureMediaId)
    * @param {string} userId - User ID
    * @param {string} field - Field to update
    * @param {string} mediaId - Media record ID
@@ -105,7 +105,7 @@ const userRepository = {
   async updateProfileMediaId(userId, field, mediaId, client) {
     const executor = client || { query };
     const queryText = `
-      UPDATE individual_profiles SET ${field} = $1 WHERE user_id = $2
+      UPDATE "individualProfiles" SET ${field} = $1 WHERE "userId" = $2
     `;
     await executor.query(queryText, [mediaId, userId]);
   },
@@ -118,8 +118,8 @@ const userRepository = {
     const { firstName, lastName, country, city, address } = profileData;
 
     const fields = {
-      first_name: firstName,
-      last_name: lastName,
+      firstName: firstName,
+      lastName: lastName,
       country,
       city,
       address,
@@ -142,9 +142,9 @@ const userRepository = {
 
     values.push(userId);
     const queryText = `
-      UPDATE individual_profiles
+      UPDATE "individualProfiles"
       SET ${setClauses.join(", ")}
-      WHERE user_id = $${valueIndex}
+      WHERE "userId" = $${valueIndex}
       RETURNING *;
     `;
 
@@ -169,8 +169,8 @@ const userRepository = {
   async getMediaRecord(mediaId) {
     try {
       const queryText = `
-        SELECT media_id, entity_type, entity_id, media_type, file_name, file_size, description, alt_text, uploaded_by_user_id, created_at
-        FROM media WHERE media_id = $1
+        SELECT "mediaId", "entityType", "entityId", "mediaType", "fileName", "fileSize", description, "altText", "uploadedByUserId", "createdAt"
+        FROM "media" WHERE "mediaId" = $1
       `;
       const result = await query(queryText, [mediaId]);
 
@@ -180,16 +180,16 @@ const userRepository = {
 
       const row = result.rows[0];
       return {
-        mediaId: row.media_id,
-        entityType: row.entity_type,
-        entityId: row.entity_id,
-        mediaType: row.media_type,
-        fileName: row.file_name,
-        fileSize: row.file_size,
+        mediaId: row.mediaId,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        mediaType: row.mediaType,
+        fileName: row.fileName,
+        fileSize: row.fileSize,
         description: row.description,
-        altText: row.alt_text,
-        uploadedByUserId: row.uploaded_by_user_id,
-        createdAt: row.created_at,
+        altText: row.altText,
+        uploadedByUserId: row.uploadedByUserId,
+        createdAt: row.createdAt,
       };
     } catch (error) {
       logger.error("Failed to get media record", {
@@ -207,22 +207,22 @@ const userRepository = {
    */
   async findOrganizers(filters = {}) {
     try {
-      let whereClauses = ["u.user_type = 'organization_user'"];
+      let whereClauses = [`u."userType" = 'organizationUser'`];
       let values = [];
       let idx = 1;
       if (filters.verified !== undefined) {
-        whereClauses.push(`u.is_email_verified = $${idx++}`);
+        whereClauses.push(`u."isEmailVerified" = $${idx++}`);
         values.push(filters.verified);
       }
       if (filters.active !== undefined) {
-        whereClauses.push(`u.is_active = $${idx++}`);
+        whereClauses.push(`u."isActive" = $${idx++}`);
         values.push(filters.active);
       }
       if (filters.search) {
         whereClauses.push(`(
-          p.organization_name ILIKE $${idx} OR 
-          p.organization_short_name ILIKE $${idx} OR 
-          p.official_email ILIKE $${idx} OR 
+          p."organizationName" ILIKE $${idx} OR 
+          p."organizationShortName" ILIKE $${idx} OR 
+          p."officialEmail" ILIKE $${idx} OR 
           u.email ILIKE $${idx}
         )`);
         values.push(`%${filters.search}%`);
@@ -233,15 +233,15 @@ const userRepository = {
         : "";
       const queryText = `
         SELECT 
-          u.user_id, u.email, u.is_email_verified, u.is_active, u.created_at,
-          p.organization_name, p.organization_short_name, p.organization_type, p.official_email, p.official_website_url,
-          p.profile_picture_media_id, p.cover_picture_media_id,
-          m.file_name AS profile_picture_file_name
-        FROM users u
-        JOIN organization_profiles p ON u.user_id = p.user_id
-        LEFT JOIN media m ON p.profile_picture_media_id = m.media_id
+          u."userId", u.email, u."isEmailVerified", u."isActive", u."createdAt",
+          p."organizationName", p."organizationShortName", p."organizationType", p."officialEmail", p."officialWebsiteUrl",
+          p."profilePictureMediaId", p."coverPictureMediaId",
+          m."fileName" AS profilePictureFileName
+          FROM "users" u
+          JOIN "organizationProfiles" p ON u."userId" = p."userId"
+        LEFT JOIN media m ON p."profilePictureMediaId" = m."mediaId"
         ${where}
-        ORDER BY p.organization_name ASC
+        ORDER BY p."organizationName" ASC
       `;
       const result = await query(queryText, values);
       return result.rows;

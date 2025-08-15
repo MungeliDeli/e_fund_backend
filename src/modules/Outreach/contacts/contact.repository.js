@@ -35,8 +35,8 @@ export const createContact = async (contactData, segmentId, organizerId) => {
 
     // Verify segment exists and belongs to organizer
     const segmentCheckQuery = `
-      SELECT segment_id FROM segments 
-      WHERE segment_id = $1 AND organizer_id = $2
+      SELECT "segmentId" FROM "segments" 
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
     const segmentCheckResult = await client.query(segmentCheckQuery, [
       segmentId,
@@ -49,8 +49,8 @@ export const createContact = async (contactData, segmentId, organizerId) => {
 
     // Check if email already exists in this segment
     const emailCheckQuery = `
-      SELECT contact_id FROM contacts 
-      WHERE segment_id = $1 AND email = $2
+      SELECT "contactId" FROM "contacts" 
+      WHERE "segmentId" = $1 AND email = $2
     `;
     const emailCheckResult = await client.query(emailCheckQuery, [
       segmentId,
@@ -65,7 +65,7 @@ export const createContact = async (contactData, segmentId, organizerId) => {
 
     // Insert new contact
     const insertQuery = `
-      INSERT INTO contacts (segment_id, name, email, description)
+      INSERT INTO "contacts" ("segmentId", name, email, description)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
@@ -78,7 +78,7 @@ export const createContact = async (contactData, segmentId, organizerId) => {
     ]);
 
     logger.info("Contact created successfully", {
-      contactId: result.rows[0].contact_id,
+      contactId: result.rows[0].contactId,
       segmentId,
       email,
     });
@@ -97,8 +97,8 @@ export const getContactsBySegment = async (segmentId, organizerId) => {
   try {
     // Verify segment exists and belongs to organizer
     const segmentCheckQuery = `
-      SELECT segment_id FROM segments 
-      WHERE segment_id = $1 AND organizer_id = $2
+      SELECT "segmentId" FROM "segments" 
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
     const segmentCheckResult = await query(segmentCheckQuery, [
       segmentId,
@@ -111,16 +111,16 @@ export const getContactsBySegment = async (segmentId, organizerId) => {
 
     const queryText = `
       SELECT 
-        contact_id,
+        "contactId",
         name,
         email,
         description,
-        emails_opened,
-        created_at,
-        updated_at
-      FROM contacts 
-      WHERE segment_id = $1
-      ORDER BY created_at DESC
+        "emailsOpened",
+        "createdAt",
+        "updatedAt"
+      FROM "contacts" 
+      WHERE "segmentId" = $1
+      ORDER BY "createdAt" DESC
     `;
 
     const result = await query(queryText, [segmentId]);
@@ -156,18 +156,18 @@ export const getContactById = async (contactId, organizerId) => {
   try {
     const queryText = `
       SELECT 
-        c.contact_id,
+        c."contactId",
         c.name,
         c.email,
         c.description,
-        c.emails_opened,
-        c.created_at,
-        c.updated_at,
-        s.segment_id,
-        s.name as segment_name
-      FROM contacts c
-      JOIN segments s ON c.segment_id = s.segment_id
-      WHERE c.contact_id = $1 AND s.organizer_id = $2
+        c."emailsOpened",
+        c."createdAt",
+        c."updatedAt",
+        s."segmentId",
+        s.name as segmentName
+      FROM "contacts" c
+      JOIN segments s ON c."segmentId" = s."segmentId"
+      WHERE c."contactId" = $1 AND s."organizerId" = $2
     `;
 
     const result = await query(queryText, [contactId, organizerId]);
@@ -210,10 +210,10 @@ export const updateContact = async (contactId, updateData, organizerId) => {
 
     // Check if contact exists and belongs to organizer's segment
     const contactCheckQuery = `
-      SELECT c.contact_id, c.segment_id, c.email 
-      FROM contacts c
-      JOIN segments s ON c.segment_id = s.segment_id
-      WHERE c.contact_id = $1 AND s.organizer_id = $2
+      SELECT c."contactId", c."segmentId", c.email 
+      FROM "contacts" c
+      JOIN segments s ON c."segmentId" = s."segmentId"
+      WHERE c."contactId" = $1 AND s."organizerId" = $2
     `;
     const contactCheckResult = await client.query(contactCheckQuery, [
       contactId,
@@ -229,11 +229,11 @@ export const updateContact = async (contactId, updateData, organizerId) => {
     // Check if new email conflicts with existing contact in the same segment
     if (email && email !== existingContact.email) {
       const emailCheckQuery = `
-        SELECT contact_id FROM contacts 
-        WHERE segment_id = $1 AND email = $2 AND contact_id != $3
+        SELECT "contactId" FROM "contacts" 
+        WHERE "segmentId" = $1 AND email = $2 AND "contactId" != $3
       `;
       const emailCheckResult = await client.query(emailCheckQuery, [
-        existingContact.segment_id,
+        existingContact.segmentId,
         email,
         contactId,
       ]);
@@ -275,11 +275,13 @@ export const updateContact = async (contactId, updateData, organizerId) => {
     updateValues.push(contactId, organizerId);
 
     const updateQuery = `
-      UPDATE contacts 
-      SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
-      WHERE contact_id = $${paramIndex} 
-      AND segment_id IN (
-        SELECT segment_id FROM segments WHERE organizer_id = $${paramIndex + 1}
+      UPDATE "contacts" 
+      SET ${updateFields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "contactId" = $${paramIndex} 
+      AND "segmentId" IN (
+        SELECT "segmentId" FROM segments WHERE "organizerId" = $${
+          paramIndex + 1
+        }
       )
       RETURNING *
     `;
@@ -310,9 +312,9 @@ export const deleteContact = async (contactId, organizerId) => {
   return await transaction(async (client) => {
     // Check if contact exists and belongs to organizer's segment
     const contactCheckQuery = `
-      SELECT contact_id FROM contacts c
-      JOIN segments s ON c.segment_id = s.segment_id
-      WHERE c.contact_id = $1 AND s.organizer_id = $2
+      SELECT "contactId" FROM "contacts" c
+      JOIN segments s ON c."segmentId" = s."segmentId"
+      WHERE c."contactId" = $1 AND s."organizerId" = $2
     `;
     const contactCheckResult = await client.query(contactCheckQuery, [
       contactId,
@@ -325,10 +327,10 @@ export const deleteContact = async (contactId, organizerId) => {
 
     // Delete contact
     const deleteQuery = `
-      DELETE FROM contacts 
-      WHERE contact_id = $1 
-      AND segment_id IN (
-        SELECT segment_id FROM segments WHERE organizer_id = $2
+      DELETE FROM "contacts" 
+      WHERE "contactId" = $1 
+      AND "segmentId" IN (
+        SELECT "segmentId" FROM segments WHERE "organizerId" = $2
       )
     `;
 
@@ -361,13 +363,13 @@ export const contactEmailExists = async (
 ) => {
   try {
     let queryText = `
-      SELECT contact_id FROM contacts 
-      WHERE segment_id = $1 AND email = $2
+      SELECT "contactId" FROM "contacts"   
+      WHERE "segmentId" = $1 AND email = $2
     `;
     let params = [segmentId, email];
 
     if (excludeContactId) {
-      queryText += " AND contact_id != $3";
+      queryText += ' AND "contactId" != $3';
       params.push(excludeContactId);
     }
 
@@ -395,8 +397,8 @@ export const bulkInsertContacts = async (segmentId, organizerId, contacts) => {
   return await transaction(async (client) => {
     // Verify segment exists and belongs to organizer
     const segmentCheckQuery = `
-      SELECT segment_id FROM segments
-      WHERE segment_id = $1 AND organizer_id = $2
+      SELECT "segmentId" FROM "segments"
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
     const segmentCheckResult = await client.query(segmentCheckQuery, [
       segmentId,
@@ -409,7 +411,7 @@ export const bulkInsertContacts = async (segmentId, organizerId, contacts) => {
 
     // Fetch existing emails in this segment to skip duplicates
     const existingRes = await client.query(
-      `SELECT email FROM contacts WHERE segment_id = $1`,
+      `SELECT email FROM "contacts" WHERE "segmentId" = $1`,
       [segmentId]
     );
     const existing = new Set(
@@ -428,7 +430,7 @@ export const bulkInsertContacts = async (segmentId, organizerId, contacts) => {
       }
 
       const insertQuery = `
-        INSERT INTO contacts (segment_id, name, email, description)
+        INSERT INTO "contacts"   ("segmentId", name, email, description)
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `;

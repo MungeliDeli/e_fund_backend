@@ -35,30 +35,30 @@ import notificationService from "../../notifications/notification.service.js";
  */
 function formatCampaign(campaign) {
   return {
-    campaignId: campaign.campaign_id,
-    organizerId: campaign.organizer_id,
+    campaignId: campaign.campaignId,
+    organizerId: campaign.organizerId,
     title: campaign.title,
     description: campaign.description,
-    goalAmount: parseFloat(campaign.goal_amount),
-    currentRaisedAmount: parseFloat(campaign.current_raised_amount),
-    startDate: campaign.start_date,
-    endDate: campaign.end_date,
+    goalAmount: parseFloat(campaign.goalAmount),
+    currentRaisedAmount: parseFloat(campaign.currentRaisedAmount),
+    startDate: campaign.startDate,
+    endDate: campaign.endDate,
     status: campaign.status,
-    mainMediaId: campaign.main_media_id,
-    campaignLogoMediaId: campaign.campaign_logo_media_id,
-    customPageSettings: campaign.custom_page_settings,
-    shareLink: campaign.share_link,
-    approvedByUserId: campaign.approved_by_user_id,
-    approvedAt: campaign.approved_at,
-    templateId: campaign.template_id,
-    createdAt: campaign.created_at,
-    updatedAt: campaign.updated_at,
+    mainMediaId: campaign.mainMediaId,
+    campaignLogoMediaId: campaign.campaignLogoMediaId,
+    customPageSettings: campaign.customPageSettings,
+    shareLink: campaign.shareLink,
+    approvedByUserId: campaign.approvedByUserId,
+    approvedAt: campaign.approvedAt,
+    templateId: campaign.templateId,
+    createdAt: campaign.createdAt,
+    updatedAt: campaign.updatedAt,
     // Related data
-    organizerEmail: campaign.organizer_email,
-    organizerType: campaign.organizer_type,
-    organizerName: campaign.organizer_name,
-    mainMediaFileName: campaign.main_media_file_name,
-    logoMediaFileName: campaign.logo_media_file_name,
+    organizerEmail: campaign.organizerEmail,
+    organizerType: campaign.organizerType,
+    organizerName: campaign.organizerName,
+    mainMediaFileName: campaign.mainMediaFileName,
+    logoMediaFileName: campaign.logoMediaFileName,
   };
 }
 
@@ -164,7 +164,7 @@ export const createCampaign = async (
       // Add categories if provided
       if (categoryIds.length > 0) {
         await campaignRepository.addCampaignCategories(
-          campaign.campaign_id,
+          campaign.campaignId,
           categoryIds,
           client
         );
@@ -174,10 +174,10 @@ export const createCampaign = async (
     });
 
     // Fetch complete campaign data with categories
-    const completeCampaign = await getCampaignById(result.campaign_id);
+    const completeCampaign = await getCampaignById(result.campaignId);
 
     logger.info("Campaign created successfully", {
-      campaignId: result.campaign_id,
+      campaignId: result.campaignId,
       organizerId,
       status: result.status,
     });
@@ -218,14 +218,12 @@ export const updateCampaign = async (
     });
 
     const ADMIN_ROLES = [
-      "super_admin",
-      "support_admin",
-      "event_moderator",
-      "financial_admin",
+      "superAdmin",
+      "supportAdmin",
+      "eventModerator",
+      "financialAdmin",
     ];
-    const isAdminActor = ADMIN_ROLES.includes(
-      (actorUserType || "").toLowerCase()
-    );
+    const isAdminActor = ADMIN_ROLES.includes(actorUserType);
 
     // Verify ownership unless admin actor
     if (!isAdminActor) {
@@ -276,6 +274,8 @@ export const updateCampaign = async (
 
     logger.info("Campaign updated successfully", { campaignId, organizerId });
 
+    console.log(updateData.status);
+
     // Simple notification triggers for status changes
     try {
       if (updateData.status === "active") {
@@ -283,7 +283,7 @@ export const updateCampaign = async (
         const messageInApp = `Your campaign "${completeCampaign.title}" has been approved and is now active.`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
-          type: "in_app",
+          type: "inApp",
           category: "campaign",
           priority: "high",
           title: titleInApp,
@@ -313,7 +313,7 @@ export const updateCampaign = async (
         const messageInApp = `Your campaign "${completeCampaign.title}" was rejected.`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
-          type: "in_app",
+          type: "inApp",
           category: "campaign",
           priority: "high",
           title: titleInApp,
@@ -374,7 +374,7 @@ export const getCampaignById = async (campaignId) => {
 
     const formattedCampaign = formatCampaign(campaign);
     formattedCampaign.categories = categories.map((cat) => ({
-      categoryId: cat.category_id,
+      categoryId: cat.categoryId,
       name: cat.name,
       description: cat.description,
     }));
@@ -409,11 +409,11 @@ export const getCampaignsByOrganizer = async (organizerId, filters = {}) => {
     const campaignsWithCategories = await Promise.all(
       campaigns.map(async (campaign) => {
         const categories = await campaignRepository.getCampaignCategories(
-          campaign.campaign_id
+          campaign.campaignId
         );
         const formattedCampaign = formatCampaign(campaign);
         formattedCampaign.categories = categories.map((cat) => ({
-          categoryId: cat.category_id,
+          categoryId: cat.categoryId,
           name: cat.name,
           description: cat.description,
         }));
@@ -494,11 +494,11 @@ export const getAllCampaigns = async (filters = {}) => {
     const campaignsWithCategories = await Promise.all(
       campaigns.map(async (campaign) => {
         const categories = await campaignRepository.getCampaignCategories(
-          campaign.campaign_id
+          campaign.campaignId
         );
         const formattedCampaign = formatCampaign(campaign);
         formattedCampaign.categories = categories.map((cat) => ({
-          categoryId: cat.category_id,
+          categoryId: cat.categoryId,
           name: cat.name,
           description: cat.description,
         }));

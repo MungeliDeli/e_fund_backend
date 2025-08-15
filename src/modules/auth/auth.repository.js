@@ -16,7 +16,11 @@
  */
 
 import { query, transaction } from "../../db/index.js";
-import { DatabaseError, ConflictError, NotFoundError } from "../../utils/appError.js";
+import {
+  DatabaseError,
+  ConflictError,
+  NotFoundError,
+} from "../../utils/appError.js";
 import logger from "../../utils/logger.js";
 
 /**
@@ -35,44 +39,44 @@ class AuthRepository {
       const result = await transaction(async (client) => {
         // Insert into users table
         const userQuery = `
-          INSERT INTO users (email, password_hash, user_type, is_email_verified, is_active)
+          INSERT INTO users (email, "passwordHash", "userType", "isEmailVerified", "isActive")
           VALUES ($1, $2, $3, $4, $5)
-          RETURNING user_id, email, user_type, is_email_verified, is_active, created_at
+          RETURNING "userId", email, "userType", "isEmailVerified", "isActive", "createdAt"
         `;
-        
+
         const userValues = [
           userData.email,
           userData.passwordHash,
           userData.userType,
           userData.isEmailVerified,
-          userData.isActive
+          userData.isActive,
         ];
 
         const userResult = await client.query(userQuery, userValues);
         const user = userResult.rows[0];
 
-        // Insert into individual_profiles table
+        // Insert into individualProfiles table
         const profileQuery = `
-          INSERT INTO individual_profiles (
-            user_id, first_name, last_name, phone_number, profile_picture_media_id, cover_picture_media_id, gender, 
-            date_of_birth, country, city, address
+          INSERT INTO "individualProfiles" (
+            "userId", "firstName", "lastName", "phoneNumber", "profilePictureMediaId", "coverPictureMediaId", gender, 
+            "dateOfBirth", country, city, address
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *
         `;
 
         const profileValues = [
-          user.user_id,
+          user.userId,
           profileData.firstName,
           profileData.lastName,
           profileData.phoneNumber || null,
-          null, // profile_picture_media_id - not included during registration
-          null, // cover_picture_media_id - not included during registration
+          null, // profilePictureMediaId - not included during registration
+          null, // coverPictureMediaId - not included during registration
           profileData.gender || null,
           profileData.dateOfBirth || null,
           profileData.country || null,
           profileData.city || null,
-          profileData.address || null
+          profileData.address || null,
         ];
 
         const profileResult = await client.query(profileQuery, profileValues);
@@ -80,25 +84,25 @@ class AuthRepository {
 
         return {
           user: {
-            userId: user.user_id,
+            userId: user.userId,
             email: user.email,
-            userType: user.user_type,
-            isEmailVerified: user.is_email_verified,
-            isActive: user.is_active,
-            createdAt: user.created_at
+            userType: user.userType,
+            isEmailVerified: user.isEmailVerified,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
           },
           profile: {
-            userId: profile.user_id,
-            firstName: profile.first_name,
-            lastName: profile.last_name,
-            phoneNumber: profile.phone_number,
+            userId: profile.userId,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            phoneNumber: profile.phoneNumber,
             gender: profile.gender,
-            dateOfBirth: profile.date_of_birth,
+            dateOfBirth: profile.dateOfBirth,
             country: profile.country,
             city: profile.city,
             address: profile.address,
-            createdAt: profile.created_at
-          }
+            createdAt: profile.createdAt,
+          },
         };
       });
 
@@ -107,7 +111,7 @@ class AuthRepository {
     } catch (error) {
       logger.error("Failed to create user with profile", {
         error: error.message,
-        email: userData.email
+        email: userData.email,
       });
 
       // Handle specific database errors
@@ -115,7 +119,7 @@ class AuthRepository {
         if (error.constraint && error.constraint.includes("email")) {
           throw new ConflictError("Email address is already registered");
         }
-        if (error.constraint && error.constraint.includes("phone_number")) {
+        if (error.constraint && error.constraint.includes("phoneNumber")) {
           throw new ConflictError("Phone number is already registered");
         }
       }
@@ -123,7 +127,6 @@ class AuthRepository {
       throw new DatabaseError("Failed to create user", error);
     }
   }
-
 
   /**
    * Creates an organization user and profile in a transaction
@@ -136,29 +139,29 @@ class AuthRepository {
       const executor = client ? client : { query };
       // Insert into users table
       const userQuery = `
-        INSERT INTO users (email, password_hash, user_type, is_email_verified, is_active)
+        INSERT INTO users (email, "passwordHash", "userType", "isEmailVerified", "isActive")
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING user_id, email, user_type, is_email_verified, is_active, created_at
+        RETURNING "userId", email, "userType", "isEmailVerified", "isActive", "createdAt"
       `;
       const userValues = [
         userData.email,
         userData.passwordHash,
         userData.userType,
         userData.isEmailVerified,
-        userData.isActive
+        userData.isActive,
       ];
       const userResult = await executor.query(userQuery, userValues);
       const user = userResult.rows[0];
-      // Insert into organization_profiles table
+      // Insert into organizationProfiles table
       const profileQuery = `
-        INSERT INTO organization_profiles (
-          user_id, organization_name, organization_short_name, organization_type, official_email, official_website_url, profile_picture_media_id, cover_picture_media_id, address, mission_description, establishment_date, campus_affiliation_scope, affiliated_schools_names, affiliated_department_names, primary_contact_person_name, primary_contact_person_email, primary_contact_person_phone, created_by_admin_id
+        INSERT INTO "organizationProfiles" (
+          "userId", "organizationName", "organizationShortName", "organizationType", "officialEmail", "officialWebsiteUrl", "profilePictureMediaId", "coverPictureMediaId", address, "missionDescription", "establishmentDate", "campusAffiliationScope", "affiliatedSchoolsNames", "affiliatedDepartmentNames", "primaryContactPersonName", "primaryContactPersonEmail", "primaryContactPersonPhone", "createdByAdminId"
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
         ) RETURNING *
       `;
       const profileValues = [
-        user.user_id,
+        user.userId,
         profileData.organizationName,
         profileData.organizationShortName,
         profileData.organizationType,
@@ -175,79 +178,78 @@ class AuthRepository {
         profileData.primaryContactPersonName,
         profileData.primaryContactPersonEmail,
         profileData.primaryContactPersonPhone,
-        profileData.createdByAdminId
+        profileData.createdByAdminId,
       ];
       const profileResult = await executor.query(profileQuery, profileValues);
       const profile = profileResult.rows[0];
       return {
         user: {
-          userId: user.user_id,
+          userId: user.userId,
           email: user.email,
-          userType: user.user_type,
-          isEmailVerified: user.is_email_verified,
-          isActive: user.is_active,
-          createdAt: user.created_at
+          userType: user.userType,
+          isEmailVerified: user.isEmailVerified,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
         },
-        profile
+        profile,
       };
     } catch (error) {
-       logger.error("Database error in createOrganizationUserAndProfile", {
+      logger.error("Database error in createOrganizationUserAndProfile", {
         message: error.message,
         detail: error.detail, // Provides specific error info from Postgres
-        code: error.code,     // SQLSTATE error code
+        code: error.code, // SQLSTATE error code
         constraint: error.constraint, // Name of the constraint that was violated
         stack: error.stack,
-        profileData: profileData // Log the data that was being inserted
+        profileData: profileData, // Log the data that was being inserted
       });
-      throw new DatabaseError("Failed to create organization user and profile", error);
+      throw new DatabaseError(
+        "Failed to create organization user and profile",
+        error
+      );
     }
   }
 
   /**
    * Finds a user by userId
    * @param {string} userId - users id
-   * @returns {Promise<object|null>} user object or null if not found 
+   * @returns {Promise<object|null>} user object or null if not found
    *
    */
 
-  async findById(userId){
+  async findById(userId) {
     try {
       const queryText = `
         SELECT 
-          u.user_id, u.email, u.password_hash, u.user_type, 
-          u.is_email_verified, u.is_active, u.created_at, u.updated_at
+          u."userId", u.email, u."passwordHash", u."userType", 
+          u."isEmailVerified", u."isActive", u."createdAt", u."updatedAt"
         FROM users u
-        WHERE u.user_id = $1 `;
+        WHERE u."userId" = $1 `;
 
-        const result = await query(queryText , [userId]);
+      const result = await query(queryText, [userId]);
 
-        if(result.rowCount === 0 ){
-          return null
-        }
+      if (result.rowCount === 0) {
+        return null;
+      }
 
-        const user = result.rows[0];
+      const user = result.rows[0];
 
-        return {
-          userId: user.user_id,
-          email: user.email,
-          passwordHash: user.password_hash,
-          userType: user.user_type,
-          isEmailVerified: user.is_email_verified,
-          isActive: user.is_active,
-          createdAt: user.created_at,
-          updatedAt: user.updated_at
-        };
-
-
-
+      return {
+        userId: user.userId,
+        email: user.email,
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
     } catch (error) {
-      
-      logger.error("Failed to find user by id", 
-        {error:error.message, 
-          userId
-        });
+      logger.error("Failed to find user by id", {
+        error: error.message,
+        userId,
+      });
 
-        throw new DatabaseError("Failed to find user" , error)
+      throw new DatabaseError("Failed to find user", error);
     }
   }
 
@@ -260,8 +262,8 @@ class AuthRepository {
     try {
       const queryText = `
         SELECT 
-          u.user_id, u.email, u.password_hash, u.user_type, 
-          u.is_email_verified, u.is_active, u.created_at, u.updated_at
+          u."userId", u.email, u."passwordHash", u."userType", 
+          u."isEmailVerified", u."isActive", u."createdAt", u."updatedAt"
         FROM users u
         WHERE u.email = $1
       `;
@@ -274,19 +276,19 @@ class AuthRepository {
 
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        passwordHash: user.password_hash,
-        userType: user.user_type,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
       logger.error("Failed to find user by email", {
         error: error.message,
-        email
+        email,
       });
       throw new DatabaseError("Failed to find user", error);
     }
@@ -302,9 +304,9 @@ class AuthRepository {
     try {
       const queryText = `
         UPDATE users 
-        SET is_email_verified = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
-        RETURNING user_id, email, is_email_verified, updated_at
+        SET "isEmailVerified" = $2, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "userId" = $1
+        RETURNING "userId", email, "isEmailVerified", "updatedAt"
       `;
 
       const result = await query(queryText, [userId, isVerified]);
@@ -315,16 +317,16 @@ class AuthRepository {
 
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        isEmailVerified: user.is_email_verified,
-        updatedAt: user.updated_at
+        isEmailVerified: user.isEmailVerified,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
       logger.error("Failed to update email verification", {
         error: error.message,
         userId,
-        isVerified
+        isVerified,
       });
 
       if (error instanceof NotFoundError) {
@@ -345,9 +347,9 @@ class AuthRepository {
     try {
       const queryText = `
         UPDATE users 
-        SET is_active = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
-        RETURNING user_id, email, is_active, updated_at
+        SET "isActive" = $2, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "userId" = $1
+        RETURNING "userId", email, "isActive", "updatedAt"
       `;
 
       const result = await query(queryText, [userId, isActive]);
@@ -358,16 +360,16 @@ class AuthRepository {
 
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        isActive: user.is_active,
-        updatedAt: user.updated_at
+        isActive: user.isActive,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
       logger.error("Failed to update user status", {
         error: error.message,
         userId,
-        isActive
+        isActive,
       });
 
       if (error instanceof NotFoundError) {
@@ -391,13 +393,11 @@ class AuthRepository {
     } catch (error) {
       logger.error("Failed to check email existence", {
         error: error.message,
-        email
+        email,
       });
       throw new DatabaseError("Failed to check email existence", error);
     }
   }
-
-
 
   /**
    * Checks if phone number already exists
@@ -406,13 +406,14 @@ class AuthRepository {
    */
   async phoneNumberExists(phoneNumber) {
     try {
-      const queryText = "SELECT 1 FROM individual_profiles WHERE phone_number = $1";
+      const queryText =
+        'SELECT 1 FROM "individualProfiles" WHERE "phoneNumber" = $1';
       const result = await query(queryText, [phoneNumber]);
       return result.rowCount > 0;
     } catch (error) {
       logger.error("Failed to check phone number existence", {
         error: error.message,
-        phoneNumber
+        phoneNumber,
       });
       throw new DatabaseError("Failed to check phone number existence", error);
     }
@@ -430,12 +431,15 @@ class AuthRepository {
   async createPasswordResetToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+        INSERT INTO "passwordResetTokens" ("userId", "tokenHash", "expiresAt")
         VALUES ($1, $2, $3)
       `;
       await query(queryText, [userId, tokenHash, expiresAt]);
     } catch (error) {
-      logger.error("Failed to create password reset token", { error: error.message, userId });
+      logger.error("Failed to create password reset token", {
+        error: error.message,
+        userId,
+      });
       throw new DatabaseError("Failed to create password reset token", error);
     }
   }
@@ -448,26 +452,31 @@ class AuthRepository {
   async findPasswordResetToken(tokenHash) {
     try {
       const queryText = `
-        SELECT u.* FROM password_reset_tokens prt
-        JOIN users u ON prt.user_id = u.user_id
-        WHERE prt.token_hash = $1 AND prt.expires_at > NOW()
+        SELECT u.* FROM "passwordResetTokens" prt
+        JOIN users u ON prt."userId" = u."userId"
+        WHERE prt."tokenHash" = $1 AND prt."expiresAt" > NOW()
       `;
       const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        passwordHash: user.password_hash,
-        userType: user.user_type,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
-      logger.error("Failed to find user by password reset token", { error: error.message });
-      throw new DatabaseError("Failed to find user by password reset token", error);
+      logger.error("Failed to find user by password reset token", {
+        error: error.message,
+      });
+      throw new DatabaseError(
+        "Failed to find user by password reset token",
+        error
+      );
     }
   }
 
@@ -479,11 +488,13 @@ class AuthRepository {
   async deletePasswordResetToken(tokenHash) {
     try {
       const queryText = `
-        DELETE FROM password_reset_tokens WHERE token_hash = $1
+        DELETE FROM "passwordResetTokens" WHERE "tokenHash" = $1
       `;
       await query(queryText, [tokenHash]);
     } catch (error) {
-      logger.error("Failed to delete password reset token", { error: error.message });
+      logger.error("Failed to delete password reset token", {
+        error: error.message,
+      });
       throw new DatabaseError("Failed to delete password reset token", error);
     }
   }
@@ -496,12 +507,18 @@ class AuthRepository {
   async deletePasswordResetTokenByUserId(userId) {
     try {
       const queryText = `
-        DELETE FROM password_reset_tokens WHERE user_id = $1
+        DELETE FROM "passwordResetTokens" WHERE "userId" = $1
       `;
       await query(queryText, [userId]);
     } catch (error) {
-      logger.error("Failed to delete password reset token by userId", { error: error.message, userId });
-      throw new DatabaseError("Failed to delete password reset token by userId", error);
+      logger.error("Failed to delete password reset token by userId", {
+        error: error.message,
+        userId,
+      });
+      throw new DatabaseError(
+        "Failed to delete password reset token by userId",
+        error
+      );
     }
   }
 
@@ -515,16 +532,18 @@ class AuthRepository {
     try {
       const queryText = `
         UPDATE users
-        SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $2
+        SET "passwordHash" = $1, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "userId" = $2
       `;
       await query(queryText, [newPasswordHash, userId]);
     } catch (error) {
-      logger.error("Failed to update user password", { error: error.message, userId });
+      logger.error("Failed to update user password", {
+        error: error.message,
+        userId,
+      });
       throw new DatabaseError("Failed to update user password", error);
     }
   }
-
 
   // EMAIL VERIFICATION TOKEN
   /**
@@ -534,16 +553,22 @@ class AuthRepository {
    * @param {Date} expiresAt
    * @returns {Promise<void>}
    */
-  async  createEmailVerificationToken(userId, tokenHash, expiresAt) {
+  async createEmailVerificationToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+        INSERT INTO "emailVerificationTokens" ("userId", "tokenHash", "expiresAt")
         VALUES ($1, $2, $3)
       `;
       await query(queryText, [userId, tokenHash, expiresAt]);
     } catch (error) {
-      logger.error("Failed to create email verification token", { error: error.message, userId });
-      throw new DatabaseError("Failed to create email verification token", error);
+      logger.error("Failed to create email verification token", {
+        error: error.message,
+        userId,
+      });
+      throw new DatabaseError(
+        "Failed to create email verification token",
+        error
+      );
     }
   }
 
@@ -555,26 +580,31 @@ class AuthRepository {
   async findEmailVerificationToken(tokenHash) {
     try {
       const queryText = `
-        SELECT u.* FROM email_verification_tokens evt
-        JOIN users u ON evt.user_id = u.user_id
-        WHERE evt.token_hash = $1 AND evt.expires_at > NOW()
+        SELECT u.* FROM "emailVerificationTokens" evt
+        JOIN users u ON evt."userId" = u."userId"
+        WHERE evt."tokenHash" = $1 AND evt."expiresAt" > NOW()
       `;
       const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        passwordHash: user.password_hash,
-        userType: user.user_type,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
-      logger.error("Failed to find user by email verification token", { error: error.message });
-      throw new DatabaseError("Failed to find user by email verification token", error);
+      logger.error("Failed to find user by email verification token", {
+        error: error.message,
+      });
+      throw new DatabaseError(
+        "Failed to find user by email verification token",
+        error
+      );
     }
   }
 
@@ -586,12 +616,17 @@ class AuthRepository {
   async deleteEmailVerificationToken(tokenHash) {
     try {
       const queryText = `
-        DELETE FROM email_verification_tokens WHERE token_hash = $1
+        DELETE FROM "emailVerificationTokens" WHERE "tokenHash" = $1
       `;
       await query(queryText, [tokenHash]);
     } catch (error) {
-      logger.error("Failed to delete email verification token", { error: error.message });
-      throw new DatabaseError("Failed to delete email verification token", error);
+      logger.error("Failed to delete email verification token", {
+        error: error.message,
+      });
+      throw new DatabaseError(
+        "Failed to delete email verification token",
+        error
+      );
     }
   }
 
@@ -603,19 +638,20 @@ class AuthRepository {
   async deleteEmailVerificationTokenByUserId(userId) {
     try {
       const queryText = `
-        DELETE FROM email_verification_tokens WHERE user_id = $1
+        DELETE FROM "emailVerificationTokens" WHERE "userId" = $1
       `;
       await query(queryText, [userId]);
     } catch (error) {
-      logger.error("Failed to delete email verification token by userId", { error: error.message, userId });
-      throw new DatabaseError("Failed to delete email verification token by userId", error);
+      logger.error("Failed to delete email verification token by userId", {
+        error: error.message,
+        userId,
+      });
+      throw new DatabaseError(
+        "Failed to delete email verification token by userId",
+        error
+      );
     }
   }
-
-
-
-
-
 
   // REFRESH TOKEN
 
@@ -629,12 +665,15 @@ class AuthRepository {
   async createRefreshToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+        INSERT INTO "refreshTokens" ("userId", "tokenHash", "expiresAt")
         VALUES ($1, $2, $3)
       `;
       await query(queryText, [userId, tokenHash, expiresAt]);
     } catch (error) {
-      logger.error("Failed to create refresh token", { error: error.message, userId });
+      logger.error("Failed to create refresh token", {
+        error: error.message,
+        userId,
+      });
       throw new DatabaseError("Failed to create refresh token", error);
     }
   }
@@ -647,25 +686,27 @@ class AuthRepository {
   async findRefreshToken(tokenHash) {
     try {
       const queryText = `
-        SELECT u.* FROM refresh_tokens rt
-        JOIN users u ON rt.user_id = u.user_id
-        WHERE rt.token_hash = $1 AND rt.expires_at > NOW()
+        SELECT u.* FROM "refreshTokens" rt
+        JOIN users u ON rt."userId" = u."userId"
+        WHERE rt."tokenHash" = $1 AND rt."expiresAt" > NOW()
       `;
       const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        passwordHash: user.password_hash,
-        userType: user.user_type,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
-      logger.error("Failed to find user by refresh token", { error: error.message });
+      logger.error("Failed to find user by refresh token", {
+        error: error.message,
+      });
       throw new DatabaseError("Failed to find user by refresh token", error);
     }
   }
@@ -678,7 +719,7 @@ class AuthRepository {
   async deleteRefreshToken(tokenHash) {
     try {
       const queryText = `
-        DELETE FROM refresh_tokens WHERE token_hash = $1
+        DELETE FROM "refreshTokens" WHERE "tokenHash" = $1
       `;
       await query(queryText, [tokenHash]);
     } catch (error) {
@@ -695,18 +736,22 @@ class AuthRepository {
   async deleteAllRefreshTokensForUser(userId) {
     try {
       const queryText = `
-        DELETE FROM refresh_tokens WHERE user_id = $1
+        DELETE FROM "refreshTokens" WHERE "userId" = $1
       `;
       await query(queryText, [userId]);
     } catch (error) {
-      logger.error("Failed to delete all refresh tokens for user", { error: error.message, userId });
-      throw new DatabaseError("Failed to delete all refresh tokens for user", error);
+      logger.error("Failed to delete all refresh tokens for user", {
+        error: error.message,
+        userId,
+      });
+      throw new DatabaseError(
+        "Failed to delete all refresh tokens for user",
+        error
+      );
     }
   }
 
-
   // PASSWORD SETUP TOKEN
-  
 
   /**
    * Creates a password setup token for a user (organizational activation)
@@ -718,7 +763,7 @@ class AuthRepository {
   async createPasswordSetupToken(userId, tokenHash, expiresAt) {
     try {
       const queryText = `
-        INSERT INTO password_setup_tokens (user_id, token_hash, expires_at)
+        INSERT INTO "passwordSetupTokens" ("userId", "tokenHash", "expiresAt")
         VALUES ($1, $2, $3)
       `;
       await query(queryText, [userId, tokenHash, expiresAt]);
@@ -735,25 +780,28 @@ class AuthRepository {
   async findPasswordSetupToken(tokenHash) {
     try {
       const queryText = `
-        SELECT u.* FROM password_setup_tokens pst
-        JOIN users u ON pst.user_id = u.user_id
-        WHERE pst.token_hash = $1 AND pst.expires_at > NOW()
+        SELECT u.* FROM "passwordSetupTokens" pst
+        JOIN users u ON pst."userId" = u."userId"
+        WHERE pst."tokenHash" = $1 AND pst."expiresAt" > NOW()
       `;
       const result = await query(queryText, [tokenHash]);
       if (result.rowCount === 0) return null;
       const user = result.rows[0];
       return {
-        userId: user.user_id,
+        userId: user.userId,
         email: user.email,
-        passwordHash: user.password_hash,
-        userType: user.user_type,
-        isEmailVerified: user.is_email_verified,
-        isActive: user.is_active,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
+        passwordHash: user.passwordHash,
+        userType: user.userType,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     } catch (error) {
-      throw new DatabaseError("Failed to find user by password setup token", error);
+      throw new DatabaseError(
+        "Failed to find user by password setup token",
+        error
+      );
     }
   }
 
@@ -765,7 +813,7 @@ class AuthRepository {
   async deletePasswordSetupToken(tokenHash) {
     try {
       const queryText = `
-        DELETE FROM password_setup_tokens WHERE token_hash = $1
+        DELETE FROM "passwordSetupTokens" WHERE "tokenHash" = $1
       `;
       await query(queryText, [tokenHash]);
     } catch (error) {
@@ -783,12 +831,15 @@ class AuthRepository {
     try {
       const queryText = `
         UPDATE users
-        SET password_hash = $1, is_email_verified = TRUE, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $2
+        SET "passwordHash" = $1, "isEmailVerified" = TRUE, "isActive" = TRUE, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "userId" = $2
       `;
       await query(queryText, [newPasswordHash, userId]);
     } catch (error) {
-      throw new DatabaseError("Failed to update user password and activate", error);
+      throw new DatabaseError(
+        "Failed to update user password and activate",
+        error
+      );
     }
   }
 
@@ -797,11 +848,24 @@ class AuthRepository {
    * @param {Object} mediaData
    * @returns {Promise<void>}
    */
-  async createMediaRecord({ mediaId, entityType, entityId, mediaType, fileName, fileSize, description, altText, uploadedByUserId }, client = null) {
+  async createMediaRecord(
+    {
+      mediaId,
+      entityType,
+      entityId,
+      mediaType,
+      fileName,
+      fileSize,
+      description,
+      altText,
+      uploadedByUserId,
+    },
+    client = null
+  ) {
     try {
       const executor = client ? client : { query };
       const queryText = `
-        INSERT INTO media (media_id, entity_type, entity_id, media_type, file_name, file_size, description, alt_text, uploaded_by_user_id)
+        INSERT INTO media ("mediaId", "entityType", "entityId", "mediaType", "fileName", "fileSize", "description", "altText", "uploadedByUserId")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `;
       await executor.query(queryText, [
@@ -813,11 +877,11 @@ class AuthRepository {
         fileSize,
         description,
         altText,
-        uploadedByUserId
+        uploadedByUserId,
       ]);
     } catch (error) {
-      logger.error('Failed to create media record', { error: error.message });
-      throw new DatabaseError('Failed to create media record', error);
+      logger.error("Failed to create media record", { error: error.message });
+      throw new DatabaseError("Failed to create media record", error);
     }
   }
 
@@ -832,17 +896,20 @@ class AuthRepository {
     try {
       const executor = client ? client : { query };
       const queryText = `
-        UPDATE media
-        SET entity_id = $1
-        WHERE media_id = $2
+        UPDATE "media"
+        SET "entityId" = $1
+        WHERE "mediaId" = $2
       `;
       await executor.query(queryText, [entityId, mediaId]);
     } catch (error) {
-      logger.error('Failed to update media entityId', { error: error.message, mediaId, entityId });
-      throw new DatabaseError('Failed to update media entityId', error);
+      logger.error("Failed to update media entityId", {
+        error: error.message,
+        mediaId,
+        entityId,
+      });
+      throw new DatabaseError("Failed to update media entityId", error);
     }
   }
 }
 
 export default new AuthRepository();
- 

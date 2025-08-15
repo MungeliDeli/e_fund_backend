@@ -34,8 +34,8 @@ export const createSegment = async (segmentData, organizerId) => {
 
     // Check if segment name already exists for this organizer
     const nameCheckQuery = `
-      SELECT segment_id FROM segments 
-      WHERE organizer_id = $1 AND name = $2
+      SELECT "segmentId" FROM "segments" 
+      WHERE "organizerId" = $1 AND name = $2
     `;
     const nameCheckResult = await client.query(nameCheckQuery, [
       organizerId,
@@ -48,7 +48,7 @@ export const createSegment = async (segmentData, organizerId) => {
 
     // Insert new segment
     const insertQuery = `
-      INSERT INTO segments (organizer_id, name, description)
+      INSERT INTO "segments" ("organizerId", name, description)
       VALUES ($1, $2, $3)
       RETURNING *
     `;
@@ -60,7 +60,7 @@ export const createSegment = async (segmentData, organizerId) => {
     ]);
 
     logger.info("Segment created successfully", {
-      segmentId: result.rows[0].segment_id,
+      segmentId: result.rows[0].segmentId,
       organizerId,
       name,
     });
@@ -78,21 +78,21 @@ export const getSegmentsByOrganizer = async (organizerId) => {
   try {
     const queryText = `
       SELECT 
-        s.segment_id,
+        s."segmentId",
         s.name,
         s.description,
-        s.created_at,
-        s.updated_at,
-        COUNT(c.contact_id) as contact_count
-      FROM segments s
-      LEFT JOIN contacts c ON s.segment_id = c.segment_id
-      WHERE s.organizer_id = $1
-      GROUP BY s.segment_id, s.name, s.description, s.created_at, s.updated_at
-      ORDER BY s.created_at DESC
+        s."createdAt",
+        s."updatedAt",
+        COUNT(c."contactId") as "contactCount"
+      FROM "segments" s
+      LEFT JOIN "contacts" c ON s."segmentId" = c."segmentId"
+      WHERE s."organizerId" = $1
+      GROUP BY s."segmentId", s.name, s.description, s."createdAt", s."updatedAt"
+      ORDER BY s."createdAt" DESC
     `;
 
     const result = await query(queryText, [organizerId]);
-
+    console.log("result", result);
     logger.info("Segments retrieved successfully", {
       organizerId,
       count: result.rows.length,
@@ -119,16 +119,16 @@ export const getSegmentById = async (segmentId, organizerId) => {
   try {
     const queryText = `
       SELECT 
-        s.segment_id,
+        s."segmentId",
         s.name,
         s.description,
-        s.created_at,
-        s.updated_at,
-        COUNT(c.contact_id) as contact_count
-      FROM segments s
-      LEFT JOIN contacts c ON s.segment_id = c.segment_id
-      WHERE s.segment_id = $1 AND s.organizer_id = $2
-      GROUP BY s.segment_id, s.name, s.description, s.created_at, s.updated_at
+        s."createdAt",
+        s."updatedAt",
+        COUNT(c."contactId") as "contactCount"
+      FROM "segments" s
+      LEFT JOIN "contacts" c ON s."segmentId" = c."segmentId"
+      WHERE s."segmentId" = $1 AND s."organizerId" = $2
+      GROUP BY s."segmentId", s.name, s.description, s."createdAt", s."updatedAt"
     `;
 
     const result = await query(queryText, [segmentId, organizerId]);
@@ -171,8 +171,8 @@ export const updateSegment = async (segmentId, updateData, organizerId) => {
 
     // Check if segment exists and belongs to organizer
     const segmentCheckQuery = `
-      SELECT segment_id FROM segments 
-      WHERE segment_id = $1 AND organizer_id = $2
+      SELECT "segmentId" FROM "segments" 
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
     const segmentCheckResult = await client.query(segmentCheckQuery, [
       segmentId,
@@ -186,8 +186,8 @@ export const updateSegment = async (segmentId, updateData, organizerId) => {
     // Check if new name conflicts with existing segment (excluding current)
     if (name) {
       const nameCheckQuery = `
-        SELECT segment_id FROM segments 
-        WHERE organizer_id = $1 AND name = $2 AND segment_id != $3
+        SELECT "segmentId" FROM "segments" 
+        WHERE "organizerId" = $1 AND name = $2 AND "segmentId" != $3
       `;
       const nameCheckResult = await client.query(nameCheckQuery, [
         organizerId,
@@ -226,9 +226,9 @@ export const updateSegment = async (segmentId, updateData, organizerId) => {
     updateValues.push(segmentId, organizerId);
 
     const updateQuery = `
-      UPDATE segments 
-      SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
-      WHERE segment_id = $${paramIndex} AND organizer_id = $${paramIndex + 1}
+      UPDATE "segments" 
+      SET ${updateFields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "segmentId" = $${paramIndex} AND "organizerId" = $${paramIndex + 1}
       RETURNING *
     `;
 
@@ -254,8 +254,8 @@ export const deleteSegment = async (segmentId, organizerId) => {
   return await transaction(async (client) => {
     // Check if segment exists and belongs to organizer
     const segmentCheckQuery = `
-      SELECT segment_id FROM segments 
-      WHERE segment_id = $1 AND organizer_id = $2
+      SELECT "segmentId" FROM "segments" 
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
     const segmentCheckResult = await client.query(segmentCheckQuery, [
       segmentId,
@@ -268,21 +268,21 @@ export const deleteSegment = async (segmentId, organizerId) => {
 
     // Check if segment has contacts
     const contactCheckQuery = `
-      SELECT COUNT(*) as contact_count FROM contacts 
-      WHERE segment_id = $1
+      SELECT COUNT(*) as "contactCount" FROM "contacts" 
+      WHERE "segmentId" = $1
     `;
     const contactCheckResult = await client.query(contactCheckQuery, [
       segmentId,
     ]);
 
-    if (parseInt(contactCheckResult.rows[0].contact_count) > 0) {
+    if (parseInt(contactCheckResult.rows[0].contactCount) > 0) {
       throw new ConflictError("Cannot delete segment with existing contacts");
     }
 
     // Delete segment
     const deleteQuery = `
-      DELETE FROM segments 
-      WHERE segment_id = $1 AND organizer_id = $2
+      DELETE FROM "segments" 
+      WHERE "segmentId" = $1 AND "organizerId" = $2
     `;
 
     const result = await client.query(deleteQuery, [segmentId, organizerId]);
@@ -314,13 +314,13 @@ export const segmentNameExists = async (
 ) => {
   try {
     let queryText = `
-      SELECT segment_id FROM segments 
-      WHERE organizer_id = $1 AND name = $2
+      SELECT "segmentId" FROM "segments"     
+      WHERE "organizerId" = $1 AND name = $2
     `;
     let params = [organizerId, name];
 
     if (excludeSegmentId) {
-      queryText += " AND segment_id != $3";
+      queryText += ' AND "segmentId" != $3';
       params.push(excludeSegmentId);
     }
 

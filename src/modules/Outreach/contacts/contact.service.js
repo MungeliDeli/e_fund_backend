@@ -57,7 +57,7 @@ export const createContact = async (contactData, segmentId, organizerId) => {
     );
 
     logger.info("Contact created successfully", {
-      contactId: contact.contact_id,
+      contactId: contact.contactId,
       email: contact.email,
       segmentId,
       organizerId,
@@ -173,7 +173,7 @@ export const updateContact = async (contactId, updateData, organizerId) => {
     if (updateData.email && updateData.email !== existingContact.email) {
       const emailExists = await contactRepository.contactEmailExists(
         updateData.email,
-        existingContact.segment_id,
+        existingContact.segmentId,
         contactId
       );
       if (emailExists) {

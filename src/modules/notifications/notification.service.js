@@ -9,7 +9,7 @@ import logger from "../../utils/logger.js";
 class NotificationService {
   async createAndDispatch({
     userId,
-    type, // 'email' | 'in_app'
+    type, // 'email' | 'inApp'
     category,
     priority = "medium",
     title,
@@ -32,9 +32,9 @@ class NotificationService {
       relatedEntityId,
     });
 
-    if (type === "in_app") {
-      await notificationRepository.setDelivered(row.notification_id);
-      return { ...row, delivery_status: "delivered" };
+    if (type === "inApp") {
+      await notificationRepository.setDelivered(row.notificationId);
+      return { ...row, deliveryStatus: "delivered" };
     }
 
     if (type === "email") {
@@ -47,23 +47,23 @@ class NotificationService {
         const html = `<p>${message}</p>`;
         await sendGenericEmail(to, subject, html);
         console.log("Email sent", {
-          notificationId: row.notification_id,
+          notificationId: row.notificationId,
           to,
           subject,
           html,
         });
-        await notificationRepository.setSent(row.notification_id);
-        return { ...row, delivery_status: "sent" };
+        await notificationRepository.setSent(row.notificationId);
+        return { ...row, deliveryStatus: "sent" };
       } catch (err) {
         logger.error("Failed to send notification email", {
-          notificationId: row.notification_id,
+          notificationId: row.notificationId,
           error: err.message,
         });
         await notificationRepository.setFailedWithError(
-          row.notification_id,
+          row.notificationId,
           err.message
         );
-        return { ...row, delivery_status: "failed" };
+        return { ...row, deliveryStatus: "failed" };
       }
     }
   }
@@ -91,20 +91,18 @@ class NotificationService {
 
     for (const row of rows) {
       try {
-        const to = await notificationRepository.selectEmailByUserId(
-          row.user_id
-        );
+        const to = await notificationRepository.selectEmailByUserId(row.userId);
         if (!to) throw new Error("Recipient email not found");
 
         await sendGenericEmail(to, row.title, `<p>${row.message}</p>`);
-        await notificationRepository.setSent(row.notification_id);
+        await notificationRepository.setSent(row.notificationId);
       } catch (err) {
         logger.warn("Email retry failed", {
-          notificationId: row.notification_id,
+          notificationId: row.notificationId,
           error: err.message,
         });
         await notificationRepository.setFailedWithError(
-          row.notification_id,
+          row.notificationId,
           err.message
         );
       }

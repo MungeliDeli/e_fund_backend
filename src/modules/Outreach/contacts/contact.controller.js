@@ -42,13 +42,13 @@ export const createContact = async (req, res) => {
   );
 
   ResponseFactory.created(res, "Contact created successfully", {
-    contactId: contact.contact_id,
+    contactId: contact.contactId,
     name: contact.name,
     email: contact.email,
     description: contact.description,
-    emailsOpened: contact.emails_opened,
-    segmentId: contact.segment_id,
-    createdAt: contact.created_at,
+    emailsOpened: contact.emailsOpened,
+    segmentId: contact.segmentId,
+    createdAt: contact.createdAt,
   });
 };
 
@@ -113,15 +113,15 @@ export const getContactById = async (req, res) => {
   const contact = await contactService.getContactById(contactId, organizerId);
 
   ResponseFactory.ok(res, "Contact retrieved successfully", {
-    contactId: contact.contact_id,
+    contactId: contact.contactId,
     name: contact.name,
     email: contact.email,
     description: contact.description,
-    emailsOpened: contact.emails_opened,
-    segmentId: contact.segment_id,
-    segmentName: contact.segment_name,
-    createdAt: contact.created_at,
-    updatedAt: contact.updated_at,
+    emailsOpened: contact.emailsOpened,
+    segmentId: contact.segmentId,
+    segmentName: contact.segmentName,
+    createdAt: contact.createdAt,
+    updatedAt: contact.updatedAt,
   });
 };
 
@@ -148,13 +148,13 @@ export const updateContact = async (req, res) => {
   );
 
   ResponseFactory.ok(res, "Contact updated successfully", {
-    contactId: updatedContact.contact_id,
+    contactId: updatedContact.contactId,
     name: updatedContact.name,
     email: updatedContact.email,
     description: updatedContact.description,
-    emailsOpened: updatedContact.emails_opened,
-    segmentId: updatedContact.segment_id,
-    updatedAt: updatedContact.updated_at,
+    emailsOpened: updatedContact.emailsOpened,
+    segmentId: updatedContact.segmentId,
+    updatedAt: updatedContact.updatedAt,
   });
 };
 

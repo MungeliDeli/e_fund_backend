@@ -3,9 +3,9 @@
 
 
 -- Now drop the old constraint and add the new one
-ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_status_check;
+ALTER TABLE "campaigns" DROP CONSTRAINT IF EXISTS "campaigns_status_check";
 
-ALTER TABLE campaigns ADD CONSTRAINT campaigns_status_check 
+ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_status_check" 
 CHECK (status IN ('draft', 'pending', 'active', 'successful', 'closed', 'cancelled', 'rejected'));
 
 -- Add comment to document the status meanings

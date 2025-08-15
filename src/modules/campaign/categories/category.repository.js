@@ -32,7 +32,7 @@ export const createCategory = async (categoryData, client) => {
     const { name, description, isActive } = categoryData;
 
     const queryText = `
-      INSERT INTO categories (name, description, is_active)
+      INSERT INTO "categories" (name, description, "isActive")
       VALUES ($1, $2, $3)
       RETURNING *
     `;
@@ -49,17 +49,17 @@ export const createCategory = async (categoryData, client) => {
 
     const category = result.rows[0];
     logger.info("Category created successfully", {
-      categoryId: category.category_id,
+      categoryId: category.categoryId,
       name: category.name,
     });
 
     return {
-      categoryId: category.category_id,
+      categoryId: category.categoryId,
       name: category.name,
       description: category.description,
-      isActive: category.is_active,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at,
+      isActive: category.isActive,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
     };
   } catch (error) {
     logger.error("Failed to create category", {
@@ -84,9 +84,9 @@ export const createCategory = async (categoryData, client) => {
 export const getCategoryById = async (categoryId) => {
   try {
     const queryText = `
-      SELECT category_id, name, description, is_active, created_at, updated_at
-      FROM categories
-      WHERE category_id = $1
+      SELECT "categoryId", name, description, "isActive", "createdAt", "updatedAt"
+      FROM "categories"
+      WHERE "categoryId" = $1
     `;
 
     const result = await query(queryText, [categoryId]);
@@ -97,12 +97,12 @@ export const getCategoryById = async (categoryId) => {
 
     const category = result.rows[0];
     return {
-      categoryId: category.category_id,
+      categoryId: category.categoryId,
       name: category.name,
       description: category.description,
-      isActive: category.is_active,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at,
+      isActive: category.isActive,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
     };
   } catch (error) {
     logger.error("Failed to get category by ID", {
@@ -120,20 +120,20 @@ export const getCategoryById = async (categoryId) => {
 export const getCategories = async () => {
   try {
     const queryText = `
-      SELECT category_id, name, description, is_active, created_at, updated_at
-      FROM categories
+      SELECT "categoryId", name, description, "isActive", "createdAt", "updatedAt"
+      FROM "categories"
       ORDER BY name ASC
     `;
 
     const result = await query(queryText);
 
     const categories = result.rows.map((category) => ({
-      categoryId: category.category_id,
+      categoryId: category.categoryId,
       name: category.name,
       description: category.description,
-      isActive: category.is_active,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at,
+      isActive: category.isActive,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
     }));
 
     return {
@@ -180,7 +180,7 @@ export const updateCategory = async (categoryId, updateData, client) => {
     }
 
     if (isActive !== undefined) {
-      setClauses.push(`is_active = $${valueIndex++}`);
+      setClauses.push(`"isActive" = $${valueIndex++}`);
       values.push(isActive);
     }
 
@@ -190,9 +190,9 @@ export const updateCategory = async (categoryId, updateData, client) => {
 
     values.push(categoryId);
     const queryText = `
-      UPDATE categories
+      UPDATE "categories"
       SET ${setClauses.join(", ")}
-      WHERE category_id = $${valueIndex}
+      WHERE "categoryId" = $${valueIndex}
       RETURNING *
     `;
 
@@ -209,12 +209,12 @@ export const updateCategory = async (categoryId, updateData, client) => {
     });
 
     return {
-      categoryId: category.category_id,
+      categoryId: category.categoryId,
       name: category.name,
       description: category.description,
-      isActive: category.is_active,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at,
+      isActive: category.isActive,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
     };
   } catch (error) {
     logger.error("Failed to update category", {
@@ -245,14 +245,14 @@ export const updateCategory = async (categoryId, updateData, client) => {
 export const categoryNameExists = async (name, excludeCategoryId = null) => {
   try {
     let queryText = `
-      SELECT category_id
-      FROM categories
+      SELECT "categoryId"
+      FROM "categories" 
       WHERE name = $1
     `;
     let values = [name];
 
     if (excludeCategoryId) {
-      queryText += ` AND category_id != $2`;
+      queryText += ` AND "categoryId" != $2`;
       values.push(excludeCategoryId);
     }
 
