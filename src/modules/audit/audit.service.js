@@ -43,7 +43,7 @@ function formatAuditLog(auditLog) {
     actionType: auditLog.actionType,
     entityType: auditLog.entityType,
     entityId: auditLog.entityId,
-    details: auditLog.details ? JSON.parse(auditLog.details) : null,
+    details: auditLog.details || null,
     timestamp: auditLog.timestamp,
     ipAddress: auditLog.ipAddress,
     userAgent: auditLog.userAgent,

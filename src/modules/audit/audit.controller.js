@@ -17,10 +17,7 @@
  */
 
 import auditService from "./audit.service.js";
-import {
-  sendSuccessResponse,
-  sendCreatedResponse,
-} from "../../utils/response.utils.js";
+import { ResponseFactory } from "../../utils/response.utils.js";
 import logger from "../../utils/logger.js";
 
 /**
@@ -39,7 +36,7 @@ async function createAuditLog(req, res) {
     entityType: auditLog.entityType,
   });
 
-  sendCreatedResponse(res, "Audit log created successfully", auditLog);
+  ResponseFactory.created(res, "Audit log created successfully", auditLog);
 }
 
 /**
@@ -74,7 +71,7 @@ async function getAuditLogs(req, res) {
 
   const result = await auditService.getAuditLogs(filters, pagination);
 
-  sendSuccessResponse(res, "Audit logs retrieved successfully", result);
+  ResponseFactory.ok(res, "Audit logs retrieved successfully", result);
 }
 
 /**
@@ -87,7 +84,7 @@ async function getAuditLogById(req, res) {
 
   const auditLog = await auditService.getAuditLogById(logId);
 
-  sendSuccessResponse(res, "Audit log retrieved successfully", auditLog);
+  ResponseFactory.ok(res, "Audit log retrieved successfully", auditLog);
 }
 
 /**
@@ -107,7 +104,7 @@ async function getAuditLogsByUser(req, res) {
 
   const result = await auditService.getAuditLogsByUser(userId, pagination);
 
-  sendSuccessResponse(res, "User audit logs retrieved successfully", result);
+  ResponseFactory.ok(res, "User audit logs retrieved successfully", result);
 }
 
 /**
@@ -131,7 +128,7 @@ async function getAuditLogsByEntity(req, res) {
     pagination
   );
 
-  sendSuccessResponse(res, "Entity audit logs retrieved successfully", result);
+  ResponseFactory.ok(res, "Entity audit logs retrieved successfully", result);
 }
 
 /**
@@ -156,11 +153,7 @@ async function getAuditLogStats(req, res) {
 
   const stats = await auditService.getAuditLogStats(filters);
 
-  sendSuccessResponse(
-    res,
-    "Audit log statistics retrieved successfully",
-    stats
-  );
+  ResponseFactory.ok(res, "Audit log statistics retrieved successfully", stats);
 }
 
 /**
@@ -185,7 +178,7 @@ async function getAuditLogSummary(req, res) {
 
   const summary = await auditService.getAuditLogSummary(filters);
 
-  sendSuccessResponse(res, "Audit log summary retrieved successfully", summary);
+  ResponseFactory.ok(res, "Audit log summary retrieved successfully", summary);
 }
 
 /**
@@ -208,7 +201,7 @@ async function deleteOldAuditLogs(req, res) {
     deletedBy: user.userId,
   });
 
-  sendSuccessResponse(
+  ResponseFactory.ok(
     res,
     `${deletedCount} old audit logs deleted successfully`,
     {
@@ -286,7 +279,7 @@ async function exportAuditLogs(req, res) {
   }
 
   // Default JSON response
-  sendSuccessResponse(res, "Audit logs exported successfully", {
+  ResponseFactory.ok(res, "Audit logs exported successfully", {
     format,
     totalLogs: result.logs.length,
     logs: result.logs,

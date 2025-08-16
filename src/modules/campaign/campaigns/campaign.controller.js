@@ -41,6 +41,8 @@ export const createCampaign = async (req, res) => {
   const message =
     campaignData.status === "pending"
       ? "Campaign submitted for approval successfully"
+      : campaignData.status === "draft"
+      ? "Campaign draft saved successfully"
       : "Campaign created successfully";
 
   ResponseFactory.created(res, message, campaign);

@@ -98,6 +98,22 @@ export const createCampaignSchema = Joi.object({
     .messages({
       "any.required": "Custom page settings are required.",
     }),
+  status: Joi.string()
+    .valid(
+      "draft",
+      "pending",
+      "active",
+      "successful",
+      "closed",
+      "cancelled",
+      "rejected"
+    )
+    .optional()
+    .default("draft")
+    .messages({
+      "any.only":
+        "Status must be one of: draft, pending, active, successful, closed, cancelled, rejected.",
+    }),
 });
 
 // Schema for updating an existing campaign

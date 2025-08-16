@@ -186,17 +186,21 @@ export const createCampaign = async (
 
     // Log audit event for campaign creation
     if (global.req) {
-      await logCampaignEvent(
-        global.req,
-        CAMPAIGN_ACTIONS.CAMPAIGN_CREATED,
-        result.campaignId,
-        {
-          organizerId,
-          title: campaignData.title,
-          status: result.status,
-          categoryCount: categoryIds.length,
-        }
-      );
+      let actionType = CAMPAIGN_ACTIONS.CAMPAIGN_CREATED;
+
+      // Determine the appropriate action type based on status
+      if (result.status === "pending") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_SUBMITTED;
+      } else if (result.status === "active") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED;
+      }
+
+      await logCampaignEvent(global.req, actionType, result.campaignId, {
+        organizerId,
+        title: campaignData.title,
+        status: result.status,
+        categoryCount: categoryIds.length,
+      });
     }
 
     return completeCampaign;
@@ -290,8 +294,6 @@ export const updateCampaign = async (
     const completeCampaign = await getCampaignById(campaignId);
 
     logger.info("Campaign updated successfully", { campaignId, organizerId });
-
-    console.log(updateData.status);
 
     // Simple notification triggers for status changes
     try {
