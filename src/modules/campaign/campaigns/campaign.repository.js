@@ -600,6 +600,35 @@ export const findCampaignsByStatus = async (status, client) => {
 };
 
 /**
+ * Find users by roles
+ * @param {Array<string>} roles - Array of user roles to search for
+ * @param {Object} [client] - Optional DB client for transaction
+ * @returns {Promise<Array>} List of users with the specified roles
+ */
+export const findUsersByRoles = async (roles, client) => {
+  const executor = client || { query };
+
+  try {
+    const placeholders = roles.map((_, index) => `$${index + 1}`).join(",");
+    const queryText = `
+      SELECT "userId", "userType", "email"
+      FROM "users"
+      WHERE "userType" = ANY(ARRAY[${placeholders}])
+      AND "isActive" = TRUE
+    `;
+
+    const result = await executor.query(queryText, roles);
+    return result.rows;
+  } catch (error) {
+    logger.error("Failed to find users by roles", {
+      error: error.message,
+      roles,
+    });
+    throw new DatabaseError("Failed to find users by roles", error);
+  }
+};
+
+/**
  * Create a media record in the media table
  * @param {Object} mediaRecord - Media record data
  * @param {Object} [client] - Optional DB client for transaction
@@ -642,6 +671,7 @@ export default {
   findCampaignsByOrganizer,
   findAllCampaigns,
   findCampaignsByStatus,
+  findUsersByRoles,
   addCampaignCategories,
   removeCampaignCategories,
   getCampaignCategories,

@@ -215,19 +215,19 @@ export const processPendingStartCampaigns = async (req, res) => {
 };
 
 /**
- * Manually activate a pendingStart campaign (organizer endpoint)
+ * Manually publish a pendingStart campaign (organizer endpoint)
  * @param {import('express').Request} req - Express request object
  * @param {import('express').Response} res - Express response object
  * @returns {Promise<void>}
  */
-export const activatePendingStartCampaign = async (req, res) => {
+export const publishPendingStartCampaign = async (req, res) => {
   const { campaignId } = req.params;
   const organizerId = req.user.userId;
 
-  const campaign = await campaignService.activatePendingStartCampaign(
+  const campaign = await campaignService.publishPendingStartCampaign(
     campaignId,
     organizerId
   );
 
-  ResponseFactory.ok(res, "Campaign activated successfully", campaign);
+  ResponseFactory.ok(res, "Campaign published successfully", campaign);
 };

@@ -710,12 +710,12 @@ export const processPendingStartCampaigns = async () => {
 };
 
 /**
- * Manually activate a pendingStart campaign (for organizers)
+ * Manually publish a pendingStart campaign (for organizers)
  * @param {string} campaignId - Campaign ID
  * @param {string} organizerId - Organizer ID
  * @returns {Promise<Object>} Updated campaign
  */
-export const activatePendingStartCampaign = async (campaignId, organizerId) => {
+export const publishPendingStartCampaign = async (campaignId, organizerId) => {
   try {
     // Verify ownership
     const isOwner = await campaignRepository.isCampaignOwner(
@@ -723,14 +723,14 @@ export const activatePendingStartCampaign = async (campaignId, organizerId) => {
       organizerId
     );
     if (!isOwner) {
-      throw new AuthorizationError("You can only activate your own campaigns");
+      throw new AuthorizationError("You can only publish your own campaigns");
     }
 
     // Get current campaign
     const campaign = await campaignRepository.findCampaignById(campaignId);
     if (campaign.status !== "pendingStart") {
       throw new Error(
-        "Campaign must be in pendingStart status to be activated"
+        "Campaign must be in pendingStart status to be published"
       );
     }
 
@@ -742,10 +742,25 @@ export const activatePendingStartCampaign = async (campaignId, organizerId) => {
       }
     );
 
-    // Send notification
+    // Log audit event for campaign publishing
+    if (global.req) {
+      await logCampaignEvent(
+        global.req,
+        CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED,
+        campaignId,
+        {
+          organizerId,
+          title: campaign.title,
+          status: "active",
+          action: "manual_publish",
+        }
+      );
+    }
+
+    // Send notification to organizer
     try {
-      const titleInApp = "Campaign activated";
-      const messageInApp = `Your campaign "${campaign.title}" has been manually activated and is now live.`;
+      const titleInApp = "Campaign published";
+      const messageInApp = `Your campaign "${campaign.title}" has been published and is now live.`;
       await notificationService.createAndDispatch({
         userId: organizerId,
         type: "inApp",
@@ -756,19 +771,58 @@ export const activatePendingStartCampaign = async (campaignId, organizerId) => {
         data: { campaignId, status: "active" },
         relatedEntityType: "campaign",
         relatedEntityId: campaignId,
-        templateId: "campaign.activated.v1",
+        templateId: "campaign.published.v1",
       });
     } catch (notificationError) {
-      logger.error("Failed to send campaign activation notification", {
-        error: notificationError.message,
+      logger.error(
+        "Failed to send campaign publish notification to organizer",
+        {
+          error: notificationError.message,
+          campaignId,
+        }
+      );
+    }
+
+    // Send notification to admins about campaign publication
+    try {
+      const adminRoles = [
+        "superAdmin",
+        "supportAdmin",
+        "eventModerator",
+        "financialAdmin",
+      ];
+      const adminUsers = await campaignRepository.findUsersByRoles(adminRoles);
+
+      for (const adminUser of adminUsers) {
+        await notificationService.createAndDispatch({
+          userId: adminUser.userId,
+          type: "inApp",
+          category: "campaign",
+          priority: "medium",
+          title: "Campaign published",
+          message: `Campaign "${campaign.title}" has been published by organizer.`,
+          data: {
+            campaignId,
+            status: "active",
+            organizerId,
+            organizerName: campaign.organizerName || "Unknown Organizer",
+          },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "admin.campaign.published.v1",
+        });
+      }
+    } catch (adminNotificationError) {
+      logger.error("Failed to send campaign publish notification to admins", {
+        error: adminNotificationError.message,
         campaignId,
       });
     }
 
-    logger.info("Campaign manually activated", { campaignId, organizerId });
+    logger.info("Campaign published successfully", { campaignId, organizerId });
     return updatedCampaign;
   } catch (error) {
-    logger.error("Failed to activate pendingStart campaign", {
+    logger.error("Failed to publish pendingStart campaign", {
       error: error.message,
       campaignId,
       organizerId,
