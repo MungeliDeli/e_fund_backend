@@ -101,7 +101,8 @@ export const createCampaignSchema = Joi.object({
   status: Joi.string()
     .valid(
       "draft",
-      "pending",
+      "pendingApproval",
+      "pendingStart",
       "active",
       "successful",
       "closed",
@@ -112,7 +113,7 @@ export const createCampaignSchema = Joi.object({
     .default("draft")
     .messages({
       "any.only":
-        "Status must be one of: draft, pending, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
 });
 
@@ -122,7 +123,8 @@ export const updateCampaignSchema = Joi.object({
   status: Joi.string()
     .valid(
       "draft",
-      "pending",
+      "pendingApproval",
+      "pendingStart",
       "active",
       "successful",
       "closed",
@@ -132,7 +134,7 @@ export const updateCampaignSchema = Joi.object({
     .optional()
     .messages({
       "any.only":
-        "Status must be one of: draft, pending, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
 });
 
@@ -163,7 +165,8 @@ export const campaignFiltersSchema = Joi.object({
   status: Joi.string()
     .valid(
       "draft",
-      "pending",
+      "pendingApproval",
+      "pendingStart",
       "active",
       "successful",
       "closed",
@@ -173,7 +176,7 @@ export const campaignFiltersSchema = Joi.object({
     .optional()
     .messages({
       "any.only":
-        "Status must be one of: draft, pending, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
   limit: Joi.number()
     .integer()

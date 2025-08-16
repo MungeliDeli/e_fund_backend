@@ -26,6 +26,8 @@ import {
   saveCampaignDraft,
   canEditCampaign,
   getCampaignByShareLink,
+  processPendingStartCampaigns,
+  activatePendingStartCampaign,
 } from "./campaign.controller.js";
 import {
   validateCreateCampaign,
@@ -75,6 +77,16 @@ router.get(
   "/:campaignId/can-edit",
   validateCampaignId,
   catchAsync(canEditCampaign)
+);
+
+// Admin endpoints
+router.post("/process-pending-start", catchAsync(processPendingStartCampaigns));
+
+// Organizer endpoints
+router.post(
+  "/:campaignId/activate",
+  validateCampaignId,
+  catchAsync(activatePendingStartCampaign)
 );
 
 export default router;

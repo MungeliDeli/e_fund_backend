@@ -189,7 +189,7 @@ export const createCampaign = async (
       let actionType = CAMPAIGN_ACTIONS.CAMPAIGN_CREATED;
 
       // Determine the appropriate action type based on status
-      if (result.status === "pending") {
+      if (result.status === "pendingApproval") {
         actionType = CAMPAIGN_ACTIONS.CAMPAIGN_SUBMITTED;
       } else if (result.status === "active") {
         actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED;
@@ -263,10 +263,27 @@ export const updateCampaign = async (
       const updatePayload = { ...updateData };
       if (
         isAdminActor &&
-        (updateData.status === "active" || updateData.status === "rejected")
+        (updateData.status === "pendingStart" ||
+          updateData.status === "active" ||
+          updateData.status === "rejected")
       ) {
         updatePayload.approvedByUserId = organizerId;
         updatePayload.approvedAt = new Date();
+      }
+
+      // Handle status transition logic
+      if (isAdminActor && updateData.status === "pendingStart") {
+        // When admin approves, check if campaign should be active or pendingStart
+        const currentCampaign = await campaignRepository.findCampaignById(
+          campaignId
+        );
+        const now = new Date();
+        const startDate = new Date(currentCampaign.startDate);
+
+        // If start date is in the past or today, make it active immediately
+        if (startDate <= now) {
+          updatePayload.status = "active";
+        }
       }
 
       const campaign = await campaignRepository.updateCampaign(
@@ -297,9 +314,47 @@ export const updateCampaign = async (
 
     // Simple notification triggers for status changes
     try {
-      if (updateData.status === "active") {
+      if (updateData.status === "pendingStart") {
         const titleInApp = "Campaign approved";
-        const messageInApp = `Your campaign "${completeCampaign.title}" has been approved and is now active.`;
+        const messageInApp = `Your campaign "${
+          completeCampaign.title
+        }" has been approved and will start on ${new Date(
+          completeCampaign.startDate
+        ).toLocaleDateString()}.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "inApp",
+          category: "campaign",
+          priority: "high",
+          title: titleInApp,
+          message: messageInApp,
+          data: { campaignId, status: "pendingStart" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.approved.v1",
+        });
+
+        const titleEmail = "Your campaign has been approved";
+        const messageEmail = `Hi, your campaign \"${
+          completeCampaign.title
+        }\" has been approved and will start on ${new Date(
+          completeCampaign.startDate
+        ).toLocaleDateString()}.`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "email",
+          category: "campaign",
+          priority: "high",
+          title: titleEmail,
+          message: messageEmail,
+          data: { campaignId, status: "pendingStart" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.approved.v1",
+        });
+      } else if (updateData.status === "active") {
+        const titleInApp = "Campaign is now live";
+        const messageInApp = `Your campaign "${completeCampaign.title}" is now active and accepting donations.`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "inApp",
@@ -313,8 +368,8 @@ export const updateCampaign = async (
           templateId: "campaign.approved.v1",
         });
 
-        const titleEmail = "Your campaign has been approved";
-        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" has been approved and is now live.`;
+        const titleEmail = "Your campaign is now live";
+        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" is now active and accepting donations.`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "email",
@@ -589,5 +644,135 @@ export const canEditCampaign = async (campaignId, organizerId) => {
       organizerId,
     });
     return false;
+  }
+};
+
+/**
+ * Process pendingStart campaigns and transition them to active if start date is reached
+ * This function should be called periodically (e.g., via cron job)
+ * @returns {Promise<number>} Number of campaigns transitioned
+ */
+export const processPendingStartCampaigns = async () => {
+  try {
+    const now = new Date();
+    const pendingStartCampaigns =
+      await campaignRepository.findCampaignsByStatus("pendingStart");
+
+    let transitionedCount = 0;
+
+    for (const campaign of pendingStartCampaigns) {
+      const startDate = new Date(campaign.startDate);
+      if (startDate <= now) {
+        await campaignRepository.updateCampaign(campaign.campaignId, {
+          status: "active",
+        });
+
+        // Send notification to organizer
+        try {
+          const titleInApp = "Campaign is now live";
+          const messageInApp = `Your campaign "${campaign.title}" has started and is now active.`;
+          await notificationService.createAndDispatch({
+            userId: campaign.organizerId,
+            type: "inApp",
+            category: "campaign",
+            priority: "high",
+            title: titleInApp,
+            message: messageInApp,
+            data: { campaignId: campaign.campaignId, status: "active" },
+            relatedEntityType: "campaign",
+            relatedEntityId: campaign.campaignId,
+            templateId: "campaign.started.v1",
+          });
+        } catch (notificationError) {
+          logger.error("Failed to send campaign start notification", {
+            error: notificationError.message,
+            campaignId: campaign.campaignId,
+          });
+        }
+
+        transitionedCount++;
+      }
+    }
+
+    if (transitionedCount > 0) {
+      logger.info(
+        `Transitioned ${transitionedCount} campaigns from pendingStart to active`
+      );
+    }
+
+    return transitionedCount;
+  } catch (error) {
+    logger.error("Failed to process pendingStart campaigns", {
+      error: error.message,
+    });
+    throw new DatabaseError("Failed to process pendingStart campaigns", error);
+  }
+};
+
+/**
+ * Manually activate a pendingStart campaign (for organizers)
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<Object>} Updated campaign
+ */
+export const activatePendingStartCampaign = async (campaignId, organizerId) => {
+  try {
+    // Verify ownership
+    const isOwner = await campaignRepository.isCampaignOwner(
+      campaignId,
+      organizerId
+    );
+    if (!isOwner) {
+      throw new AuthorizationError("You can only activate your own campaigns");
+    }
+
+    // Get current campaign
+    const campaign = await campaignRepository.findCampaignById(campaignId);
+    if (campaign.status !== "pendingStart") {
+      throw new Error(
+        "Campaign must be in pendingStart status to be activated"
+      );
+    }
+
+    // Update status to active
+    const updatedCampaign = await campaignRepository.updateCampaign(
+      campaignId,
+      {
+        status: "active",
+      }
+    );
+
+    // Send notification
+    try {
+      const titleInApp = "Campaign activated";
+      const messageInApp = `Your campaign "${campaign.title}" has been manually activated and is now live.`;
+      await notificationService.createAndDispatch({
+        userId: organizerId,
+        type: "inApp",
+        category: "campaign",
+        priority: "high",
+        title: titleInApp,
+        message: messageInApp,
+        data: { campaignId, status: "active" },
+        relatedEntityType: "campaign",
+        relatedEntityId: campaignId,
+        templateId: "campaign.activated.v1",
+      });
+    } catch (notificationError) {
+      logger.error("Failed to send campaign activation notification", {
+        error: notificationError.message,
+        campaignId,
+      });
+    }
+
+    logger.info("Campaign manually activated", { campaignId, organizerId });
+    return updatedCampaign;
+  } catch (error) {
+    logger.error("Failed to activate pendingStart campaign", {
+      error: error.message,
+      campaignId,
+      organizerId,
+    });
+    throw error;
   }
 };

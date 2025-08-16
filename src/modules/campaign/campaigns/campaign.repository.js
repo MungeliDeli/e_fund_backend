@@ -548,6 +548,58 @@ export const findAllCampaigns = async (filters = {}) => {
 };
 
 /**
+ * Find campaigns by status
+ * @param {string} status - Campaign status
+ * @param {Object} [client] - Optional DB client for transaction
+ * @returns {Promise<Array>} List of campaigns with the specified status
+ */
+export const findCampaignsByStatus = async (status, client) => {
+  const executor = client || { query };
+
+  try {
+    const queryText = `
+      SELECT 
+        c.*,
+        u.email as organizerEmail,
+        op."organizationName" as organizerName
+      FROM "campaigns" c
+      JOIN "users" u ON c."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      WHERE c.status = $1
+      ORDER BY c."createdAt" DESC
+    `;
+
+    const result = await executor.query(queryText, [status]);
+
+    // Parse JSON fields for each campaign
+    const campaigns = result.rows.map((campaign) => {
+      if (
+        campaign.customPageSettings &&
+        typeof campaign.customPageSettings === "string"
+      ) {
+        try {
+          campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
+        } catch (parseError) {
+          logger.warn("Failed to parse customPageSettings JSON", {
+            campaignId: campaign.campaignId,
+            error: parseError.message,
+          });
+        }
+      }
+      return campaign;
+    });
+
+    return campaigns;
+  } catch (error) {
+    logger.error("Failed to find campaigns by status", {
+      error: error.message,
+      status,
+    });
+    throw new DatabaseError("Failed to find campaigns by status", error);
+  }
+};
+
+/**
  * Create a media record in the media table
  * @param {Object} mediaRecord - Media record data
  * @param {Object} [client] - Optional DB client for transaction
@@ -589,6 +641,7 @@ export default {
   findCampaignById,
   findCampaignsByOrganizer,
   findAllCampaigns,
+  findCampaignsByStatus,
   addCampaignCategories,
   removeCampaignCategories,
   getCampaignCategories,

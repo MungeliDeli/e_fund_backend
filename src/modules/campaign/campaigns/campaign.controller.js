@@ -39,7 +39,7 @@ export const createCampaign = async (req, res) => {
   );
 
   const message =
-    campaignData.status === "pending"
+    campaignData.status === "pendingApproval"
       ? "Campaign submitted for approval successfully"
       : campaignData.status === "draft"
       ? "Campaign draft saved successfully"
@@ -69,8 +69,10 @@ export const updateCampaign = async (req, res) => {
   );
 
   const message =
-    updateData.status === "pending"
+    updateData.status === "pendingApproval"
       ? "Campaign submitted for approval successfully"
+      : updateData.status === "pendingStart"
+      ? "Campaign approved and scheduled for start"
       : "Campaign updated successfully";
 
   ResponseFactory.ok(res, message, campaign);
@@ -195,4 +197,37 @@ export const getCampaignByShareLink = async (req, res) => {
     }
     throw error;
   }
+};
+
+/**
+ * Process pendingStart campaigns and transition them to active (admin endpoint)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const processPendingStartCampaigns = async (req, res) => {
+  const transitionedCount =
+    await campaignService.processPendingStartCampaigns();
+
+  ResponseFactory.ok(res, "Pending start campaigns processed successfully", {
+    transitionedCount,
+  });
+};
+
+/**
+ * Manually activate a pendingStart campaign (organizer endpoint)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const activatePendingStartCampaign = async (req, res) => {
+  const { campaignId } = req.params;
+  const organizerId = req.user.userId;
+
+  const campaign = await campaignService.activatePendingStartCampaign(
+    campaignId,
+    organizerId
+  );
+
+  ResponseFactory.ok(res, "Campaign activated successfully", campaign);
 };
