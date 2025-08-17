@@ -23,7 +23,6 @@ import {
   getCampaignById,
   getCampaignsByOrganizer,
   getAllCampaigns,
-  saveCampaignDraft,
   canEditCampaign,
   getCampaignByShareLink,
   processPendingStartCampaigns,
@@ -32,7 +31,6 @@ import {
 import {
   validateCreateCampaign,
   validateUpdateCampaign,
-  validateSaveDraft,
   validateCampaignId,
 } from "./campaign.validation.js";
 
@@ -64,13 +62,7 @@ router.put(
   catchAsync(updateCampaign)
 );
 
-// Draft operations
-router.post("/draft", validateSaveDraft, catchAsync(saveCampaignDraft));
-router.put(
-  "/draft/:campaignId",
-  validateSaveDraft,
-  catchAsync(saveCampaignDraft)
-);
+// Draft operations removed during demolition
 
 // Utility endpoints
 router.get(
@@ -84,7 +76,7 @@ router.post("/process-pending-start", catchAsync(processPendingStartCampaigns));
 
 // Organizer endpoints
 router.post(
-  "/:campaignId/publish",
+  "/:campaignId/activate",
   validateCampaignId,
   catchAsync(publishPendingStartCampaign)
 );

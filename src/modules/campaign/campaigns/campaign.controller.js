@@ -119,37 +119,7 @@ export const getAllCampaigns = async (req, res) => {
   ResponseFactory.ok(res, "All campaigns fetched successfully", campaigns);
 };
 
-/**
- * Save campaign as draft
- * @param {import('express').Request} req - Express request object
- * @param {import('express').Response} res - Express response object
- * @returns {Promise<void>}
- */
-export const saveCampaignDraft = async (req, res) => {
-  const organizerId = req.user.userId;
-  const { campaignId } = req.params;
-  const { categoryIds, ...campaignData } = req.body;
-
-  let campaign;
-  if (campaignId) {
-    // Update existing draft
-    campaign = await campaignService.updateCampaign(
-      campaignId,
-      organizerId,
-      campaignData,
-      categoryIds
-    );
-  } else {
-    // Create new draft
-    campaign = await campaignService.createCampaign(
-      organizerId,
-      campaignData,
-      categoryIds || []
-    );
-  }
-
-  ResponseFactory.ok(res, "Campaign draft saved successfully", campaign);
-};
+// Draft functionality removed during demolition
 
 /**
  * Check if user can edit campaign

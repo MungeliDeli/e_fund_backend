@@ -48,11 +48,9 @@ function formatCampaign(campaign) {
     status: campaign.status,
     mainMediaId: campaign.mainMediaId,
     campaignLogoMediaId: campaign.campaignLogoMediaId,
-    customPageSettings: campaign.customPageSettings,
     shareLink: campaign.shareLink,
     approvedByUserId: campaign.approvedByUserId,
     approvedAt: campaign.approvedAt,
-    templateId: campaign.templateId,
     createdAt: campaign.createdAt,
     updatedAt: campaign.updatedAt,
     // Related data
@@ -74,57 +72,7 @@ function generateShareLink(campaignId) {
   return `FR-CO-${shortId.toUpperCase()}`;
 }
 
-/**
- * Create media records for campaign images
- * @param {Object} imageMetadata - Image metadata from frontend
- * @param {string} campaignId - Campaign ID
- * @param {string} organizerId - Organizer ID
- * @param {Object} client - Database client for transaction
- * @returns {Promise<Object>} Created media records
- */
-async function createCampaignMediaRecords(
-  imageMetadata,
-  campaignId,
-  organizerId,
-  client
-) {
-  const mediaRecords = {};
-
-  for (const [field, metadata] of Object.entries(imageMetadata)) {
-    if (metadata && metadata.key) {
-      const mediaId = uuidv4();
-
-      // Determine entity type based on field
-      let entityType = "campaign";
-      let description = metadata.description || `${field} for campaign`;
-
-      // Create media record
-      const mediaRecord = {
-        mediaId,
-        entityType,
-        entityId: campaignId,
-        mediaType: "image",
-        fileName: metadata.key,
-        fileSize: metadata.fileSize,
-        description,
-        altText: metadata.altText || "",
-        uploadedByUserId: organizerId,
-      };
-
-      await campaignRepository.createMediaRecord(mediaRecord, client);
-      mediaRecords[field] = mediaId;
-
-      logger.info("Campaign media record created", {
-        mediaId,
-        field,
-        campaignId,
-        fileName: metadata.key,
-      });
-    }
-  }
-
-  return mediaRecords;
-}
+// Complex image upload logic removed during demolition
 
 /**
  * Create a new campaign
@@ -535,52 +483,7 @@ export const getCampaignsByOrganizer = async (organizerId, filters = {}) => {
   }
 };
 
-/**
- * Save campaign as draft (create or update)
- * @param {string} organizerId - Organizer ID
- * @param {Object} campaignData - Campaign data including customPageSettings and imageMetadata
- * @param {string} [campaignId] - Existing campaign ID for updates
- * @returns {Promise<Object>} Saved campaign
- */
-export const saveCampaignDraft = async (
-  organizerId,
-  campaignData,
-  campaignId = null
-) => {
-  try {
-    const { categoryIds = [], ...campaignFields } = campaignData;
-
-    if (campaignId) {
-      // Update existing draft
-      return await updateCampaign(
-        campaignId,
-        organizerId,
-        {
-          ...campaignFields,
-          status: "draft",
-        },
-        categoryIds
-      );
-    } else {
-      // Create new draft
-      return await createCampaign(
-        organizerId,
-        {
-          ...campaignFields,
-          status: "draft",
-        },
-        categoryIds
-      );
-    }
-  } catch (error) {
-    logger.error("Failed to save campaign draft", {
-      error: error.message,
-      organizerId,
-      campaignId,
-    });
-    throw error;
-  }
-};
+// Draft functionality removed during demolition
 
 /**
  * Get all campaigns with optional filters (for admin)

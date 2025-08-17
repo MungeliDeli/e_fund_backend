@@ -62,13 +62,7 @@ const baseCampaignSchema = {
   campaignLogoMediaId: Joi.string().uuid().optional().allow(null, "").messages({
     "string.guid": "Campaign logo media ID must be a valid UUID.",
   }),
-  customPageSettings: Joi.object().optional().messages({
-    "object.base": "Custom page settings must be a valid JSON object.",
-  }),
-  templateId: Joi.string().trim().min(1).max(100).optional().messages({
-    "string.empty": "Template ID is required.",
-    "string.max": "Template ID cannot be more than 100 characters long.",
-  }),
+  // Template-related fields removed during demolition
   categoryIds: Joi.array()
     .items(Joi.string().uuid())
     .optional()
@@ -89,15 +83,7 @@ export const createCampaignSchema = Joi.object({
   goalAmount: baseCampaignSchema.goalAmount.required().messages({
     "any.required": "Goal amount is required.",
   }),
-  templateId: baseCampaignSchema.templateId.required().messages({
-    "any.required": "Template ID is required.",
-    "string.empty": "Template ID is required.",
-  }),
-  customPageSettings: baseCampaignSchema.customPageSettings
-    .required()
-    .messages({
-      "any.required": "Custom page settings are required.",
-    }),
+  // Template-related fields removed during demolition
   status: Joi.string()
     .valid(
       "draft",
@@ -138,27 +124,7 @@ export const updateCampaignSchema = Joi.object({
     }),
 });
 
-// Schema for saving campaign as draft
-export const saveDraftSchema = Joi.object({
-  customPageSettings: Joi.object().required().messages({
-    "any.required": "Custom page settings are required.",
-    "object.base": "Custom page settings must be a valid JSON object.",
-  }),
-  templateId: Joi.string().trim().min(1).max(100).required().messages({
-    "any.required": "Template ID is required.",
-    "string.empty": "Template ID is required.",
-    "string.max": "Template ID cannot be more than 100 characters long.",
-  }),
-  // Optional fields for draft
-  title: baseCampaignSchema.title,
-  description: baseCampaignSchema.description,
-  goalAmount: baseCampaignSchema.goalAmount,
-  startDate: baseCampaignSchema.startDate,
-  endDate: baseCampaignSchema.endDate,
-  mainMediaId: baseCampaignSchema.mainMediaId,
-  campaignLogoMediaId: baseCampaignSchema.campaignLogoMediaId,
-  categoryIds: baseCampaignSchema.categoryIds,
-});
+// Draft schema removed during demolition
 
 // Schema for campaign filters (for listing campaigns)
 export const campaignFiltersSchema = Joi.object({
@@ -233,6 +199,6 @@ const validate =
 // Export validation middlewares
 export const validateCreateCampaign = validate(createCampaignSchema);
 export const validateUpdateCampaign = validate(updateCampaignSchema);
-export const validateSaveDraft = validate(saveDraftSchema);
+// Draft validation removed during demolition
 export const validateCampaignId = validate(campaignIdSchema, "params");
 export const validateCampaignFilters = validate(campaignFiltersSchema, "query");
