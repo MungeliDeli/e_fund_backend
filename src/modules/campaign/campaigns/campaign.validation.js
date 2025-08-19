@@ -14,15 +14,15 @@ import Joi from "joi";
 // Base campaign schema (common fields)
 // Added .allow(null, '') to optional fields to support draft saving where fields can be empty.
 const baseCampaignSchema = {
-  title: Joi.string()
+  name: Joi.string()
     .trim()
     .min(3)
     .max(255)
     .optional()
     .allow(null, "")
     .messages({
-      "string.min": "Title must be at least 3 characters long.",
-      "string.max": "Title cannot be more than 255 characters long.",
+      "string.min": "Name must be at least 3 characters long.",
+      "string.max": "Name cannot be more than 255 characters long.",
     }),
   description: Joi.string()
     .trim()
@@ -31,6 +31,35 @@ const baseCampaignSchema = {
     .allow(null, "")
     .messages({
       "string.max": "Description cannot be more than 5000 characters long.",
+    }),
+  themeColor: Joi.string()
+    .pattern(/^#[0-9A-Fa-f]{6}$/)
+    .optional()
+    .allow(null, "")
+    .messages({
+      "string.pattern.base":
+        "Theme color must be a valid hex color code (e.g., #10B981).",
+    }),
+  predefinedAmounts: Joi.alternatives()
+    .try(
+      Joi.string().custom((value, helpers) => {
+        try {
+          const parsed = JSON.parse(value);
+          if (!Array.isArray(parsed) || parsed.length !== 4) {
+            return helpers.error("array.length");
+          }
+          return parsed;
+        } catch (error) {
+          return helpers.error("string.base");
+        }
+      }),
+      Joi.array().items(Joi.string()).length(4)
+    )
+    .optional()
+    .allow(null, "")
+    .messages({
+      "array.length": "Exactly 4 predefined amounts are required.",
+      "string.base": "Predefined amounts must be a valid JSON array.",
     }),
   goalAmount: Joi.number()
     .positive()
@@ -56,37 +85,82 @@ const baseCampaignSchema = {
       "date.format": "End date must be in ISO format.",
       "date.greater": "End date must be after start date.",
     }),
-  mainMediaId: Joi.string().uuid().optional().allow(null, "").messages({
-    "string.guid": "Main media ID must be a valid UUID.",
-  }),
-  campaignLogoMediaId: Joi.string().uuid().optional().allow(null, "").messages({
-    "string.guid": "Campaign logo media ID must be a valid UUID.",
-  }),
+
+  statusReason: Joi.string()
+    .trim()
+    .max(1000)
+    .optional()
+    .allow(null, "")
+    .messages({
+      "string.max": "Status reason cannot be more than 1000 characters.",
+    }),
+
   // Template-related fields removed during demolition
-  categoryIds: Joi.array()
-    .items(Joi.string().uuid())
+  categoryIds: Joi.alternatives()
+    .try(
+      Joi.string().custom((value, helpers) => {
+        try {
+          const parsed = JSON.parse(value);
+          if (!Array.isArray(parsed)) {
+            return helpers.error("array.base");
+          }
+          if (parsed.length < 1) {
+            return helpers.error("array.min");
+          }
+          if (parsed.length > 3) {
+            return helpers.error("array.max");
+          }
+          // Validate each item is a UUID
+          for (const id of parsed) {
+            if (
+              typeof id !== "string" ||
+              !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                id
+              )
+            ) {
+              return helpers.error("string.guid");
+            }
+          }
+          return parsed;
+        } catch (error) {
+          return helpers.error("string.base");
+        }
+      }),
+      Joi.array().items(Joi.string().uuid()).min(1).max(3)
+    )
     .optional()
     .allow(null)
     .messages({
       "array.base": "Category IDs must be an array.",
+      "array.min": "At least one category is required.",
+      "array.max": "Maximum 3 categories allowed.",
+      "string.base": "Category IDs must be a valid JSON string.",
       "string.guid": "Each category ID must be a valid UUID.",
     }),
+
+  // Campaign settings for custom page configuration
+  campaignSettings: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Campaign settings must be a valid JSON string.",
+  }),
 };
 
 // Schema for creating a new campaign
 export const createCampaignSchema = Joi.object({
   ...baseCampaignSchema,
-  title: baseCampaignSchema.title.required().messages({
-    "any.required": "Title is required.",
-    "string.empty": "Title is required.",
+  name: baseCampaignSchema.name.required().messages({
+    "any.required": "Name is required.",
+    "string.empty": "Name is required.",
   }),
   goalAmount: baseCampaignSchema.goalAmount.required().messages({
     "any.required": "Goal amount is required.",
   }),
+  categoryIds: baseCampaignSchema.categoryIds.required().messages({
+    "any.required": "At least one category is required.",
+    "array.min": "At least one category is required.",
+  }),
   // Template-related fields removed during demolition
   status: Joi.string()
     .valid(
-      "draft",
       "pendingApproval",
       "pendingStart",
       "active",
@@ -96,10 +170,10 @@ export const createCampaignSchema = Joi.object({
       "rejected"
     )
     .optional()
-    .default("draft")
+    .default("pendingApproval")
     .messages({
       "any.only":
-        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
 });
 
@@ -108,7 +182,6 @@ export const updateCampaignSchema = Joi.object({
   ...baseCampaignSchema,
   status: Joi.string()
     .valid(
-      "draft",
       "pendingApproval",
       "pendingStart",
       "active",
@@ -120,7 +193,7 @@ export const updateCampaignSchema = Joi.object({
     .optional()
     .messages({
       "any.only":
-        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
 });
 
@@ -130,7 +203,6 @@ export const updateCampaignSchema = Joi.object({
 export const campaignFiltersSchema = Joi.object({
   status: Joi.string()
     .valid(
-      "draft",
       "pendingApproval",
       "pendingStart",
       "active",
@@ -142,7 +214,7 @@ export const campaignFiltersSchema = Joi.object({
     .optional()
     .messages({
       "any.only":
-        "Status must be one of: draft, pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
+        "Status must be one of: pendingApproval, pendingStart, active, successful, closed, cancelled, rejected.",
     }),
   limit: Joi.number()
     .integer()

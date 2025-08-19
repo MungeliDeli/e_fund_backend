@@ -17,6 +17,7 @@
  */
 
 import { Router } from "express";
+import multer from "multer";
 import {
   createCampaign,
   updateCampaign,
@@ -38,6 +39,33 @@ import { logRequestCount } from "../../../middlewares/requestLogger.middleware.j
 import { catchAsync } from "../../../middlewares/errorHandler.js";
 import { authenticate } from "../../../middlewares/auth.middleware.js";
 
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 5, // Maximum 5 files (1 main + 3 secondary + 1 extra)
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow images and videos
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("video/")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image and video files are allowed"), false);
+    }
+  },
+}).fields([
+  { name: "mainMedia", maxCount: 1 },
+  { name: "secondaryImage0", maxCount: 1 },
+  { name: "secondaryImage1", maxCount: 1 },
+  { name: "secondaryImage2", maxCount: 1 },
+]);
+
+
+
 const router = Router();
 
 // Apply request logger to all campaign routes
@@ -51,7 +79,12 @@ router.use(authenticate);
 // router.use(requireOrganizationUser);
 
 // Campaign CRUD operations
-router.post("/", validateCreateCampaign, catchAsync(createCampaign));
+router.post(
+  "/",
+  upload,
+  validateCreateCampaign, // Re-enabled now that campaignSettings is working
+  catchAsync(createCampaign)
+);
 router.get("/my-campaigns", catchAsync(getCampaignsByOrganizer));
 router.get("/all", catchAsync(getAllCampaigns)); // Admin endpoint
 router.get("/:campaignId", validateCampaignId, catchAsync(getCampaignById));

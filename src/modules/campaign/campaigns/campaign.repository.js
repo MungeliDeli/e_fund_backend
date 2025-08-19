@@ -11,7 +11,7 @@
  * - Manage campaign-category relationships
  * - Handle campaign status updates
  * - Error handling and logging
- * - Media record management for campaign images
+ * - Media is now stored in customPageSettings JSON instead of separate media table
  *
  * @author FundFlow Team
  * @version 1.0.0
@@ -32,12 +32,13 @@ export const createCampaign = async (campaignData, client) => {
 
   const {
     organizerId,
-    title,
+    name,
     description,
     goalAmount,
     startDate,
     endDate,
-    status = "draft",
+    status = "pendingApproval",
+    customPageSettings,
     shareLink,
   } = campaignData;
 
@@ -47,21 +48,25 @@ export const createCampaign = async (campaignData, client) => {
   try {
     const queryText = `
       INSERT INTO "campaigns" (
-        "organizerId", title, description, "goalAmount", "startDate", "endDate",
-        status, "shareLink"
+        "organizerId", name, description, "goalAmount", "startDate", "endDate",
+        status, "customPageSettings", "shareLink"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
 
     const values = [
       organizerId,
-      title,
+      name,
       description,
       finalGoalAmount,
       startDate,
       endDate,
       status,
+      // Handle JSON field - stringify if it's an object
+      customPageSettings && typeof customPageSettings === "object"
+        ? JSON.stringify(customPageSettings)
+        : customPageSettings,
       shareLink,
     ];
 
@@ -69,7 +74,25 @@ export const createCampaign = async (campaignData, client) => {
 
     const createdCampaign = result.rows[0];
 
-    // Template-related JSON parsing removed during demolition
+    // Parse JSON fields if they exist and are strings
+    if (
+      createdCampaign.customPageSettings &&
+      typeof createdCampaign.customPageSettings === "string"
+    ) {
+      try {
+        createdCampaign.customPageSettings = JSON.parse(
+          createdCampaign.customPageSettings
+        );
+      } catch (parseError) {
+        logger.warn(
+          "Failed to parse customPageSettings JSON in create result",
+          {
+            campaignId: createdCampaign.campaignId,
+            error: parseError.message,
+          }
+        );
+      }
+    }
 
     logger.info("Campaign created successfully", {
       campaignId: createdCampaign.campaignId,
@@ -98,12 +121,14 @@ export const updateCampaign = async (campaignId, updateData, client) => {
   const executor = client || { query };
 
   const allowedFields = {
-    title: "title",
+    name: "name",
     description: "description",
     goalAmount: "goalAmount",
     startDate: "startDate",
     endDate: "endDate",
     status: "status",
+    statusReason: "statusReason",
+    customPageSettings: "customPageSettings",
     shareLink: "shareLink",
     approvedByUserId: "approvedByUserId",
     approvedAt: "approvedAt",
@@ -119,16 +144,25 @@ export const updateCampaign = async (campaignId, updateData, client) => {
     if (dbColumnName && value !== undefined) {
       setClauses.push(`"${dbColumnName}" = $${valueIndex++}`);
 
-      values.push(value);
+      // Handle JSON fields that need to be stringified
+      if (
+        key === "customPageSettings" &&
+        typeof value === "object" &&
+        value !== null
+      ) {
+        values.push(JSON.stringify(value));
+      } else {
+        values.push(value);
+      }
     }
   }
 
   if (setClauses.length === 0) {
-    throw new Error("No valid fields to update");
     logger.error("No valid fields to update", {
       campaignId,
       updateData,
     });
+    throw new Error("No valid fields to update");
   }
 
   values.push(campaignId);
@@ -148,7 +182,25 @@ export const updateCampaign = async (campaignId, updateData, client) => {
 
     const updatedCampaign = result.rows[0];
 
-    // Template-related JSON parsing removed during demolition
+    // Parse JSON fields if they exist and are strings
+    if (
+      updatedCampaign.customPageSettings &&
+      typeof updatedCampaign.customPageSettings === "string"
+    ) {
+      try {
+        updatedCampaign.customPageSettings = JSON.parse(
+          updatedCampaign.customPageSettings
+        );
+      } catch (parseError) {
+        logger.warn(
+          "Failed to parse customPageSettings JSON in update result",
+          {
+            campaignId,
+            error: parseError.message,
+          }
+        );
+      }
+    }
 
     logger.info("Campaign updated successfully", { campaignId });
     return updatedCampaign;
@@ -165,7 +217,7 @@ export const updateCampaign = async (campaignId, updateData, client) => {
 };
 
 /**
- * Find a campaign by ID with organizer and media information
+ * Find a campaign by ID with organizer information
  * @param {string} campaignId - Campaign ID
  * @returns {Promise<Object>} Campaign record with related data
  */
@@ -176,14 +228,10 @@ export const findCampaignById = async (campaignId) => {
         c.*,
         u.email as organizerEmail,
         u."userType" as organizerType,
-        op."organizationName" as organizerName,
-        m1."fileName" as "mainMediaFileName",
-        m2."fileName" as "logoMediaFileName"
+        op."organizationName" as organizerName
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
-      LEFT JOIN "media" m1 ON c."mainMediaId" = m1."mediaId"
-      LEFT JOIN "media" m2 ON c."campaignLogoMediaId" = m2."mediaId"
       WHERE c."campaignId" = $1
     `;
 
@@ -194,8 +242,21 @@ export const findCampaignById = async (campaignId) => {
     }
 
     const campaign = result.rows[0];
-
-    // Template-related JSON parsing removed during demolition
+    console.log("campaign", campaign);
+    // Parse JSON fields if they exist and are strings
+    if (
+      campaign.customPageSettings &&
+      typeof campaign.customPageSettings === "string"
+    ) {
+      try {
+        campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
+      } catch (parseError) {
+        logger.warn("Failed to parse customPageSettings JSON", {
+          campaignId,
+          error: parseError.message,
+        });
+      }
+    }
 
     return campaign;
   } catch (error) {
@@ -228,10 +289,10 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
       values.push(filters.status);
     }
 
-    // Search filter - search in title and description
+    // Search filter - search in name and description
     if (filters.search && filters.search.trim()) {
       whereClauses.push(`(
-        c.title ILIKE $${valueIndex} OR 
+        c.name ILIKE $${valueIndex} OR 
         c.description ILIKE $${valueIndex}
       )`);
       values.push(`%${filters.search.trim()}%`);
@@ -246,7 +307,7 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
         c.*,
         u.email as organizerEmail,
         op."organizationName" as organizerName
-      FROM "campaigns"   c
+      FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
       WHERE ${whereClauses.join(" AND ")}
@@ -421,10 +482,10 @@ export const findAllCampaigns = async (filters = {}) => {
       values.push(filters.status);
     }
 
-    // Search filter - search in title and description
+    // Search filter - search in name and description
     if (filters.search && filters.search.trim()) {
       whereClauses.push(`(
-        c.title ILIKE $${valueIndex} OR 
+        c.name ILIKE $${valueIndex} OR 
         c.description ILIKE $${valueIndex}
       )`);
       values.push(`%${filters.search.trim()}%`);
@@ -561,8 +622,6 @@ export const findUsersByRoles = async (roles, client) => {
   }
 };
 
-// Media record creation removed during demolition
-
 export default {
   createCampaign,
   updateCampaign,
@@ -575,5 +634,4 @@ export default {
   removeCampaignCategories,
   getCampaignCategories,
   isCampaignOwner,
-  // createMediaRecord removed during demolition
 };

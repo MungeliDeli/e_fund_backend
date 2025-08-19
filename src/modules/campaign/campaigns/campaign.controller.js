@@ -23,19 +23,20 @@ import { NotFoundError } from "../../../utils/appError.js";
 import logger from "../../../utils/logger.js";
 
 /**
- * Create a new campaign
+ * Create a new campaign with media uploads
  * @param {import('express').Request} req - Express request object
  * @param {import('express').Response} res - Express response object
  * @returns {Promise<void>}
  */
 export const createCampaign = async (req, res) => {
   const organizerId = req.user.userId;
-  const { categoryIds, ...campaignData } = req.body;
+  const campaignData = req.body;
+  const mediaFiles = req.files || {};
 
   const campaign = await campaignService.createCampaign(
     organizerId,
     campaignData,
-    categoryIds || []
+    mediaFiles
   );
 
   const message =

@@ -78,6 +78,39 @@ export async function getSignedS3Url(key, expiresIn = 60 * 60) {
 }
 
 /**
+ * Upload campaign media to S3 with campaign-specific key
+ * @param {Object} params
+ * @param {Buffer} params.fileBuffer - File data
+ * @param {string} params.fileName - Original file name (for extension)
+ * @param {string} params.mimeType - MIME type
+ * @param {string} params.campaignId - Campaign ID for key generation
+ * @param {string} params.mediaType - Media type ('main', 'sec1', 'sec2', etc.)
+ * @param {string} [params.folder] - Optional folder prefix (default: 'campaigns')
+ * @returns {Promise<string>} S3 key of the uploaded file
+ */
+export async function uploadCampaignMediaToS3({
+  fileBuffer,
+  fileName,
+  mimeType,
+  campaignId,
+  mediaType,
+  folder = "campaigns",
+}) {
+  const ext = path.extname(fileName);
+  const key = `${folder}/${campaignId}${mediaType}${ext}`;
+  
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: mimeType,
+  });
+  
+  await s3.send(command);
+  return key;
+}
+
+/**
  * GENERATE PUBLIC URL FOR S3 OBJECTS
  * This function is suitable for objects with public read access.
  * @param {string} key - S3 object key (this is the file_name stored in your media table)

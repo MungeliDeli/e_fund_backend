@@ -29,6 +29,10 @@ import { v4 as uuidv4 } from "uuid";
 import notificationService from "../../notifications/notification.service.js";
 import { logCampaignEvent } from "../../audit/audit.utils.js";
 import { CAMPAIGN_ACTIONS } from "../../audit/audit.constants.js";
+import {
+  uploadCampaignMediaToS3,
+  getPublicS3Url,
+} from "../../../utils/s3.utils.js";
 
 /**
  * Format campaign data for API response
@@ -39,15 +43,15 @@ function formatCampaign(campaign) {
   return {
     campaignId: campaign.campaignId,
     organizerId: campaign.organizerId,
-    title: campaign.title,
+    name: campaign.name, // Use name instead of title
     description: campaign.description,
     goalAmount: parseFloat(campaign.goalAmount),
     currentRaisedAmount: parseFloat(campaign.currentRaisedAmount),
     startDate: campaign.startDate,
     endDate: campaign.endDate,
     status: campaign.status,
-    mainMediaId: campaign.mainMediaId,
-    campaignLogoMediaId: campaign.campaignLogoMediaId,
+    statusReason: campaign.statusReason || null,
+    customPageSettings: campaign.customPageSettings,
     shareLink: campaign.shareLink,
     approvedByUserId: campaign.approvedByUserId,
     approvedAt: campaign.approvedAt,
@@ -57,8 +61,6 @@ function formatCampaign(campaign) {
     organizerEmail: campaign.organizerEmail,
     organizerType: campaign.organizerType,
     organizerName: campaign.organizerName,
-    mainMediaFileName: campaign.mainMediaFileName,
-    logoMediaFileName: campaign.logoMediaFileName,
   };
 }
 
@@ -72,55 +74,255 @@ function generateShareLink(campaignId) {
   return `FR-CO-${shortId.toUpperCase()}`;
 }
 
-// Complex image upload logic removed during demolition
+/**
+ * Upload campaign media files to S3 and return URLs with metadata
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} mediaFiles - Object containing media files
+ * @returns {Promise<Object>} Object containing media URLs and metadata
+ */
+async function uploadCampaignMedia(campaignId, organizerId, mediaFiles) {
+  const mediaData = {};
+
+  try {
+    // Handle main media (image or video)
+    if (mediaFiles.mainMedia && mediaFiles.mainMedia[0]) {
+      const mainFile = mediaFiles.mainMedia[0];
+      const mediaType = "main";
+
+      // Create S3 key with campaign ID prefix
+      const s3Key = await uploadCampaignMediaToS3({
+        fileBuffer: mainFile.buffer,
+        fileName: mainFile.originalname,
+        mimeType: mainFile.mimetype,
+        campaignId,
+        mediaType,
+      });
+
+      // Get public URL and store with metadata
+      const publicUrl = getPublicS3Url(s3Key);
+      mediaData.mainMedia = {
+        url: publicUrl,
+        type: mainFile.mimetype.startsWith("video/") ? "video" : "image",
+        fileName: mainFile.originalname,
+        fileSize: mainFile.size,
+        mimeType: mainFile.mimetype,
+        s3Key: s3Key,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      logger.info("Main media uploaded successfully", {
+        campaignId,
+        s3Key,
+        mediaType: mediaData.mainMedia.type,
+      });
+    }
+
+    // Handle secondary images (sec1 and sec2)
+    const secondaryImageKeys = Object.keys(mediaFiles).filter((key) =>
+      key.startsWith("secondaryImage")
+    );
+
+    if (secondaryImageKeys.length > 0) {
+      mediaData.secondaryImages = [];
+    }
+
+    for (let i = 0; i < secondaryImageKeys.length; i++) {
+      const key = secondaryImageKeys[i];
+      const fileArray = mediaFiles[key];
+
+      if (fileArray && fileArray[0]) {
+        const file = fileArray[0];
+        const mediaType = `sec${i + 1}`; // sec1, sec2
+
+        // Upload to S3 with campaign ID prefix
+        const s3Key = await uploadCampaignMediaToS3({
+          fileBuffer: file.buffer,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          campaignId,
+          mediaType,
+        });
+
+        // Get public URL and store with metadata
+        const publicUrl = getPublicS3Url(s3Key);
+        mediaData.secondaryImages.push({
+          url: publicUrl,
+          type: "image",
+          fileName: file.originalname,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          s3Key: s3Key,
+          uploadedAt: new Date().toISOString(),
+        });
+
+        logger.info("Secondary image uploaded successfully", {
+          campaignId,
+          s3Key,
+          index: i + 1,
+        });
+      }
+    }
+
+    return mediaData;
+  } catch (error) {
+    logger.error("Failed to upload campaign media", {
+      error: error.message,
+      campaignId,
+      organizerId,
+    });
+    throw new DatabaseError("Failed to upload campaign media", error);
+  }
+}
 
 /**
- * Create a new campaign
+ * Create a new campaign with media uploads
  * @param {string} organizerId - Organizer ID
  * @param {Object} campaignData - Campaign data
- * @param {Array<string>} categoryIds - Array of category IDs
+ * @param {Object} mediaFiles - Object containing media files
  * @returns {Promise<Object>} Created campaign
  */
 export const createCampaign = async (
   organizerId,
   campaignData,
-  categoryIds = []
+  mediaFiles = {}
 ) => {
   try {
     logger.info("Creating new campaign", {
       organizerId,
-      title: campaignData.title,
+      name: campaignData.name,
       status: campaignData.status,
     });
 
     // Generate share link
     const shareLink = generateShareLink(uuidv4());
 
+    // Separate campaign table data from campaign settings
+    const {
+      name,
+      description,
+      goalAmount,
+      startDate,
+      endDate,
+      status = "pendingApproval",
+      categoryIds, // Changed from categoryId to categoryIds array
+      campaignSettings, // This comes as JSON string from frontend
+      ...otherData
+    } = campaignData;
+
+    // Parse categoryIds if it's a string
+    let parsedCategoryIds = [];
+    if (categoryIds) {
+      try {
+        parsedCategoryIds =
+          typeof categoryIds === "string"
+            ? JSON.parse(categoryIds)
+            : categoryIds;
+      } catch (parseError) {
+        logger.warn("Failed to parse categoryIds JSON, using empty array", {
+          categoryIds,
+          error: parseError.message,
+        });
+        parsedCategoryIds = [];
+      }
+    }
+
+    // Validate categoryIds
+    if (!Array.isArray(parsedCategoryIds) || parsedCategoryIds.length === 0) {
+      throw new Error("At least one category is required");
+    }
+    if (parsedCategoryIds.length > 3) {
+      throw new Error("Maximum 3 categories allowed");
+    }
+
+    // Parse campaignSettings if it's a string
+    let parsedCampaignSettings = {};
+    if (campaignSettings) {
+      try {
+        parsedCampaignSettings =
+          typeof campaignSettings === "string"
+            ? JSON.parse(campaignSettings)
+            : campaignSettings;
+      } catch (parseError) {
+        logger.warn("Failed to parse campaignSettings JSON, using defaults", {
+          campaignSettings,
+          error: parseError.message,
+        });
+        // Fallback to defaults
+        parsedCampaignSettings = {
+          title: name,
+          message: description,
+          predefinedAmounts: ["25", "50", "100", "200"],
+          themeColor: "#10B981",
+        };
+      }
+    } else {
+      // Fallback to defaults if no campaignSettings provided
+      parsedCampaignSettings = {
+        title: name,
+        message: description,
+        predefinedAmounts: ["25", "50", "100", "200"],
+        themeColor: "#10B981",
+      };
+    }
+
+    // Build initial custom page settings object (without media)
+    const customPageSettings = {
+      ...parsedCampaignSettings,
+      // Media data will be added after S3 upload
+    };
+
     const campaignRecord = {
-      ...campaignData,
       organizerId,
+      name, // Use name directly since we renamed the column
+      description,
+      goalAmount: parseFloat(goalAmount),
+      startDate: startDate || null,
+      endDate: endDate || null,
+      status,
+      customPageSettings,
       shareLink,
-      status: campaignData.status || "draft",
     };
 
     // Use transaction for atomic operation
     const result = await transaction(async (client) => {
-      // Create campaign
+      // Step 1: Create campaign first to get campaignId
       const campaign = await campaignRepository.createCampaign(
         campaignRecord,
         client
       );
+      const campaignId = campaign.campaignId;
 
-      // Add categories if provided
-      if (categoryIds.length > 0) {
+      // Step 2: Upload media files to S3 and get URLs with metadata
+      const mediaData = await uploadCampaignMedia(
+        campaignId,
+        organizerId,
+        mediaFiles
+      );
+
+      // Step 3: Update custom page settings with media data
+      const updatedCustomPageSettings = {
+        ...customPageSettings,
+        ...mediaData, // Spread media data directly into settings
+      };
+
+      // Step 4: Update campaign with media URLs in custom page settings
+      const updatedCampaign = await campaignRepository.updateCampaign(
+        campaignId,
+        { customPageSettings: updatedCustomPageSettings },
+        client
+      );
+
+      // Step 5: Add category if provided
+      if (parsedCategoryIds.length > 0) {
         await campaignRepository.addCampaignCategories(
-          campaign.campaignId,
-          categoryIds,
+          campaignId,
+          parsedCategoryIds,
           client
         );
       }
 
-      return campaign;
+      return updatedCampaign;
     });
 
     // Fetch complete campaign data with categories
@@ -145,9 +347,9 @@ export const createCampaign = async (
 
       await logCampaignEvent(global.req, actionType, result.campaignId, {
         organizerId,
-        title: campaignData.title,
+        title: campaignData.name,
         status: result.status,
-        categoryCount: categoryIds.length,
+        categoryCount: parsedCategoryIds.length,
       });
     }
 
@@ -226,10 +428,11 @@ export const updateCampaign = async (
           campaignId
         );
         const now = new Date();
-        const startDate = new Date(currentCampaign.startDate);
+        const startDateRaw = currentCampaign.startDate;
+        const startDate = startDateRaw ? new Date(startDateRaw) : null;
 
-        // If start date is in the past or today, make it active immediately
-        if (startDate <= now) {
+        // Only auto-activate if there is a valid start date and it's due
+        if (startDate && !isNaN(startDate.getTime()) && startDate <= now) {
           updatePayload.status = "active";
         }
       }
@@ -264,11 +467,8 @@ export const updateCampaign = async (
     try {
       if (updateData.status === "pendingStart") {
         const titleInApp = "Campaign approved";
-        const messageInApp = `Your campaign "${
-          completeCampaign.title
-        }" has been approved and will start on ${new Date(
-          completeCampaign.startDate
-        ).toLocaleDateString()}.`;
+        const messageInApp = `Your campaign "${completeCampaign.name}" has been approved.`;
+        const fullLink = buildCampaignLink(campaignId);
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "inApp",
@@ -276,18 +476,19 @@ export const updateCampaign = async (
           priority: "high",
           title: titleInApp,
           message: messageInApp,
-          data: { campaignId, status: "pendingStart" },
+          data: {
+            campaignId,
+            status: "pendingStart",
+            route: `/campaigns/${campaignId}`,
+            linkText: "View campaign",
+          },
           relatedEntityType: "campaign",
           relatedEntityId: campaignId,
           templateId: "campaign.approved.v1",
         });
 
         const titleEmail = "Your campaign has been approved";
-        const messageEmail = `Hi, your campaign \"${
-          completeCampaign.title
-        }\" has been approved and will start on ${new Date(
-          completeCampaign.startDate
-        ).toLocaleDateString()}.`;
+        const messageEmail = `Hi, your campaign \"${completeCampaign.name}\" has been approved. <br/><a href="${fullLink}">View campaign</a>`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "email",
@@ -302,7 +503,8 @@ export const updateCampaign = async (
         });
       } else if (updateData.status === "active") {
         const titleInApp = "Campaign is now live";
-        const messageInApp = `Your campaign "${completeCampaign.title}" is now active and accepting donations.`;
+        const messageInApp = `Your campaign "${completeCampaign.name}" is now active and accepting donations.`;
+        const fullLink = buildCampaignLink(campaignId);
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "inApp",
@@ -310,14 +512,19 @@ export const updateCampaign = async (
           priority: "high",
           title: titleInApp,
           message: messageInApp,
-          data: { campaignId, status: "active" },
+          data: {
+            campaignId,
+            status: "active",
+            route: `/campaigns/${campaignId}`,
+            linkText: "View campaign",
+          },
           relatedEntityType: "campaign",
           relatedEntityId: campaignId,
           templateId: "campaign.approved.v1",
         });
 
         const titleEmail = "Your campaign is now live";
-        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" is now active and accepting donations.`;
+        const messageEmail = `Hi, your campaign \"${completeCampaign.name}\" is now active and accepting donations. <br/><a href="${fullLink}">View campaign</a>`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "email",
@@ -332,7 +539,8 @@ export const updateCampaign = async (
         });
       } else if (updateData.status === "rejected") {
         const titleInApp = "Campaign rejected";
-        const messageInApp = `Your campaign "${completeCampaign.title}" was rejected.`;
+        const messageInApp = `Your campaign \"${completeCampaign.name}\" was rejected.`;
+        const fullLink = buildCampaignLink(campaignId);
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "inApp",
@@ -340,14 +548,24 @@ export const updateCampaign = async (
           priority: "high",
           title: titleInApp,
           message: messageInApp,
-          data: { campaignId, status: "rejected" },
+          data: {
+            campaignId,
+            status: "rejected",
+            route: `/campaigns/${campaignId}`,
+            linkText: "See reason here",
+            reason: updateData.statusReason || null,
+          },
           relatedEntityType: "campaign",
           relatedEntityId: campaignId,
           templateId: "campaign.rejected.v1",
         });
 
         const titleEmail = "Your campaign was rejected";
-        const messageEmail = `Hi, your campaign \"${completeCampaign.title}\" was rejected.`;
+        const messageEmail = `Hi, your campaign \"${
+          completeCampaign.name
+        }\" was rejected.${
+          updateData.statusReason ? ` Reason: ${updateData.statusReason}` : ""
+        } <br/><a href="${fullLink}">See reason here</a>`;
         await notificationService.createAndDispatch({
           userId: completeCampaign.organizerId,
           type: "email",
@@ -359,6 +577,47 @@ export const updateCampaign = async (
           relatedEntityType: "campaign",
           relatedEntityId: campaignId,
           templateId: "campaign.rejected.v1",
+        });
+      } else if (updateData.status === "cancelled") {
+        const titleInApp = "Campaign cancelled";
+        const messageInApp = `Your campaign \"${completeCampaign.name}\" was cancelled.`;
+        const fullLink = buildCampaignLink(campaignId);
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "inApp",
+          category: "campaign",
+          priority: "high",
+          title: titleInApp,
+          message: messageInApp,
+          data: {
+            campaignId,
+            status: "cancelled",
+            route: `/campaigns/${campaignId}`,
+            linkText: "See reason here",
+            reason: updateData.statusReason || null,
+          },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.cancelled.v1",
+        });
+
+        const titleEmail = "Your campaign was cancelled";
+        const messageEmail = `Hi, your campaign \"${
+          completeCampaign.name
+        }\" was cancelled.${
+          updateData.statusReason ? ` Reason: ${updateData.statusReason}` : ""
+        } <br/><a href="${fullLink}">See reason here</a>`;
+        await notificationService.createAndDispatch({
+          userId: completeCampaign.organizerId,
+          type: "email",
+          category: "campaign",
+          priority: "high",
+          title: titleEmail,
+          message: messageEmail,
+          data: { campaignId, status: "cancelled" },
+          relatedEntityType: "campaign",
+          relatedEntityId: campaignId,
+          templateId: "campaign.cancelled.v1",
         });
       }
     } catch (notifyError) {
@@ -373,17 +632,19 @@ export const updateCampaign = async (
     if (global.req) {
       let actionType = CAMPAIGN_ACTIONS.CAMPAIGN_UPDATED;
 
-      // Determine specific action type based on status change
-      if (updateData.status === "active") {
+      // Map status transitions to specific audit actions
+      if (updateData.status === "pendingStart") {
+        // Admin approved but campaign not yet live
         actionType = CAMPAIGN_ACTIONS.CAMPAIGN_APPROVED;
+      } else if (updateData.status === "active") {
+        // Campaign is now live
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED;
       } else if (updateData.status === "rejected") {
         actionType = CAMPAIGN_ACTIONS.CAMPAIGN_REJECTED;
-      } else if (updateData.status === "published") {
-        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PUBLISHED;
-      } else if (updateData.status === "paused") {
-        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_PAUSED;
-      } else if (updateData.status === "draft") {
-        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_RESUMED;
+      } else if (updateData.status === "cancelled") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_CANCELLED;
+      } else if (updateData.status === "pendingApproval") {
+        actionType = CAMPAIGN_ACTIONS.CAMPAIGN_SUBMITTED;
       }
 
       await logCampaignEvent(global.req, actionType, campaignId, {
@@ -392,6 +653,7 @@ export const updateCampaign = async (
         previousStatus: completeCampaign.status,
         newStatus: updateData.status,
         isAdminAction: isAdminActor,
+        statusReason: updateData.statusReason || null,
       });
     }
 
@@ -538,7 +800,7 @@ export const canEditCampaign = async (campaignId, organizerId) => {
 
     // Check if campaign is in editable state
     const campaign = await campaignRepository.findCampaignById(campaignId);
-    const editableStatuses = ["draft", "rejected"];
+    const editableStatuses = ["rejected"];
     return editableStatuses.includes(campaign.status);
   } catch (error) {
     logger.error("Failed to check campaign edit permission", {
@@ -564,8 +826,9 @@ export const processPendingStartCampaigns = async () => {
     let transitionedCount = 0;
 
     for (const campaign of pendingStartCampaigns) {
-      const startDate = new Date(campaign.startDate);
-      if (startDate <= now) {
+      const startDateRaw = campaign.startDate;
+      const startDate = startDateRaw ? new Date(startDateRaw) : null;
+      if (startDate && !isNaN(startDate.getTime()) && startDate <= now) {
         await campaignRepository.updateCampaign(campaign.campaignId, {
           status: "active",
         });
@@ -573,7 +836,7 @@ export const processPendingStartCampaigns = async () => {
         // Send notification to organizer
         try {
           const titleInApp = "Campaign is now live";
-          const messageInApp = `Your campaign "${campaign.title}" has started and is now active.`;
+          const messageInApp = `Your campaign "${campaign.name}" has started and is now active.`;
           await notificationService.createAndDispatch({
             userId: campaign.organizerId,
             type: "inApp",
@@ -653,7 +916,7 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
         campaignId,
         {
           organizerId,
-          title: campaign.title,
+          title: campaign.name,
           status: "active",
           action: "manual_publish",
         }
@@ -663,7 +926,7 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
     // Send notification to organizer
     try {
       const titleInApp = "Campaign published";
-      const messageInApp = `Your campaign "${campaign.title}" has been published and is now live.`;
+      const messageInApp = `Your campaign "${campaign.name}" has been published and is now live.`;
       await notificationService.createAndDispatch({
         userId: organizerId,
         type: "inApp",
@@ -703,7 +966,7 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
           category: "campaign",
           priority: "medium",
           title: "Campaign published",
-          message: `Campaign "${campaign.title}" has been published by organizer.`,
+          message: `Campaign "${campaign.name}" has been published by organizer.`,
           data: {
             campaignId,
             status: "active",
@@ -733,3 +996,19 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
     throw error;
   }
 };
+
+function buildCampaignLink(campaignId) {
+  const route = `/campaigns/${campaignId}`;
+  const base =
+    process.env.FRONTEND_BASE_URL ||
+    process.env.APP_BASE_URL ||
+    process.env.CORS_ORIGIN ||
+    "";
+  if (
+    typeof base === "string" &&
+    (base.startsWith("http://") || base.startsWith("https://"))
+  ) {
+    return base.replace(/\/+$/, "") + route;
+  }
+  return route;
+}
