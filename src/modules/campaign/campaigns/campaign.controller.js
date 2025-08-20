@@ -154,14 +154,8 @@ export const getCampaignByShareLink = async (req, res) => {
   }
 
   try {
-    // This would need to be implemented in the service/repository
-    // For now, we'll return a placeholder response
-    logger.info("Getting campaign by share link", { shareLink });
-
-    ResponseFactory.ok(res, "Campaign fetched successfully", {
-      shareLink,
-      message: "Public campaign endpoint - implementation needed",
-    });
+    const campaign = await campaignService.getCampaignByShareLink(shareLink);
+    ResponseFactory.ok(res, "Campaign fetched successfully", campaign);
   } catch (error) {
     if (error instanceof NotFoundError) {
       return ResponseFactory.notFound(res, "Campaign not found");

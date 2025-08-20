@@ -272,6 +272,61 @@ export const findCampaignById = async (campaignId) => {
 };
 
 /**
+ * Find a campaign by share link with organizer information
+ * @param {string} shareLink - Public share link (e.g., FR-CO-XXXXXXX)
+ * @returns {Promise<Object>} Campaign record with related data
+ */
+export const findCampaignByShareLink = async (shareLink) => {
+  try {
+    const queryText = `
+      SELECT 
+        c.*,
+        u.email as organizerEmail,
+        u."userType" as organizerType,
+        op."organizationName" as organizerName
+      FROM "campaigns" c
+      JOIN "users" u ON c."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      WHERE c."shareLink" = $1
+    `;
+
+    const result = await query(queryText, [shareLink]);
+
+    if (result.rowCount === 0) {
+      throw new NotFoundError("Campaign not found");
+    }
+
+    const campaign = result.rows[0];
+
+    // Parse JSON fields if they exist and are strings
+    if (
+      campaign.customPageSettings &&
+      typeof campaign.customPageSettings === "string"
+    ) {
+      try {
+        campaign.customPageSettings = JSON.parse(campaign.customPageSettings);
+      } catch (parseError) {
+        logger.warn("Failed to parse customPageSettings JSON", {
+          shareLink,
+          error: parseError.message,
+        });
+      }
+    }
+
+    return campaign;
+  } catch (error) {
+    logger.error("Failed to find campaign by share link", {
+      error: error.message,
+      shareLink,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to find campaign", error);
+  }
+};
+
+/**
  * Find campaigns by organizer ID with optional filters
  * @param {string} organizerId - Organizer ID
  * @param {Object} filters - Optional filters (status, search, limit, offset)
@@ -626,6 +681,7 @@ export default {
   createCampaign,
   updateCampaign,
   findCampaignById,
+  findCampaignByShareLink,
   findCampaignsByOrganizer,
   findAllCampaigns,
   findCampaignsByStatus,

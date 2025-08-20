@@ -704,6 +704,55 @@ export const getCampaignById = async (campaignId) => {
 };
 
 /**
+ * Get a campaign by share link (public)
+ * Only returns if campaign is publicly viewable (active or successful or closed)
+ * and not in pendingApproval, pendingStart, rejected, or cancelled
+ * @param {string} shareLink - Public share link
+ * @returns {Promise<Object>} Campaign with categories
+ */
+export const getCampaignByShareLink = async (shareLink) => {
+  try {
+    const campaign = await campaignRepository.findCampaignByShareLink(
+      shareLink
+    );
+
+    // Enforce public visibility rules
+    const nonPublicStatuses = [
+      "pendingApproval",
+      "pendingStart",
+      "rejected",
+      "cancelled",
+      "draft",
+    ];
+    if (nonPublicStatuses.includes(campaign.status)) {
+      throw new NotFoundError("Campaign not publicly available");
+    }
+
+    const categories = await campaignRepository.getCampaignCategories(
+      campaign.campaignId
+    );
+
+    const formattedCampaign = formatCampaign(campaign);
+    formattedCampaign.categories = categories.map((cat) => ({
+      categoryId: cat.categoryId,
+      name: cat.name,
+      description: cat.description,
+    }));
+
+    return formattedCampaign;
+  } catch (error) {
+    logger.error("Failed to get campaign by share link", {
+      error: error.message,
+      shareLink,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to get campaign by share link", error);
+  }
+};
+
+/**
  * Get campaigns by organizer with optional filters
  * @param {string} organizerId - Organizer ID
  * @param {Object} filters - Optional filters (status, limit, offset)
@@ -908,6 +957,25 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
       }
     );
 
+    // Build public link and title slug
+    const titleSlug = (campaign.name || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 80);
+    const publicRoute = `/campaign/${campaign.shareLink}-${titleSlug}`;
+    const base =
+      process.env.FRONTEND_BASE_URL ||
+      process.env.APP_BASE_URL ||
+      process.env.CORS_ORIGIN ||
+      "";
+    const fullPublicLink =
+      typeof base === "string" &&
+      (base.startsWith("http://") || base.startsWith("https://"))
+        ? base.replace(/\/+$/, "") + publicRoute
+        : publicRoute;
+
     // Log audit event for campaign publishing
     if (global.req) {
       await logCampaignEvent(
@@ -919,6 +987,9 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
           title: campaign.name,
           status: "active",
           action: "manual_publish",
+          shareLink: campaign.shareLink,
+          titleSlug,
+          publicLink: publicRoute,
         }
       );
     }
@@ -934,10 +1005,38 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
         priority: "high",
         title: titleInApp,
         message: messageInApp,
-        data: { campaignId, status: "active" },
+        data: {
+          campaignId,
+          status: "active",
+          shareLink: campaign.shareLink,
+          titleSlug,
+          publicLink: publicRoute,
+        },
         relatedEntityType: "campaign",
         relatedEntityId: campaignId,
         templateId: "campaign.published.v1",
+      });
+
+      // Also send email to organizer
+      const titleEmail = "Your campaign is live";
+      const messageEmail = `Hi, your campaign \"${campaign.name}\" is now live. <br/><a href="${fullPublicLink}">View your campaign</a>`;
+      await notificationService.createAndDispatch({
+        userId: organizerId,
+        type: "email",
+        category: "campaign",
+        priority: "high",
+        title: titleEmail,
+        message: messageEmail,
+        data: {
+          campaignId,
+          status: "active",
+          shareLink: campaign.shareLink,
+          titleSlug,
+          publicLink: publicRoute,
+        },
+        relatedEntityType: "campaign",
+        relatedEntityId: campaignId,
+        templateId: "campaign.published.email.v1",
       });
     } catch (notificationError) {
       logger.error(
@@ -972,6 +1071,9 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
             status: "active",
             organizerId,
             organizerName: campaign.organizerName || "Unknown Organizer",
+            shareLink: campaign.shareLink,
+            titleSlug,
+            publicLink: publicRoute,
           },
           relatedEntityType: "campaign",
           relatedEntityId: campaignId,
@@ -998,6 +1100,8 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
 };
 
 function buildCampaignLink(campaignId) {
+  // Prefer public share link if available
+  // Fallback to internal organizer view
   const route = `/campaigns/${campaignId}`;
   const base =
     process.env.FRONTEND_BASE_URL ||
