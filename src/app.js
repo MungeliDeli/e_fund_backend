@@ -96,7 +96,7 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1", categoryRoutes);
+app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 app.use("/api/v1/outreach/segments", segmentRoutes);
 app.use("/api/v1/outreach/contacts", contactRoutes);

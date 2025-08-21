@@ -64,17 +64,12 @@ const upload = multer({
   { name: "secondaryImage2", maxCount: 1 },
 ]);
 
-
-
 const router = Router();
-
-// Apply request logger to all campaign routes
-router.use(logRequestCount);
 
 // Public routes (no authentication required)
 router.get("/share/:shareLink", catchAsync(getCampaignByShareLink));
 
-// Protected routes (authentication required)
+  
 router.use(authenticate);
 // router.use(requireOrganizationUser);
 

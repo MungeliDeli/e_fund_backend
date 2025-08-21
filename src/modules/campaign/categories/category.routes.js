@@ -41,16 +41,12 @@ router.use(authenticate);
 router.use(requireAdmin);
 
 // Category CRUD operations
-router.post("/categories", validateCategory, catchAsync(createCategory));
-router.get("/categories", catchAsync(getCategories));
-router.get("/categories/stats", catchAsync(getCategoryStats));
-router.get(
-  "/categories/:categoryId",
-  validateCategoryId,
-  catchAsync(getCategoryById)
-);
+router.post("/", validateCategory, catchAsync(createCategory));
+router.get("/", catchAsync(getCategories));
+router.get("/stats", catchAsync(getCategoryStats));
+router.get("/:categoryId", validateCategoryId, catchAsync(getCategoryById));
 router.put(
-  "/categories/:categoryId",
+  "/:categoryId",
   validateCategoryId,
   validateCategory,
   catchAsync(updateCategory)
