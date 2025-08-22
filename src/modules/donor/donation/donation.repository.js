@@ -2,24 +2,30 @@ import { db } from "../../../db/index.js";
 import { logger } from "../../../utils/logger.js";
 
 class DonationRepository {
-  async createDonation(donationData, transactionId, messageId = null) {
-    const result = await db.query(
-      `INSERT INTO "donations" (
-        "campaignId", "donorUserId", "amount", "isAnonymous", 
-        "messageId", "paymentTransactionId", "status"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        donationData.campaignId,
-        donationData.userId || null,
-        donationData.amount,
-        donationData.isAnonymous,
-        messageId,
-        transactionId,
-        "pending",
-      ]
-    );
+  async createDonation(donationData, client = null) {
+    const query = `INSERT INTO "donations" (
+      "campaignId", "donorUserId", "amount", "isAnonymous", 
+      "phoneNumber", "paymentMethod", "status", "currency"
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
 
-    return result.rows[0];
+    const params = [
+      donationData.campaignId,
+      donationData.userId || null,
+      donationData.amount,
+      donationData.isAnonymous || false,
+      donationData.phoneNumber || null,
+      donationData.paymentMethod || null,
+      donationData.status || "pending",
+      donationData.currency || "USD",
+    ];
+
+    if (client) {
+      const result = await client.query(query, params);
+      return result.rows[0];
+    } else {
+      const result = await db.query(query, params);
+      return result.rows[0];
+    }
   }
 
   async getDonationById(donationId) {
@@ -70,6 +76,19 @@ class DonationRepository {
     return result.rows[0] || null;
   }
 
+  async updateDonationTransactionId(donationId, transactionId, client = null) {
+    const query = `UPDATE "donations" SET "paymentTransactionId" = $1 WHERE "donationId" = $2 RETURNING *`;
+    const params = [transactionId, donationId];
+
+    if (client) {
+      const result = await client.query(query, params);
+      return result.rows[0] || null;
+    } else {
+      const result = await db.query(query, params);
+      return result.rows[0] || null;
+    }
+  }
+
   async getDonationStats(campaignId) {
     const result = await db.query(
       `SELECT 
@@ -102,17 +121,22 @@ class DonationRepository {
     return result.rows;
   }
 
-  async updateCampaignStatistics(campaignId, amount) {
-    const result = await db.query(
-      `UPDATE "campaigns" 
+  async updateCampaignStatistics(campaignId, amount, client = null) {
+    const query = `UPDATE "campaigns" 
        SET "currentRaisedAmount" = "currentRaisedAmount" + $1,
            "updatedAt" = CURRENT_TIMESTAMP
        WHERE "campaignId" = $2 
-       RETURNING "currentRaisedAmount"`,
-      [amount, campaignId]
-    );
+       RETURNING "currentRaisedAmount"`;
 
-    return result.rows[0] || null;
+    const params = [amount, campaignId];
+
+    if (client) {
+      const result = await client.query(query, params);
+      return result.rows[0] || null;
+    } else {
+      const result = await db.query(query, params);
+      return result.rows[0] || null;
+    }
   }
 }
 

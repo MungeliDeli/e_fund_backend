@@ -11,13 +11,15 @@ class DonationController {
     return successResponse(
       res,
       {
-        message: "Donation data prepared successfully",
+        message: "Donation created successfully",
         data: {
-          donationData: result.donationData,
-          messageData: result.messageData,
+          donation: result.donation,
+          transaction: result.transaction,
+          messageId: result.messageId,
+          success: result.success,
         },
       },
-      200
+      201
     );
   }
 

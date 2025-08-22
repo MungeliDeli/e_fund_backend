@@ -1,49 +1,155 @@
 import donationRepository from "./donation.repository.js";
+import transactionService from "../../payment/transactions/transaction.service.js";
+import messageService from "../messages/message.service.js";
 import { AppError } from "../../../utils/appError.js";
 import { logger } from "../../../utils/logger.js";
+import { transaction } from "../../../db/index.js";
 
 class DonationService {
   async createDonation(donationData, userId = null) {
     try {
-      // Validate campaign exists and is active
-      // This would typically be done through a campaign service
-
-      // Prepare data for repository
-      const donationPayload = {
-        ...donationData,
-        userId: userId, // Can be null for anonymous donations
-      };
-
-      // Create donation message if provided
-      let messageId = null;
-      if (donationData.messageText && donationData.messageText.trim()) {
-        // This would typically be done through the message service
-        // For now, we'll assume the message is created separately
-        logger.info("Message text provided for donation", {
-          campaignId: donationData.campaignId,
-          hasMessage: true,
-        });
+      // Validate required fields
+      if (
+        !donationData.campaignId ||
+        !donationData.amount ||
+        donationData.amount <= 0
+      ) {
+        throw new AppError(
+          "Invalid donation data: campaignId and amount are required",
+          400
+        );
       }
 
-      // Note: Transaction creation will be handled by the payment service
-      // This service will receive the transactionId from the payment flow
+      // Use database transaction to ensure data consistency
+      const result = await transaction(async (client) => {
+        // 1. Create donation record
+        const donationPayload = {
+          campaignId: donationData.campaignId,
+          userId: userId, // Can be null for anonymous donations
+          amount: donationData.amount,
+          currency: donationData.currency || "USD",
+          status: "pending",
+          isAnonymous: donationData.isAnonymous || false,
+          phoneNumber: donationData.phoneNumber,
+          paymentMethod: donationData.paymentMethod,
+        };
 
-      logger.info("Donation data prepared", {
-        campaignId: donationData.campaignId,
-        amount: donationData.amount,
-        isAnonymous: donationData.isAnonymous,
-        hasMessage: !!donationData.messageText,
+        const donation = await donationRepository.createDonation(
+          donationPayload,
+          client
+        );
+        logger.info("Donation record created", {
+          donationId: donation.donationId,
+          campaignId: donationData.campaignId,
+          amount: donationData.amount,
+          isAnonymous: donationData.isAnonymous,
+        });
+
+        // 2. Create transaction record
+        const transactionPayload = {
+          donationId: donation.donationId,
+          campaignId: donationData.campaignId,
+          amount: donationData.amount,
+          currency: donationData.currency || "USD",
+          gatewayUsed: donationData.paymentMethod,
+          status: "pending",
+          gatewayTransactionId: `MOCK_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`,
+          metadata: {
+            phoneNumber: donationData.phoneNumber,
+            paymentMethod: donationData.paymentMethod,
+            isAnonymous: donationData.isAnonymous,
+          },
+        };
+
+        const transaction = await transactionService.createTransaction(
+          transactionPayload
+        );
+        logger.info("Transaction record created", {
+          transactionId: transaction.transactionId,
+          donationId: donation.donationId,
+          gatewayTransactionId: transaction.gatewayTransactionId,
+        });
+
+        // 3. Update donation with transaction ID
+        await donationRepository.updateDonationTransactionId(
+          donation.donationId,
+          transaction.transactionId,
+          client
+        );
+
+        // 4. Create donation message if provided
+        let messageId = null;
+        if (donationData.messageText && donationData.messageText.trim()) {
+          const messagePayload = {
+            campaignId: donationData.campaignId,
+            donationId: donation.donationId,
+            messageText: donationData.messageText.trim(),
+            status: "pending", // Will be moderated later
+            isAnonymous: donationData.isAnonymous || false,
+          };
+
+          // Note: We'll need to add createMessage method to messageService
+          // For now, we'll log the message data
+          logger.info("Message data prepared for donation", {
+            donationId: donation.donationId,
+            messageText: donationData.messageText,
+            isAnonymous: donationData.isAnonymous,
+          });
+
+          // TODO: Implement message creation when messageService.createMessage is available
+          // const message = await messageService.createMessage(messagePayload);
+          // const message = await messageService.createMessage(messagePayload);
+          // messageId = message.messageId;
+        }
+
+        // 5. Update campaign statistics
+        await donationRepository.updateCampaignStatistics(
+          donationData.campaignId,
+          donationData.amount,
+          client
+        );
+
+        logger.info("Campaign statistics updated", {
+          campaignId: donationData.campaignId,
+          amount: donationData.amount,
+        });
+
+        return {
+          donation,
+          transaction,
+          messageId,
+          success: true,
+        };
       });
 
-      return {
-        donationData: donationPayload,
-        messageData: donationData.messageText
-          ? { messageText: donationData.messageText }
-          : null,
-      };
+      logger.info("Donation creation completed successfully", {
+        donationId: result.donation.donationId,
+        transactionId: result.transaction.transactionId,
+        campaignId: donationData.campaignId,
+        amount: donationData.amount,
+      });
+
+      return result;
     } catch (error) {
-      logger.error("Error preparing donation data:", error);
-      throw new AppError("Failed to prepare donation data", 500);
+      logger.error("Error creating donation:", error);
+
+      // Provide specific error messages based on error type
+      if (error.code === "23505") {
+        // Unique constraint violation
+        throw new AppError(
+          "Donation with this information already exists",
+          409
+        );
+      } else if (error.code === "23503") {
+        // Foreign key constraint violation
+        throw new AppError("Invalid campaign or user reference", 400);
+      } else if (error instanceof AppError) {
+        throw error;
+      } else {
+        throw new AppError("Failed to create donation", 500);
+      }
     }
   }
 
