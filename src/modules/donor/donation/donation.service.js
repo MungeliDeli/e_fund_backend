@@ -1,6 +1,8 @@
 import donationRepository from "./donation.repository.js";
 import transactionService from "../../payment/transactions/transaction.service.js";
 import messageService from "../messages/message.service.js";
+import { logCustomEvent } from "../../audit/audit.utils.js";
+import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
 import { AppError } from "../../../utils/appError.js";
 import { logger } from "../../../utils/logger.js";
 import { transaction } from "../../../db/index.js";
@@ -38,6 +40,32 @@ class DonationService {
           donationPayload,
           client
         );
+
+        // Log donation creation in audit logs
+        try {
+          await logCustomEvent(
+            { user: { userId: userId || "anonymous" } },
+            DONATION_ACTIONS.DONATION_MADE,
+            ENTITY_TYPES.DONATION,
+            donation.donationId,
+            {
+              campaignId: donationData.campaignId,
+              amount: donationData.amount,
+              currency: donationData.currency || "USD",
+              isAnonymous: donationData.isAnonymous || false,
+              paymentMethod: donationData.paymentMethod,
+              phoneNumber: donationData.phoneNumber,
+              messageText: donationData.messageText
+                ? "Message provided"
+                : "No message",
+            }
+          );
+        } catch (auditError) {
+          logger.warn("Failed to log donation creation audit", {
+            error: auditError.message,
+          });
+        }
+
         logger.info("Donation record created", {
           donationId: donation.donationId,
           campaignId: donationData.campaignId,
@@ -66,6 +94,28 @@ class DonationService {
         const transaction = await transactionService.createTransaction(
           transactionPayload
         );
+
+        // Log transaction creation in audit logs
+        try {
+          await logCustomEvent(
+            { user: { userId: userId || "anonymous" } },
+            DONATION_ACTIONS.DONATION_MADE,
+            ENTITY_TYPES.TRANSACTION,
+            transaction.transactionId,
+            {
+              donationId: donation.donationId,
+              campaignId: donationData.campaignId,
+              amount: donationData.amount,
+              gatewayUsed: donationData.paymentMethod,
+              gatewayTransactionId: transaction.gatewayTransactionId,
+            }
+          );
+        } catch (auditError) {
+          logger.warn("Failed to log transaction creation audit", {
+            error: auditError.message,
+          });
+        }
+
         logger.info("Transaction record created", {
           transactionId: transaction.transactionId,
           donationId: donation.donationId,
@@ -98,10 +148,30 @@ class DonationService {
             isAnonymous: donationData.isAnonymous,
           });
 
+          // Log message creation in audit logs
+          try {
+            await logCustomEvent(
+              { user: { userId: userId || "anonymous" } },
+              DONATION_ACTIONS.DONATION_MADE,
+              ENTITY_TYPES.DONATION,
+              donation.donationId,
+              {
+                campaignId: donationData.campaignId,
+                donationId: donation.donationId,
+                messageText: "Message provided",
+                isAnonymous: donationData.isAnonymous || false,
+                messageLength: donationData.messageText.length,
+              }
+            );
+          } catch (auditError) {
+            logger.warn("Failed to log message creation audit", {
+              error: auditError.message,
+            });
+          }
+
           // TODO: Implement message creation when messageService.createMessage is available
           // const message = await messageService.createMessage(messagePayload);
-          // const message = await messageService.createMessage(messagePayload);
-          // messageId = message.messageId;
+          // const messageId = message.messageId;
         }
 
         // 5. Update campaign statistics
@@ -183,11 +253,52 @@ class DonationService {
       mockGatewayResponse
     );
 
+    // Log transaction success in audit logs
+    try {
+      await logCustomEvent(
+        { user: { userId: donation.donorUserId || "anonymous" } },
+        DONATION_ACTIONS.DONATION_MADE,
+        ENTITY_TYPES.TRANSACTION,
+        txn.transactionId,
+        {
+          donationId: donation.donationId,
+          campaignId: donation.campaignId,
+          status: "succeeded",
+          gatewayResponse: mockGatewayResponse,
+          simulation: true,
+        }
+      );
+    } catch (auditError) {
+      logger.warn("Failed to log transaction success audit", {
+        error: auditError.message,
+      });
+    }
+
     // 2) Mark donation as completed
     await donationRepository.updateDonationStatus(
       donation.donationId,
       "completed"
     );
+
+    // Log donation completion in audit logs
+    try {
+      await logCustomEvent(
+        { user: { userId: donation.donorUserId || "anonymous" } },
+        DONATION_ACTIONS.DONATION_MADE,
+        ENTITY_TYPES.DONATION,
+        donation.donationId,
+        {
+          campaignId: donation.campaignId,
+          status: "completed",
+          transactionId: txn.transactionId,
+          simulation: true,
+        }
+      );
+    } catch (auditError) {
+      logger.warn("Failed to log donation completion audit", {
+        error: auditError.message,
+      });
+    }
 
     // 3) Recalculate campaign statistics based on completed donations to be concurrency-safe
     const stats = await donationRepository.recalculateCampaignStatistics(
