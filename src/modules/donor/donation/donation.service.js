@@ -3,6 +3,8 @@ import transactionService from "../../payment/transactions/transaction.service.j
 import messageService from "../messages/message.service.js";
 import { logCustomEvent } from "../../audit/audit.utils.js";
 import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
+import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
+import notificationService from "../../notifications/notification.service.js";
 import { AppError } from "../../../utils/appError.js";
 import { logger } from "../../../utils/logger.js";
 import { transaction } from "../../../db/index.js";
@@ -185,6 +187,25 @@ class DonationService {
           campaignId: donationData.campaignId,
           amount: donationData.amount,
         });
+
+        // 6. Send notifications to campaign organizer
+        try {
+          await this.sendCampaignOrganizerNotifications(
+            donationData.campaignId,
+            donation.donationId,
+            donationData.amount,
+            donationData.currency || "USD",
+            donationData.messageText,
+            donationData.isAnonymous || false,
+            donationData.phoneNumber
+          );
+        } catch (notificationError) {
+          logger.warn("Failed to send campaign organizer notifications", {
+            error: notificationError.message,
+            campaignId: donationData.campaignId,
+            donationId: donation.donationId,
+          });
+        }
 
         return {
           donation,
@@ -445,6 +466,134 @@ class DonationService {
     } catch (error) {
       logger.error("Error updating campaign statistics:", error);
       throw new AppError("Failed to update campaign statistics", 500);
+    }
+  }
+
+  async sendCampaignOrganizerNotifications(
+    campaignId,
+    donationId,
+    amount,
+    currency,
+    messageText,
+    isAnonymous,
+    phoneNumber
+  ) {
+    try {
+      const campaign = await getCampaignById(campaignId);
+      if (!campaign || !campaign.organizerId) {
+        logger.warn("Campaign or organizer not found for notification", {
+          campaignId,
+        });
+        return;
+      }
+
+      const organizerId = campaign.organizerId;
+      const campaignName = campaign.name;
+      const formattedAmount = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+      }).format(amount);
+
+      // Prepare notification data
+      const notificationData = {
+        campaignId,
+        donationId,
+        amount: formattedAmount,
+        currency: currency || "USD",
+        campaignName,
+        isAnonymous,
+        hasMessage: !!messageText,
+        messagePreview: messageText
+          ? messageText.substring(0, 100) +
+            (messageText.length > 100 ? "..." : "")
+          : null,
+        phoneNumber: isAnonymous ? null : phoneNumber,
+      };
+
+      // Send in-app notification
+      try {
+        await notificationService.createAndDispatch({
+          userId: organizerId,
+          type: "inApp",
+          category: "donation",
+          priority: "medium",
+          title: `New donation received for ${campaignName}`,
+          message: `${formattedAmount} donation received${
+            messageText ? " with a message" : ""
+          }`,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.v1",
+        });
+
+        logger.info("In-app notification sent to campaign organizer", {
+          campaignId,
+          organizerId,
+          donationId,
+        });
+      } catch (inAppError) {
+        logger.warn("Failed to send in-app notification", {
+          error: inAppError.message,
+          campaignId,
+          organizerId,
+          donationId,
+        });
+      }
+
+      // Send email notification
+      try {
+        const emailTitle = `New donation received for ${campaignName}`;
+        const emailMessage = `
+          <h2>New Donation Received!</h2>
+          <p>Your campaign <strong>${campaignName}</strong> has received a new donation.</p>
+          <p><strong>Amount:</strong> ${formattedAmount}</p>
+          <p><strong>Donation ID:</strong> ${donationId}</p>
+          ${
+            messageText
+              ? `<p><strong>Message:</strong> "${messageText}"</p>`
+              : ""
+          }
+          ${
+            !isAnonymous && phoneNumber
+              ? `<p><strong>Contact:</strong> ${phoneNumber}</p>`
+              : ""
+          }
+          <p>Thank you for your fundraising efforts!</p>
+        `;
+
+        await notificationService.createAndDispatch({
+          userId: organizerId,
+          type: "email",
+          category: "donation",
+          priority: "medium",
+          title: emailTitle,
+          message: emailMessage,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.email.v1",
+        });
+
+        logger.info("Email notification sent to campaign organizer", {
+          campaignId,
+          organizerId,
+          donationId,
+        });
+      } catch (emailError) {
+        logger.warn("Failed to send email notification", {
+          error: emailError.message,
+          campaignId,
+          organizerId,
+          donationId,
+        });
+      }
+    } catch (error) {
+      logger.error("Failed to send campaign organizer notifications", {
+        error: error.message,
+        campaignId,
+        donationId,
+      });
     }
   }
 }
