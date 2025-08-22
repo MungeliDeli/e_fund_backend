@@ -4,6 +4,7 @@ import messageService from "../messages/message.service.js";
 import { logCustomEvent } from "../../audit/audit.utils.js";
 import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
 import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
+import { getUserById } from "../../users/user.service.js";
 import notificationService from "../../notifications/notification.service.js";
 import { AppError } from "../../../utils/appError.js";
 import { logger } from "../../../utils/logger.js";
@@ -204,6 +205,52 @@ class DonationService {
             error: notificationError.message,
             campaignId: donationData.campaignId,
             donationId: donation.donationId,
+          });
+        }
+
+        // 7. Send notifications to donor (if registered user)
+        if (userId && !donationData.isAnonymous) {
+          try {
+            await this.sendDonorNotifications(
+              userId,
+              donation.donationId,
+              donationData.campaignId,
+              donationData.amount,
+              donationData.currency || "USD",
+              donationData.messageText
+            );
+          } catch (donorNotificationError) {
+            logger.warn("Failed to send donor notifications", {
+              error: donorNotificationError.message,
+              userId,
+              donationId: donation.donationId,
+            });
+          }
+        } else if (donationData.isAnonymous) {
+          // Handle anonymous donor differently - generate receipt but don't send notifications
+          try {
+            await this.sendAnonymousDonorReceipt(
+              donation.donationId,
+              donationData.campaignId,
+              donationData.amount,
+              donationData.currency || "USD",
+              donationData.messageText
+            );
+          } catch (anonymousReceiptError) {
+            logger.warn("Failed to generate anonymous donor receipt", {
+              error: anonymousReceiptError.message,
+              donationId: donation.donationId,
+              campaignId: donationData.campaignId,
+            });
+          }
+
+          // Log anonymous donation activity
+          logger.info("Anonymous donation received - receipt generated", {
+            donationId: donation.donationId,
+            campaignId: donationData.campaignId,
+            amount: donationData.amount,
+            phoneNumber: donationData.phoneNumber,
+            hasMessage: !!donationData.messageText,
           });
         }
 
@@ -593,6 +640,245 @@ class DonationService {
         error: error.message,
         campaignId,
         donationId,
+      });
+    }
+  }
+
+  async sendDonorNotifications(
+    userId,
+    donationId,
+    campaignId,
+    amount,
+    currency,
+    messageText
+  ) {
+    try {
+      const user = await getUserById(userId);
+      if (!user) {
+        logger.warn("User not found for donor notification", { userId });
+        return;
+      }
+
+      const campaign = await getCampaignById(campaignId);
+      if (!campaign) {
+        logger.warn("Campaign not found for donor notification", {
+          campaignId,
+        });
+        return;
+      }
+
+      const campaignName = campaign.name;
+      const formattedAmount = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+      }).format(amount);
+
+      // Prepare notification data
+      const notificationData = {
+        campaignId,
+        donationId,
+        amount: formattedAmount,
+        currency: currency || "USD",
+        campaignName,
+        hasMessage: !!messageText,
+        messagePreview: messageText
+          ? messageText.substring(0, 100) +
+            (messageText.length > 100 ? "..." : "")
+          : null,
+      };
+
+      // Send in-app notification
+      try {
+        await notificationService.createAndDispatch({
+          userId: userId,
+          type: "inApp",
+          category: "donation",
+          priority: "medium",
+          title: `Your donation for ${campaignName} has been received!`,
+          message: `${formattedAmount} donation received${
+            messageText ? " with a message" : ""
+          }`,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.v1",
+        });
+
+        logger.info("In-app notification sent to donor", {
+          userId,
+          donationId,
+          campaignId,
+        });
+      } catch (inAppError) {
+        logger.warn("Failed to send in-app notification to donor", {
+          error: inAppError.message,
+          userId,
+          donationId,
+          campaignId,
+        });
+      }
+
+      // Send email notification
+      try {
+        const emailTitle = `Your donation for ${campaignName} has been received!`;
+        const emailMessage = `
+          <h2>Your Donation Received!</h2>
+          <p>Your donation for campaign <strong>${campaignName}</strong> has been received.</p>
+          <p><strong>Amount:</strong> ${formattedAmount}</p>
+          <p><strong>Donation ID:</strong> ${donationId}</p>
+          ${
+            messageText
+              ? `<p><strong>Message:</strong> "${messageText}"</p>`
+              : ""
+          }
+          <p>Thank you for your support!</p>
+        `;
+
+        await notificationService.createAndDispatch({
+          userId: userId,
+          type: "email",
+          category: "donation",
+          priority: "medium",
+          title: emailTitle,
+          message: emailMessage,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.email.v1",
+        });
+
+        logger.info("Email notification sent to donor", {
+          userId,
+          donationId,
+          campaignId,
+        });
+      } catch (emailError) {
+        logger.warn("Failed to send email notification to donor", {
+          error: emailError.message,
+          userId,
+          donationId,
+          campaignId,
+        });
+      }
+    } catch (error) {
+      logger.error("Failed to send donor notifications", {
+        error: error.message,
+        userId,
+        donationId,
+        campaignId,
+      });
+    }
+  }
+
+  async sendAnonymousDonorReceipt(
+    donationId,
+    campaignId,
+    amount,
+    currency,
+    messageText
+  ) {
+    try {
+      const campaign = await getCampaignById(campaignId);
+      if (!campaign) {
+        logger.warn("Campaign not found for anonymous donor receipt", {
+          campaignId,
+        });
+        return;
+      }
+
+      const campaignName = campaign.name;
+      const formattedAmount = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+      }).format(amount);
+
+      const notificationData = {
+        campaignId,
+        donationId,
+        amount: formattedAmount,
+        currency: currency || "USD",
+        campaignName,
+        hasMessage: !!messageText,
+        messagePreview: messageText
+          ? messageText.substring(0, 100) +
+            (messageText.length > 100 ? "..." : "")
+          : null,
+      };
+
+      // Send in-app notification
+      try {
+        await notificationService.createAndDispatch({
+          userId: null, // Anonymous user
+          type: "inApp",
+          category: "donation",
+          priority: "medium",
+          title: `Your anonymous donation for ${campaignName} has been received!`,
+          message: `${formattedAmount} anonymous donation received${
+            messageText ? " with a message" : ""
+          }`,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.v1",
+        });
+
+        logger.info("In-app anonymous donor receipt sent", {
+          donationId,
+          campaignId,
+        });
+      } catch (inAppError) {
+        logger.warn("Failed to send in-app anonymous donor receipt", {
+          error: inAppError.message,
+          donationId,
+          campaignId,
+        });
+      }
+
+      // Send email notification
+      try {
+        const emailTitle = `Your anonymous donation for ${campaignName} has been received!`;
+        const emailMessage = `
+          <h2>Your Anonymous Donation Received!</h2>
+          <p>Your anonymous donation for campaign <strong>${campaignName}</strong> has been received.</p>
+          <p><strong>Amount:</strong> ${formattedAmount}</p>
+          <p><strong>Donation ID:</strong> ${donationId}</p>
+          ${
+            messageText
+              ? `<p><strong>Message:</strong> "${messageText}"</p>`
+              : ""
+          }
+          <p>Thank you for your support!</p>
+        `;
+
+        await notificationService.createAndDispatch({
+          userId: null, // Anonymous user
+          type: "email",
+          category: "donation",
+          priority: "medium",
+          title: emailTitle,
+          message: emailMessage,
+          data: notificationData,
+          relatedEntityType: "donation",
+          relatedEntityId: donationId,
+          templateId: "donation.received.email.v1",
+        });
+
+        logger.info("Email anonymous donor receipt sent", {
+          donationId,
+          campaignId,
+        });
+      } catch (emailError) {
+        logger.warn("Failed to send email anonymous donor receipt", {
+          error: emailError.message,
+          donationId,
+          campaignId,
+        });
+      }
+    } catch (error) {
+      logger.error("Failed to send anonymous donor receipt", {
+        error: error.message,
+        donationId,
+        campaignId,
       });
     }
   }
