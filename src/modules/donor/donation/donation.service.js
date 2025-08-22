@@ -131,6 +131,17 @@ class DonationService {
         amount: donationData.amount,
       });
 
+      // Simulate payment processing asynchronously (mock gateway)
+      this.simulatePaymentProcessing(result.donation, result.transaction).catch(
+        (error) => {
+          logger.error("Payment simulation failed", {
+            donationId: result.donation.donationId,
+            transactionId: result.transaction.transactionId,
+            error,
+          });
+        }
+      );
+
       return result;
     } catch (error) {
       logger.error("Error creating donation:", error);
@@ -151,6 +162,59 @@ class DonationService {
         throw new AppError("Failed to create donation", 500);
       }
     }
+  }
+
+  async simulatePaymentProcessing(donation, txn) {
+    // Artificial delay to mimic gateway processing time
+    const processingDelayMs = 1500;
+    await new Promise((resolve) => setTimeout(resolve, processingDelayMs));
+
+    const mockGatewayResponse = {
+      provider: txn.gatewayUsed || "MockGateway",
+      gatewayTransactionId: txn.gatewayTransactionId,
+      status: "succeeded",
+      processedAt: new Date().toISOString(),
+      meta: { simulation: true },
+    };
+
+    // 1) Mark transaction as succeeded
+    await transactionService.processPaymentSuccess(
+      txn.gatewayTransactionId,
+      mockGatewayResponse
+    );
+
+    // 2) Mark donation as completed
+    await donationRepository.updateDonationStatus(
+      donation.donationId,
+      "completed"
+    );
+
+    // 3) Recalculate campaign statistics based on completed donations to be concurrency-safe
+    const stats = await donationRepository.recalculateCampaignStatistics(
+      donation.campaignId
+    );
+
+    // Optional progress percentage calculation (derived, not persisted)
+    if (stats && stats.goalAmount && Number(stats.goalAmount) > 0) {
+      const progress =
+        (Number(stats.currentRaisedAmount) / Number(stats.goalAmount)) * 100;
+      logger.info("Campaign progress recalculated", {
+        campaignId: donation.campaignId,
+        currentRaisedAmount: stats.currentRaisedAmount,
+        goalAmount: stats.goalAmount,
+        donationCount: stats.completedCount,
+        progressPercentage: Math.min(
+          100,
+          Math.max(0, Number(progress.toFixed(2)))
+        ),
+      });
+    }
+
+    logger.info("Mock payment simulation completed", {
+      donationId: donation.donationId,
+      transactionId: txn.transactionId,
+      gatewayTransactionId: txn.gatewayTransactionId,
+    });
   }
 
   async getDonationById(donationId) {

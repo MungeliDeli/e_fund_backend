@@ -138,6 +138,36 @@ class DonationRepository {
       return result.rows[0] || null;
     }
   }
+
+  async recalculateCampaignStatistics(campaignId, client = null) {
+    const query = `
+      WITH agg AS (
+        SELECT 
+          COALESCE(SUM("amount"), 0) AS totalAmount,
+          COUNT(*) AS completedCount
+        FROM "donations"
+        WHERE "campaignId" = $1 AND "status" = 'completed'
+      ), upd AS (
+        UPDATE "campaigns" c
+        SET "currentRaisedAmount" = agg.totalAmount,
+            "updatedAt" = CURRENT_TIMESTAMP
+        FROM agg
+        WHERE c."campaignId" = $1
+        RETURNING c."currentRaisedAmount", c."goalAmount"
+      )
+      SELECT upd."currentRaisedAmount", upd."goalAmount", agg.completedCount
+      FROM upd, agg`;
+
+    const params = [campaignId];
+
+    if (client) {
+      const result = await client.query(query, params);
+      return result.rows[0] || null;
+    } else {
+      const result = await db.query(query, params);
+      return result.rows[0] || null;
+    }
+  }
 }
 
 export default new DonationRepository();
