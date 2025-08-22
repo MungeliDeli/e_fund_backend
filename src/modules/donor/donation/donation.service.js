@@ -13,17 +13,11 @@ import { transaction } from "../../../db/index.js";
 class DonationService {
   async createDonation(donationData, userId = null) {
     try {
-      // Validate required fields
-      if (
-        !donationData.campaignId ||
-        !donationData.amount ||
-        donationData.amount <= 0
-      ) {
-        throw new AppError(
-          "Invalid donation data: campaignId and amount are required",
-          400
-        );
-      }
+      // Enhanced data validation
+      await this.validateDonationData(donationData);
+
+      // Campaign state validation
+      await this.validateCampaignState(donationData.campaignId);
 
       // Use database transaction to ensure data consistency
       const result = await transaction(async (client) => {
@@ -880,6 +874,177 @@ class DonationService {
         donationId,
         campaignId,
       });
+    }
+  }
+
+  /**
+   * Comprehensive data validation for donation data
+   * @param {Object} donationData - Donation data to validate
+   * @throws {AppError} If validation fails
+   */
+  async validateDonationData(donationData) {
+    // Validate required fields
+    if (!donationData.campaignId) {
+      throw new AppError("Campaign ID is required", 400);
+    }
+    if (!donationData.amount) {
+      throw new AppError("Donation amount is required", 400);
+    }
+    if (!donationData.phoneNumber) {
+      throw new AppError("Phone number is required", 400);
+    }
+    if (!donationData.paymentMethod) {
+      throw new AppError("Payment method is required", 400);
+    }
+
+    // Validate amount
+    if (typeof donationData.amount !== "number" || isNaN(donationData.amount)) {
+      throw new AppError("Amount must be a valid number", 400);
+    }
+    if (donationData.amount <= 0) {
+      throw new AppError("Amount must be greater than 0", 400);
+    }
+    if (donationData.amount < 0.01) {
+      throw new AppError("Amount must be at least $0.01", 400);
+    }
+    if (donationData.amount > 999999.99) {
+      throw new AppError("Amount cannot exceed $999,999.99", 400);
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(donationData.phoneNumber)) {
+      throw new AppError(
+        "Phone number must be in valid international format (e.g., +1234567890)",
+        400
+      );
+    }
+
+    // Validate message content if provided
+    if (
+      donationData.messageText !== undefined &&
+      donationData.messageText !== null
+    ) {
+      if (typeof donationData.messageText !== "string") {
+        throw new AppError("Message must be a string", 400);
+      }
+
+      const trimmedMessage = donationData.messageText.trim();
+      if (trimmedMessage.length > 1000) {
+        throw new AppError("Message cannot exceed 1000 characters", 400);
+      }
+
+      // Check for potentially harmful content
+      const harmfulPatterns = [
+        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+        /javascript:/gi,
+        /on\w+\s*=/gi,
+        /data:text\/html/gi,
+      ];
+
+      for (const pattern of harmfulPatterns) {
+        if (pattern.test(trimmedMessage)) {
+          throw new AppError(
+            "Message contains potentially harmful content",
+            400
+          );
+        }
+      }
+    }
+
+    // Validate currency format
+    if (donationData.currency) {
+      const currencyRegex = /^[A-Z]{3}$/;
+      if (!currencyRegex.test(donationData.currency)) {
+        throw new AppError(
+          "Currency must be a valid 3-letter currency code (e.g., USD, EUR)",
+          400
+        );
+      }
+    }
+
+    // Validate boolean fields
+    if (
+      donationData.isAnonymous !== undefined &&
+      typeof donationData.isAnonymous !== "boolean"
+    ) {
+      throw new AppError("isAnonymous must be a boolean value", 400);
+    }
+
+    logger.info("Donation data validation passed", {
+      campaignId: donationData.campaignId,
+      amount: donationData.amount,
+      hasMessage: !!donationData.messageText,
+      isAnonymous: donationData.isAnonymous || false,
+    });
+  }
+
+  /**
+   * Validate campaign state before allowing donations
+   * @param {string} campaignId - Campaign ID to validate
+   * @throws {AppError} If campaign is not in valid state for donations
+   */
+  async validateCampaignState(campaignId) {
+    try {
+      const campaign = await getCampaignById(campaignId);
+
+      if (!campaign) {
+        throw new AppError("Campaign not found", 404);
+      }
+
+      // Check if campaign is active
+      if (campaign.status !== "active") {
+        const validStatuses = ["active"];
+        throw new AppError(
+          `Campaign is not accepting donations. Current status: ${
+            campaign.status
+          }. Only campaigns with status: ${validStatuses.join(
+            ", "
+          )} can receive donations.`,
+          422
+        );
+      }
+
+      // Check if campaign has ended
+      if (campaign.endDate && new Date(campaign.endDate) < new Date()) {
+        throw new AppError(
+          "Campaign has ended and is no longer accepting donations",
+          422
+        );
+      }
+
+      // Check if campaign has started
+      if (campaign.startDate && new Date(campaign.startDate) > new Date()) {
+        throw new AppError(
+          "Campaign has not started yet and is not accepting donations",
+          422
+        );
+      }
+
+      // Check if campaign is suspended (additional safety check)
+      if (campaign.status === "cancelled" || campaign.status === "rejected") {
+        throw new AppError(
+          `Campaign is ${campaign.status} and cannot receive donations`,
+          422
+        );
+      }
+
+      logger.info("Campaign state validation passed", {
+        campaignId,
+        status: campaign.status,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("Failed to validate campaign state", {
+        error: error.message,
+        campaignId,
+      });
+      throw new AppError("Failed to validate campaign state", 500);
     }
   }
 }
