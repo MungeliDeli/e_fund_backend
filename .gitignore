@@ -33,4 +33,7 @@ coverage/
 .vscode/
 
 # Local scripts output
-scripts/*.local.js 
+scripts/*.local.js
+
+# Implementation plans
+DONATION_FEATURE_PLAN.md 

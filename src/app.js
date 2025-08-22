@@ -25,6 +25,8 @@ import segmentRoutes from "./modules/Outreach/segments/segment.routes.js";
 import contactRoutes from "./modules/Outreach/contacts/contact.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
+import { donationRoutes, messageRoutes } from "./modules/donor/index.js";
+import { transactionRoutes } from "./modules/payment/index.js";
 
 /**
  * Express Application Setup
@@ -100,6 +102,9 @@ app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 app.use("/api/v1/outreach/segments", segmentRoutes);
 app.use("/api/v1/outreach/contacts", contactRoutes);
+app.use("/api/v1/donations", donationRoutes);
+app.use("/api/v1/messages", messageRoutes);
+app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1", notificationRoutes);
 app.use("/api/v1/audit", auditRoutes);
 
