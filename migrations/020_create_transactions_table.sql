@@ -14,7 +14,7 @@ CREATE TABLE "transactions" (
     "feesAmount" NUMERIC(12, 2),
     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "transactionType" VARCHAR(50) NOT NULL CHECK (transactionType IN ('donation_in', 'withdrawal_out', 'platform_fee'))
+    "transactionType" VARCHAR(50) NOT NULL CHECK ("transactionType" IN ('donation_in', 'withdrawal_out', 'platform_fee'))
 );
 
 -- Create indexes for better performance
