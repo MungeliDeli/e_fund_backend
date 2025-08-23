@@ -1,5 +1,5 @@
 import transactionService from "./transaction.service.js";
-import { successResponse } from "../../../utils/response.utils.js";
+import { ResponseFactory } from "../../../utils/response.utils.js";
 
 class TransactionController {
   async createTransaction(req, res) {
@@ -9,13 +9,10 @@ class TransactionController {
       transactionData
     );
 
-    return successResponse(
+    return ResponseFactory.created(
       res,
-      {
-        message: "Transaction created successfully",
-        data: transaction,
-      },
-      201
+      "Transaction created successfully",
+      transaction
     );
   }
 
@@ -26,10 +23,11 @@ class TransactionController {
       transactionId
     );
 
-    return successResponse(res, {
-      message: "Transaction retrieved successfully",
-      data: transaction,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Transaction retrieved successfully",
+      transaction
+    );
   }
 
   async getTransactionsByCampaign(req, res) {
@@ -42,10 +40,11 @@ class TransactionController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "Campaign transactions retrieved successfully",
-      data: transactions,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Campaign transactions retrieved successfully",
+      transactions
+    );
   }
 
   async getTransactionsByUser(req, res) {
@@ -58,10 +57,11 @@ class TransactionController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "User transactions retrieved successfully",
-      data: transactions,
-    });
+    return ResponseFactory.ok(
+      res,
+      "User transactions retrieved successfully",
+      transactions
+    );
   }
 
   async updateTransactionStatus(req, res) {
@@ -75,10 +75,11 @@ class TransactionController {
       userId
     );
 
-    return successResponse(res, {
-      message: "Transaction status updated successfully",
-      data: updatedTransaction,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Transaction status updated successfully",
+      updatedTransaction
+    );
   }
 
   async getTransactionStats(req, res) {
@@ -86,10 +87,11 @@ class TransactionController {
 
     const stats = await transactionService.getTransactionStats(campaignId);
 
-    return successResponse(res, {
-      message: "Transaction statistics retrieved successfully",
-      data: stats,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Transaction statistics retrieved successfully",
+      stats
+    );
   }
 
   async getTransactionsByType(req, res) {
@@ -102,10 +104,11 @@ class TransactionController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "Transactions by type retrieved successfully",
-      data: transactions,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Transactions by type retrieved successfully",
+      transactions
+    );
   }
 
   async getTransactionSummary(req, res) {
@@ -115,10 +118,11 @@ class TransactionController {
       parseInt(limit)
     );
 
-    return successResponse(res, {
-      message: "Transaction summary retrieved successfully",
-      data: summary,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Transaction summary retrieved successfully",
+      summary
+    );
   }
 
   async processPaymentSuccess(req, res) {
@@ -130,10 +134,11 @@ class TransactionController {
       gatewayResponse
     );
 
-    return successResponse(res, {
-      message: "Payment processed successfully",
-      data: transaction,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Payment processed successfully",
+      transaction
+    );
   }
 
   async processPaymentFailure(req, res) {
@@ -145,10 +150,11 @@ class TransactionController {
       failureReason
     );
 
-    return successResponse(res, {
-      message: "Payment failure processed successfully",
-      data: transaction,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Payment failure processed successfully",
+      transaction
+    );
   }
 }
 

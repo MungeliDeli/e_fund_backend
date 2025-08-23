@@ -1,5 +1,5 @@
 import messageService from "./message.service.js";
-import { successResponse } from "../../../utils/response.utils.js";
+import { ResponseFactory } from "../../../utils/response.utils.js";
 
 class MessageController {
   async getMessagesByCampaign(req, res) {
@@ -13,10 +13,7 @@ class MessageController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "Messages retrieved successfully",
-      data: messages,
-    });
+    return ResponseFactory.ok(res, "Messages retrieved successfully", messages);
   }
 
   async getMessageById(req, res) {
@@ -24,10 +21,7 @@ class MessageController {
 
     const message = await messageService.getMessageById(messageId);
 
-    return successResponse(res, {
-      message: "Message retrieved successfully",
-      data: message,
-    });
+    return ResponseFactory.ok(res, "Message retrieved successfully", message);
   }
 
   async moderateMessage(req, res) {
@@ -42,10 +36,11 @@ class MessageController {
       isFeatured
     );
 
-    return successResponse(res, {
-      message: "Message moderated successfully",
-      data: updatedMessage,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Message moderated successfully",
+      updatedMessage
+    );
   }
 
   async getPendingMessagesCount(req, res) {
@@ -53,10 +48,11 @@ class MessageController {
 
     const count = await messageService.getPendingMessagesCount(campaignId);
 
-    return successResponse(res, {
-      message: "Pending messages count retrieved successfully",
-      data: { pendingCount: count },
-    });
+    return ResponseFactory.ok(
+      res,
+      "Pending messages count retrieved successfully",
+      { pendingCount: count }
+    );
   }
 
   async getFeaturedMessages(req, res) {
@@ -68,10 +64,11 @@ class MessageController {
       parseInt(limit)
     );
 
-    return successResponse(res, {
-      message: "Featured messages retrieved successfully",
-      data: messages,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Featured messages retrieved successfully",
+      messages
+    );
   }
 
   async getMessagesByUser(req, res) {
@@ -84,10 +81,11 @@ class MessageController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "User messages retrieved successfully",
-      data: messages,
-    });
+    return ResponseFactory.ok(
+      res,
+      "User messages retrieved successfully",
+      messages
+    );
   }
 
   async toggleFeaturedStatus(req, res) {
@@ -99,10 +97,11 @@ class MessageController {
       moderatedByUserId
     );
 
-    return successResponse(res, {
-      message: "Message featured status toggled successfully",
-      data: updatedMessage,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Message featured status toggled successfully",
+      updatedMessage
+    );
   }
 }
 

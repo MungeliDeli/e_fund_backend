@@ -1,13 +1,13 @@
 import donationRepository from "./donation.repository.js";
 import transactionService from "../../payment/transactions/transaction.service.js";
 import messageService from "../messages/message.service.js";
-import { logCustomEvent } from "../../audit/audit.utils.js";
+import { logServiceEvent } from "../../audit/audit.utils.js";
 import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
 import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
 import { getUserById } from "../../users/user.service.js";
 import notificationService from "../../notifications/notification.service.js";
 import { AppError } from "../../../utils/appError.js";
-import { logger } from "../../../utils/logger.js";
+import logger from "../../../utils/logger.js";
 import { transaction } from "../../../db/index.js";
 
 class DonationService {
@@ -40,8 +40,8 @@ class DonationService {
 
         // Log donation creation in audit logs
         try {
-          await logCustomEvent(
-            { user: { userId: userId || "anonymous" } },
+          await logServiceEvent(
+            userId || null,
             DONATION_ACTIONS.DONATION_MADE,
             ENTITY_TYPES.DONATION,
             donation.donationId,
@@ -147,8 +147,8 @@ class DonationService {
 
           // Log message creation in audit logs
           try {
-            await logCustomEvent(
-              { user: { userId: userId || "anonymous" } },
+            await logServiceEvent(
+              userId || null,
               DONATION_ACTIONS.DONATION_MADE,
               ENTITY_TYPES.DONATION,
               donation.donationId,
@@ -317,8 +317,8 @@ class DonationService {
 
     // Log transaction success in audit logs
     try {
-      await logCustomEvent(
-        { user: { userId: donation.donorUserId || "anonymous" } },
+      await logServiceEvent(
+        donation.donorUserId || null,
         DONATION_ACTIONS.DONATION_MADE,
         ENTITY_TYPES.TRANSACTION,
         txn.transactionId,
@@ -344,8 +344,8 @@ class DonationService {
 
     // Log donation completion in audit logs
     try {
-      await logCustomEvent(
-        { user: { userId: donation.donorUserId || "anonymous" } },
+      await logServiceEvent(
+        donation.donorUserId || null,
         DONATION_ACTIONS.DONATION_MADE,
         ENTITY_TYPES.DONATION,
         donation.donationId,

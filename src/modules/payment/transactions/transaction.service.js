@@ -1,6 +1,6 @@
 import transactionRepository from "./transaction.repository.js";
 import { AppError } from "../../../utils/appError.js";
-import { logger } from "../../../utils/logger.js";
+import logger from "../../../utils/logger.js";
 
 class TransactionService {
   async createTransaction(transactionData) {

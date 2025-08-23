@@ -4,7 +4,9 @@ import {
   authenticate,
   optionalAuth,
 } from "../../../middlewares/auth.middleware.js";
-import {
+import donationController from "./donation.controller.js";
+
+const {
   createDonation,
   getDonationById,
   getDonationsByCampaign,
@@ -13,7 +15,7 @@ import {
   getDonationStats,
   getDonationsByUser,
   updateCampaignStatistics,
-} from "./donation.controller.js";
+} = donationController;
 import {
   validateCreateDonation,
   validateUpdateDonationStatus,

@@ -1,5 +1,5 @@
 import { db } from "../../../db/index.js";
-import { logger } from "../../../utils/logger.js";
+import logger from "../../../utils/logger.js";
 
 class DonationRepository {
   async createDonation(donationData, client = null) {

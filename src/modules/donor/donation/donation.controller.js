@@ -1,5 +1,5 @@
 import donationService from "./donation.service.js";
-import { successResponse } from "../../../utils/response.utils.js";
+import { ResponseFactory } from "../../../utils/response.utils.js";
 
 class DonationController {
   async createDonation(req, res) {
@@ -8,19 +8,12 @@ class DonationController {
 
     const result = await donationService.createDonation(donationData, userId);
 
-    return successResponse(
-      res,
-      {
-        message: "Donation created successfully",
-        data: {
-          donation: result.donation,
-          transaction: result.transaction,
-          messageId: result.messageId,
-          success: result.success,
-        },
-      },
-      201
-    );
+    return ResponseFactory.created(res, "Donation created successfully", {
+      donation: result.donation,
+      transaction: result.transaction,
+      messageId: result.messageId,
+      success: result.success,
+    });
   }
 
   async getDonationById(req, res) {
@@ -28,10 +21,7 @@ class DonationController {
 
     const donation = await donationService.getDonationById(donationId);
 
-    return successResponse(res, {
-      message: "Donation retrieved successfully",
-      data: donation,
-    });
+    return ResponseFactory.ok(res, "Donation retrieved successfully", donation);
   }
 
   async getDonationsByCampaign(req, res) {
@@ -44,10 +34,11 @@ class DonationController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "Donations retrieved successfully",
-      data: donations,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Donations retrieved successfully",
+      donations
+    );
   }
 
   async updateDonationStatus(req, res) {
@@ -61,10 +52,11 @@ class DonationController {
       userId
     );
 
-    return successResponse(res, {
-      message: "Donation status updated successfully",
-      data: updatedDonation,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Donation status updated successfully",
+      updatedDonation
+    );
   }
 
   async updateReceiptSent(req, res) {
@@ -78,10 +70,11 @@ class DonationController {
       userId
     );
 
-    return successResponse(res, {
-      message: "Receipt status updated successfully",
-      data: updatedDonation,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Receipt status updated successfully",
+      updatedDonation
+    );
   }
 
   async getDonationStats(req, res) {
@@ -89,10 +82,11 @@ class DonationController {
 
     const stats = await donationService.getDonationStats(campaignId);
 
-    return successResponse(res, {
-      message: "Donation statistics retrieved successfully",
-      data: stats,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Donation statistics retrieved successfully",
+      stats
+    );
   }
 
   async getDonationsByUser(req, res) {
@@ -105,10 +99,11 @@ class DonationController {
       parseInt(offset)
     );
 
-    return successResponse(res, {
-      message: "User donations retrieved successfully",
-      data: donations,
-    });
+    return ResponseFactory.ok(
+      res,
+      "User donations retrieved successfully",
+      donations
+    );
   }
 
   async updateCampaignStatistics(req, res) {
@@ -121,10 +116,11 @@ class DonationController {
       amount
     );
 
-    return successResponse(res, {
-      message: "Campaign statistics updated successfully",
-      data: updatedStats,
-    });
+    return ResponseFactory.ok(
+      res,
+      "Campaign statistics updated successfully",
+      updatedStats
+    );
   }
 }
 

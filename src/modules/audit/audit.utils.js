@@ -397,6 +397,48 @@ async function createAuditSummary(
   }
 }
 
+/**
+ * Simple audit logging function for use in services (no request object required)
+ * @param {string} userId - User ID (can be null for anonymous)
+ * @param {string} actionType - Action type
+ * @param {string} entityType - Entity type
+ * @param {string} entityId - Entity ID
+ * @param {Object} details - Additional details
+ */
+async function logServiceEvent(
+  userId,
+  actionType,
+  entityType,
+  entityId,
+  details = {}
+) {
+  try {
+    await auditService.createAuditLog({
+      userId: userId || null,
+      actionType,
+      entityType,
+      entityId,
+      details: {
+        timestamp: new Date().toISOString(),
+        source: "service",
+        ...details,
+      },
+      ipAddress: null,
+      userAgent: null,
+      sessionId: null,
+    });
+
+    logger.info(`Service audit log created: ${actionType}`, {
+      actionType,
+      entityType,
+      entityId,
+      userId,
+    });
+  } catch (error) {
+    logger.error("Failed to create service audit log:", error);
+  }
+}
+
 export {
   logAction,
   logUserAction,
@@ -414,4 +456,5 @@ export {
   logFileOperation,
   logBatchOperation,
   createAuditSummary,
+  logServiceEvent,
 };

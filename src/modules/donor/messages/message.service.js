@@ -1,6 +1,6 @@
 import messageRepository from "./message.repository.js";
 import { AppError } from "../../../utils/appError.js";
-import { logger } from "../../../utils/logger.js";
+import logger from "../../../utils/logger.js";
 
 class MessageService {
   async getMessagesByCampaign(

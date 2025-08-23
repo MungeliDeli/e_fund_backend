@@ -4,7 +4,9 @@ import {
   authenticate,
   optionalAuth,
 } from "../../../middlewares/auth.middleware.js";
-import {
+import transactionController from "./transaction.controller.js";
+
+const {
   createTransaction,
   getTransactionById,
   getTransactionsByCampaign,
@@ -15,7 +17,7 @@ import {
   getTransactionSummary,
   processPaymentSuccess,
   processPaymentFailure,
-} from "./transaction.controller.js";
+} = transactionController;
 import {
   validateCreateTransaction,
   validateUpdateTransactionStatus,
