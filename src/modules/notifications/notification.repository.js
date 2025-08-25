@@ -6,42 +6,51 @@
 import { query } from "../../db/index.js";
 
 export const createNotification = async (notification) => {
-  const {
-    userId,
-    type,
-    category,
-    priority = "medium",
-    title,
-    message,
-    data = null,
-    templateId = null,
-    relatedEntityType = null,
-    relatedEntityId = null,
-  } = notification;
+  try {
+    const {
+      userId,
+      type,
+      category,
+      priority = "medium",
+      title,
+      message,
+      data = null,
+      templateId = null,
+      relatedEntityType = null,
+      relatedEntityId = null,
+    } = notification;
 
-  const text = `
-    INSERT INTO "notifications" (
-      "userId", type, category, priority, title, message, data,
-      "templateId", "relatedEntityType", "relatedEntityId"
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-    RETURNING *
-  `;
+    const text = `
+      INSERT INTO "notifications" (
+        "userId", type, category, priority, title, message, data,
+        "templateId", "relatedEntityType", "relatedEntityId"
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING *
+    `;
 
-  const values = [
-    userId,
-    type,
-    category,
-    priority,
-    title,
-    message,
-    data ? JSON.stringify(data) : null,
-    templateId,
-    relatedEntityType,
-    relatedEntityId,
-  ];
+    const values = [
+      userId,
+      type,
+      category,
+      priority,
+      title,
+      message,
+      data ? JSON.stringify(data) : null,
+      templateId,
+      relatedEntityType,
+      relatedEntityId,
+    ];
 
-  const res = await query(text, values);
-  return res.rows[0];
+    const res = await query(text, values);
+
+    if (!res.rows[0]) {
+      throw new Error("Failed to create notification - no row returned");
+    }
+
+    return res.rows[0];
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const markAsRead = async (notificationId, userId) => {
@@ -79,8 +88,18 @@ export const listForUser = async (
 
 // Update delivery status helpers
 export const setDelivered = async (notificationId) => {
-  const text = `UPDATE "notifications" SET "deliveryStatus" = 'delivered' WHERE "notificationId" = $1 RETURNING *`;
-  await query(text, [notificationId]);
+  try {
+    const text = `UPDATE "notifications" SET "deliveryStatus" = 'delivered' WHERE "notificationId" = $1 RETURNING *`;
+    const result = await query(text, [notificationId]);
+
+    if (result.rowCount === 0) {
+      throw new Error(`Notification with ID ${notificationId} not found`);
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const setSent = async (notificationId) => {

@@ -4,9 +4,7 @@ import {
   authenticate,
   optionalAuth,
 } from "../../../middlewares/auth.middleware.js";
-import donationController from "./donation.controller.js";
-
-const {
+import {
   createDonation,
   getDonationById,
   getDonationsByCampaign,
@@ -15,13 +13,14 @@ const {
   getDonationStats,
   getDonationsByUser,
   updateCampaignStatistics,
-} = donationController;
+} from "./donation.controller.js";
 import {
   validateCreateDonation,
   validateUpdateDonationStatus,
   validateUpdateReceiptSent,
   validateDonationId,
   validateCampaignId,
+  validateCampaignState,
 } from "./donation.validation.js";
 
 const router = Router();
@@ -47,6 +46,7 @@ router.post(
   "/",
   optionalAuth,
   validateCreateDonation,
+  validateCampaignState,
   catchAsync(createDonation)
 );
 router.patch(

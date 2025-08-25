@@ -15,7 +15,7 @@
  */
 
 import Joi from "joi";
-import { ValidationError } from "../../../utils/appError.js";
+import { validate } from "../../../utils/validation.js";
 
 // Contact creation schema
 export const ContactSchema = Joi.object({
@@ -57,72 +57,15 @@ export const segmentIdSchema = Joi.object({
 
 /**
  * Validates contact creation and update data
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
-export const validateContact = (req, res, next) => {
-  const { error, value } = ContactSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    const errorMessage = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    throw new ValidationError(errorMessage);
-  }
-
-  // Replace req.body with validated and sanitized data
-  req.body = value;
-  next();
-};
+export const validateContact = validate(ContactSchema);
 
 /**
  * Validates contact ID parameter
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
-export const validateContactId = (req, res, next) => {
-  const { error, value } = contactIdSchema.validate(req.params, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    const errorMessage = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    throw new ValidationError(errorMessage);
-  }
-
-  // Replace req.params with validated and sanitized data
-  req.params = value;
-  next();
-};
+export const validateContactId = validate(contactIdSchema, "params");
 
 /**
  * Validates segment ID parameter
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
-export const validateSegmentId = (req, res, next) => {
-  const { error, value } = segmentIdSchema.validate(req.params, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    const errorMessage = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    throw new ValidationError(errorMessage);
-  }
-
-  // Replace req.params with validated and sanitized data
-  req.params = value;
-  next();
-}; 
+export const validateSegmentId = validate(segmentIdSchema, "params");

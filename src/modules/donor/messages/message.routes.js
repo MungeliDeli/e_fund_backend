@@ -4,9 +4,7 @@ import {
   authenticate,
   optionalAuth,
 } from "../../../middlewares/auth.middleware.js";
-import messageController from "./message.controller.js";
-
-const {
+import {
   getMessagesByCampaign,
   getMessageById,
   moderateMessage,
@@ -14,7 +12,7 @@ const {
   getFeaturedMessages,
   getMessagesByUser,
   toggleFeaturedStatus,
-} = messageController;
+} from "./message.controller.js";
 import {
   validateModerateMessage,
   validateMessageId,

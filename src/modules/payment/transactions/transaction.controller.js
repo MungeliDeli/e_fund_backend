@@ -1,161 +1,153 @@
-import transactionService from "./transaction.service.js";
+import * as transactionService from "./transaction.service.js";
 import { ResponseFactory } from "../../../utils/response.utils.js";
 
-class TransactionController {
-  async createTransaction(req, res) {
-    const transactionData = req.body;
+export const createTransaction = async (req, res) => {
+  const transactionData = req.body;
 
-    const transaction = await transactionService.createTransaction(
-      transactionData
-    );
+  const transaction = await transactionService.createTransaction(
+    transactionData
+  );
 
-    return ResponseFactory.created(
-      res,
-      "Transaction created successfully",
-      transaction
-    );
-  }
+  return ResponseFactory.created(
+    res,
+    "Transaction created successfully",
+    transaction
+  );
+};
 
-  async getTransactionById(req, res) {
-    const { transactionId } = req.params;
+export const getTransactionById = async (req, res) => {
+  const { transactionId } = req.params;
 
-    const transaction = await transactionService.getTransactionById(
-      transactionId
-    );
+  const transaction = await transactionService.getTransactionById(
+    transactionId
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Transaction retrieved successfully",
-      transaction
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Transaction retrieved successfully",
+    transaction
+  );
+};
 
-  async getTransactionsByCampaign(req, res) {
-    const { campaignId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+export const getTransactionsByCampaign = async (req, res) => {
+  const { campaignId } = req.params;
+  const { limit = 50, offset = 0 } = req.query;
 
-    const transactions = await transactionService.getTransactionsByCampaign(
-      campaignId,
-      parseInt(limit),
-      parseInt(offset)
-    );
+  const transactions = await transactionService.getTransactionsByCampaign(
+    campaignId,
+    parseInt(limit),
+    parseInt(offset)
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Campaign transactions retrieved successfully",
-      transactions
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Campaign transactions retrieved successfully",
+    transactions
+  );
+};
 
-  async getTransactionsByUser(req, res) {
-    const { userId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+export const getTransactionsByUser = async (req, res) => {
+  const { userId } = req.params;
+  const { limit = 50, offset = 0 } = req.query;
 
-    const transactions = await transactionService.getTransactionsByUser(
-      userId,
-      parseInt(limit),
-      parseInt(offset)
-    );
+  const transactions = await transactionService.getTransactionsByUser(
+    userId,
+    parseInt(limit),
+    parseInt(offset)
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "User transactions retrieved successfully",
-      transactions
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "User transactions retrieved successfully",
+    transactions
+  );
+};
 
-  async updateTransactionStatus(req, res) {
-    const { transactionId } = req.params;
-    const { status } = req.body;
-    const userId = req.user.userId;
+export const updateTransactionStatus = async (req, res) => {
+  const { transactionId } = req.params;
+  const { status } = req.body;
+  const userId = req.user.userId;
 
-    const updatedTransaction = await transactionService.updateTransactionStatus(
-      transactionId,
-      status,
-      userId
-    );
+  const updatedTransaction = await transactionService.updateTransactionStatus(
+    transactionId,
+    status,
+    userId
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Transaction status updated successfully",
-      updatedTransaction
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Transaction status updated successfully",
+    updatedTransaction
+  );
+};
 
-  async getTransactionStats(req, res) {
-    const { campaignId } = req.params;
+export const getTransactionStats = async (req, res) => {
+  const { campaignId } = req.params;
 
-    const stats = await transactionService.getTransactionStats(campaignId);
+  const stats = await transactionService.getTransactionStats(campaignId);
 
-    return ResponseFactory.ok(
-      res,
-      "Transaction statistics retrieved successfully",
-      stats
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Transaction statistics retrieved successfully",
+    stats
+  );
+};
 
-  async getTransactionsByType(req, res) {
-    const { transactionType } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+export const getTransactionsByType = async (req, res) => {
+  const { transactionType } = req.params;
+  const { limit = 50, offset = 0 } = req.query;
 
-    const transactions = await transactionService.getTransactionsByType(
-      transactionType,
-      parseInt(limit),
-      parseInt(offset)
-    );
+  const transactions = await transactionService.getTransactionsByType(
+    transactionType,
+    parseInt(limit),
+    parseInt(offset)
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Transactions by type retrieved successfully",
-      transactions
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Transactions by type retrieved successfully",
+    transactions
+  );
+};
 
-  async getTransactionSummary(req, res) {
-    const { limit = 10 } = req.query;
+export const getTransactionSummary = async (req, res) => {
+  const { limit = 10 } = req.query;
 
-    const summary = await transactionService.getTransactionSummary(
-      parseInt(limit)
-    );
+  const summary = await transactionService.getTransactionSummary(
+    parseInt(limit)
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Transaction summary retrieved successfully",
-      summary
-    );
-  }
+  return ResponseFactory.ok(
+    res,
+    "Transaction summary retrieved successfully",
+    summary
+  );
+};
 
-  async processPaymentSuccess(req, res) {
-    const { gatewayTransactionId } = req.params;
-    const gatewayResponse = req.body;
+export const processPaymentSuccess = async (req, res) => {
+  const { gatewayTransactionId } = req.params;
+  const gatewayResponse = req.body;
 
-    const transaction = await transactionService.processPaymentSuccess(
-      gatewayTransactionId,
-      gatewayResponse
-    );
+  const transaction = await transactionService.processPaymentSuccess(
+    gatewayTransactionId,
+    gatewayResponse
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Payment processed successfully",
-      transaction
-    );
-  }
+  return ResponseFactory.ok(res, "Payment processed successfully", transaction);
+};
 
-  async processPaymentFailure(req, res) {
-    const { gatewayTransactionId } = req.params;
-    const { failureReason } = req.body;
+export const processPaymentFailure = async (req, res) => {
+  const { gatewayTransactionId } = req.params;
+  const { failureReason } = req.body;
 
-    const transaction = await transactionService.processPaymentFailure(
-      gatewayTransactionId,
-      failureReason
-    );
+  const transaction = await transactionService.processPaymentFailure(
+    gatewayTransactionId,
+    failureReason
+  );
 
-    return ResponseFactory.ok(
-      res,
-      "Payment failure processed successfully",
-      transaction
-    );
-  }
-}
-
-export default new TransactionController();
+  return ResponseFactory.ok(
+    res,
+    "Payment failure processed successfully",
+    transaction
+  );
+};

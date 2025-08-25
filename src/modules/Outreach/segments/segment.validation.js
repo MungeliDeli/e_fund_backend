@@ -15,7 +15,7 @@
  */
 
 import Joi from "joi";
-import { ValidationError } from "../../../utils/appError.js";
+import { validate } from "../../../utils/validation.js";
 
 // Segment creation schema
 export const SegmentSchema = Joi.object({
@@ -44,48 +44,10 @@ export const segmentIdSchema = Joi.object({
 
 /**
  * Validates segment creation and update data
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
-export const validateSegment = (req, res, next) => {
-  const { error, value } = SegmentSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    const errorMessage = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    throw new ValidationError(errorMessage);
-  }
-
-  // Replace req.body with validated and sanitized data
-  req.body = value;
-  next();
-};
+export const validateSegment = validate(SegmentSchema);
 
 /**
  * Validates segment ID parameter
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
  */
-export const validateSegmentId = (req, res, next) => {
-  const { error, value } = segmentIdSchema.validate(req.params, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
-
-  if (error) {
-    const errorMessage = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    throw new ValidationError(errorMessage);
-  }
-
-  // Replace req.params with validated and sanitized data
-  req.params = value;
-  next();
-}; 
+export const validateSegmentId = validate(segmentIdSchema, "params");

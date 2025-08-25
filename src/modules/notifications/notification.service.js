@@ -19,52 +19,79 @@ class NotificationService {
     relatedEntityType = null,
     relatedEntityId = null,
   }) {
-    const row = await notificationRepository.createNotification({
-      userId,
-      type,
-      category,
-      priority,
-      title,
-      message,
-      data,
-      templateId,
-      relatedEntityType,
-      relatedEntityId,
-    });
+    try {
+      const row = await notificationRepository.createNotification({
+        userId,
+        type,
+        category,
+        priority,
+        title,
+        message,
+        data,
+        templateId,
+        relatedEntityType,
+        relatedEntityId,
+      });
 
-    if (type === "inApp") {
-      await notificationRepository.setDelivered(row.notificationId);
-      return { ...row, deliveryStatus: "delivered" };
-    }
-
-    if (type === "email") {
-      try {
-        // minimal: fetch recipient email from users table
-        const to = await notificationRepository.selectEmailByUserId(userId);
-        if (!to) throw new Error("Recipient email not found");
-
-        const subject = title;
-        const html = `<p>${message}</p>`;
-        await sendGenericEmail(to, subject, html);
-        console.log("Email sent", {
-          notificationId: row.notificationId,
-          to,
-          subject,
-          html,
-        });
-        await notificationRepository.setSent(row.notificationId);
-        return { ...row, deliveryStatus: "sent" };
-      } catch (err) {
-        logger.error("Failed to send notification email", {
-          notificationId: row.notificationId,
-          error: err.message,
-        });
-        await notificationRepository.setFailedWithError(
-          row.notificationId,
-          err.message
-        );
-        return { ...row, deliveryStatus: "failed" };
+      if (type === "inApp") {
+        try {
+          logger.info("Setting in-app notification as delivered", {
+            notificationId: row.notificationId,
+            userId: row.userId,
+            type: row.type,
+          });
+          await notificationRepository.setDelivered(row.notificationId);
+          logger.info("Successfully set in-app notification as delivered", {
+            notificationId: row.notificationId,
+          });
+          return { ...row, deliveryStatus: "delivered" };
+        } catch (err) {
+          logger.error("Failed to set in-app notification as delivered", {
+            notificationId: row.notificationId,
+            error: err.message,
+            stack: err.stack,
+          });
+          // Don't throw error for in-app notifications, just return with failed status
+          return { ...row, deliveryStatus: "failed", error: err.message };
+        }
       }
+
+      if (type === "email") {
+        try {
+          // minimal: fetch recipient email from users table
+          const to = await notificationRepository.selectEmailByUserId(userId);
+          if (!to) throw new Error("Recipient email not found");
+
+          const subject = title;
+          const html = `<p>${message}</p>`;
+          await sendGenericEmail(to, subject, html);
+          console.log("Email sent", {
+            notificationId: row.notificationId,
+            to,
+            subject,
+            html,
+          });
+          await notificationRepository.setSent(row.notificationId);
+          return { ...row, deliveryStatus: "sent" };
+        } catch (err) {
+          logger.error("Failed to send notification email", {
+            notificationId: row.notificationId,
+            error: err.message,
+          });
+          await notificationRepository.setFailedWithError(
+            row.notificationId,
+            err.message
+          );
+          return { ...row, deliveryStatus: "failed" };
+        }
+      }
+    } catch (err) {
+      logger.error("Failed to create notification", {
+        userId,
+        type,
+        error: err.message,
+      });
+      throw err;
     }
   }
 

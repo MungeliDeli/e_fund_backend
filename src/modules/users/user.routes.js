@@ -30,6 +30,11 @@ import {
   getMediaUrl,
   updateUserProfile,
 } from "./user.controller.js";
+import {
+  validateUpdateProfile,
+  validateUserId,
+  validateMediaId,
+} from "./user.validation.js";
 
 // Enforce 2MB file size limit per image
 const upload = multer({
@@ -41,13 +46,13 @@ const router = Router();
 // Apply request logger to all auth routes
 router.use(logRequestCount);
 // Public profile (anyone)
-router.get("/:userId/profile", catchAsync(getUserProfile));
+router.get("/:userId/profile", validateUserId, catchAsync(getUserProfile));
 // Private profile (owner only)
 router.get("/me", authenticate, catchAsync(getMyProfile));
 // Public: Get all organizers (with optional filters)
 router.get("/organizers", catchAsync(getOrganizers));
 // Get signed URL for media file
-router.get("/media/:mediaId/url", catchAsync(getMediaUrl));
+router.get("/media/:mediaId/url", validateMediaId, catchAsync(getMediaUrl));
 // Update profile/cover photo
 router.patch(
   "/me/profile-image",
@@ -60,6 +65,11 @@ router.patch(
 );
 
 // Update profile information
-router.put("/me/profile", authenticate, catchAsync(updateUserProfile));
+router.put(
+  "/me/profile",
+  authenticate,
+  validateUpdateProfile,
+  catchAsync(updateUserProfile)
+);
 
 export default router;

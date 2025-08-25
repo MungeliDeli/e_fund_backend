@@ -242,7 +242,7 @@ export const findCampaignById = async (campaignId) => {
     }
 
     const campaign = result.rows[0];
-    console.log("campaign", campaign);
+    
     // Parse JSON fields if they exist and are strings
     if (
       campaign.customPageSettings &&

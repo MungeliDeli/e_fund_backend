@@ -10,6 +10,7 @@
  */
 
 import Joi from "joi";
+import { validate } from "../../../utils/validation.js";
 
 // Base campaign schema (common fields)
 // Added .allow(null, '') to optional fields to support draft saving where fields can be empty.
@@ -242,31 +243,6 @@ export const campaignIdSchema = Joi.object({
     "string.guid": "Campaign ID must be a valid UUID.",
   }),
 });
-
-// Generic validation middleware
-const validate =
-  (schema, property = "body") =>
-  (req, res, next) => {
-    const { error, value } = schema.validate(req[property], {
-      abortEarly: false,
-      stripUnknown: true,
-    });
-
-    if (error) {
-      const errorMessage = error.details
-        .map((detail) => detail.message)
-        .join(", ");
-      // Using a consistent error response structure from the user's error handler
-      return res.status(400).json({
-        status: "error",
-        success: false,
-        message: `Validation failed: ${errorMessage}`,
-      });
-    }
-
-    req[property] = value; // Overwrite request property with validated value
-    next();
-  };
 
 // Export validation middlewares
 export const validateCreateCampaign = validate(createCampaignSchema);

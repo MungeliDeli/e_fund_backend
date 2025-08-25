@@ -1,5 +1,8 @@
 import Joi from "joi";
 import { validate } from "../../../utils/validation.js";
+import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
+import { AppError } from "../../../utils/appError.js";
+import logger from "../../../utils/logger.js";
 
 // Validation schemas
 const createDonationSchema = Joi.object({
@@ -24,10 +27,35 @@ const createDonationSchema = Joi.object({
   isAnonymous: Joi.boolean().default(false).messages({
     "boolean.base": "isAnonymous must be a boolean value",
   }),
-  messageText: Joi.string().max(1000).trim().optional().messages({
-    "string.max": "Message cannot exceed 1000 characters",
-    "string.trim": "Message cannot be empty or contain only whitespace",
-  }),
+  messageText: Joi.string()
+    .max(1000)
+    .trim()
+    .optional()
+    .custom((value, helpers) => {
+      if (value !== undefined && value !== null) {
+        // Check for potentially harmful content
+        const harmfulPatterns = [
+          /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+          /javascript:/gi,
+          /on\w+\s*=/gi,
+          /data:text\/html/gi,
+        ];
+
+        for (const pattern of harmfulPatterns) {
+          if (pattern.test(value)) {
+            return helpers.error("any.invalid", {
+              message: "Message contains potentially harmful content",
+            });
+          }
+        }
+      }
+      return value;
+    })
+    .messages({
+      "string.max": "Message cannot exceed 1000 characters",
+      "string.trim": "Message cannot be empty or contain only whitespace",
+      "any.invalid": "Message contains potentially harmful content",
+    }),
   currency: Joi.string()
     .length(3)
     .pattern(/^[A-Z]{3}$/)
@@ -37,17 +65,16 @@ const createDonationSchema = Joi.object({
       "string.pattern":
         "Currency must be a valid 3-letter currency code (e.g., USD, EUR)",
     }),
-  gatewayUsed: Joi.string().min(1).max(50).required().messages({
-    "string.empty": "Payment gateway is required",
-    "string.min": "Payment gateway name is too short",
-    "string.max": "Payment gateway name is too long",
-    "any.required": "Payment gateway is required",
+  paymentMethod: Joi.string().min(1).max(50).required().messages({
+    "string.empty": "Payment method is required",
+    "string.min": "Payment method name is too short",
+    "string.max": "Payment method name is too long",
+    "any.required": "Payment method is required",
   }),
-  gatewayTransactionId: Joi.string().min(1).max(100).required().messages({
-    "string.empty": "Gateway transaction ID is required",
+  gatewayTransactionId: Joi.string().min(1).max(100).optional().messages({
+    "string.empty": "Gateway transaction ID cannot be empty",
     "string.min": "Gateway transaction ID is too short",
     "string.max": "Gateway transaction ID is too long",
-    "any.required": "Gateway transaction ID is required",
   }),
   phoneNumber: Joi.string()
     .pattern(/^\+?[1-9]\d{1,14}$/)
@@ -101,3 +128,83 @@ export const validateUpdateDonationStatus = validate(
 export const validateUpdateReceiptSent = validate(updateReceiptSentSchema);
 export const validateDonationId = validate(donationIdSchema, "params");
 export const validateCampaignId = validate(campaignIdSchema, "params");
+
+/**
+ * Campaign state validation middleware
+ * Validates that a campaign is in a valid state to receive donations
+ */
+export const validateCampaignState = async (req, res, next) => {
+  try {
+    const { campaignId } = req.body;
+
+    if (!campaignId) {
+      return next(new AppError("Campaign ID is required", 400));
+    }
+
+    const campaign = await getCampaignById(campaignId);
+
+    if (!campaign) {
+      return next(new AppError("Campaign not found", 404));
+    }
+
+    // Check if campaign is active
+    if (campaign.status !== "active") {
+      const validStatuses = ["active"];
+      return next(
+        new AppError(
+          `Campaign is not accepting donations. Current status: ${
+            campaign.status
+          }. Only campaigns with status: ${validStatuses.join(
+            ", "
+          )} can receive donations.`,
+          422
+        )
+      );
+    }
+
+    // Check if campaign has ended
+    if (campaign.endDate && new Date(campaign.endDate) < new Date()) {
+      return next(
+        new AppError(
+          "Campaign has ended and is no longer accepting donations",
+          422
+        )
+      );
+    }
+
+    // Check if campaign has started
+    if (campaign.startDate && new Date(campaign.startDate) > new Date()) {
+      return next(
+        new AppError(
+          "Campaign has not started yet and is not accepting donations",
+          422
+        )
+      );
+    }
+
+    // Check if campaign is suspended (additional safety check)
+    if (campaign.status === "cancelled" || campaign.status === "rejected") {
+      return next(
+        new AppError(
+          `Campaign is ${campaign.status} and cannot receive donations`,
+          422
+        )
+      );
+    }
+
+    logger.info("Campaign state validation passed", {
+      campaignId,
+      status: campaign.status,
+      startDate: campaign.startDate,
+      endDate: campaign.endDate,
+    });
+
+    next();
+  } catch (error) {
+    logger.error("Failed to validate campaign state", {
+      error: error.message,
+      campaignId: req.body.campaignId,
+    });
+    next(new AppError("Failed to validate campaign state", 500));
+  }
+};

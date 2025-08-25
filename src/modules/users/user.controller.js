@@ -17,7 +17,6 @@
 
 import { getUserById } from "./user.service.js";
 import { ResponseFactory } from "../../utils/response.utils.js";
-import { updateProfileSchema } from "./user.validation.js";
 import { NotFoundError } from "../../utils/appError.js";
 import * as userService from "./user.service.js";
 import logger from "../../utils/logger.js";
@@ -83,28 +82,16 @@ export const updateProfileImage = async (req, res) => {
     updatedProfile
   );
 };
+
 /**
- * Update the profile and/or cover image for the authenticated user
+ * Update the profile information for the authenticated user
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @returns {Promise<void>}
  */
 export const updateUserProfile = async (req, res) => {
-  const { error, value } = updateProfileSchema.validate(req.body);
-  if (error) {
-    // Extract validation error messages
-    const errorMessages = error.details
-      .map((detail) => detail.message)
-      .join(", ");
-    // In a real app, you might use a custom ValidationError class
-    return ResponseFactory.badRequest(
-      res,
-      `Validation failed: ${errorMessages}`
-    );
-  }
-
   const userId = req.user.userId;
-  const updatedProfile = await userService.updateUserProfile(userId, value);
+  const updatedProfile = await userService.updateUserProfile(userId, req.body);
 
   ResponseFactory.ok(
     res,
