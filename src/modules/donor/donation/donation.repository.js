@@ -4,8 +4,8 @@ import logger from "../../../utils/logger.js";
 export const createDonation = async (donationData, client = null) => {
   const query = `INSERT INTO "donations" (
     "campaignId", "organizerId", "donorUserId", "amount", "isAnonymous", 
-    "status", "paymentTransactionId"
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
+    "status", "paymentTransactionId", "linkTokenId", "contactId"
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
 
   const params = [
     donationData.campaignId,
@@ -15,6 +15,8 @@ export const createDonation = async (donationData, client = null) => {
     donationData.isAnonymous || false,
     donationData.status || "pending",
     donationData.paymentTransactionId,
+    donationData.linkTokenId || null,
+    donationData.contactId || null,
   ];
 
   if (client) {
@@ -231,4 +233,86 @@ export const recalculateCampaignStatistics = async (
     const result = await db.query(query, params);
     return result.rows[0] || null;
   }
+};
+
+/**
+ * Get donations by link token for attribution tracking
+ * @param {string} linkTokenId - Link token ID
+ * @param {string} organizerId - Organizer ID (for authorization)
+ * @returns {Promise<Array>} Array of donations
+ */
+export const getDonationsByLinkToken = async (linkTokenId, organizerId) => {
+  const result = await db.query(
+    `SELECT d.*, c."title" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+            dm."messageText", dm."status" as "messageStatus",
+            lt."type" as "linkType", lt."utmSource", lt."utmMedium", lt."utmCampaign",
+            cont."name" as "contactName", cont."email" as "contactEmail"
+     FROM "donations" d
+     LEFT JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+     LEFT JOIN "transactions" t ON d."paymentTransactionId" = t."transactionId"
+     LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "linkTokens" lt ON d."linkTokenId" = lt."linkTokenId"
+     LEFT JOIN "contacts" cont ON d."contactId" = cont."contactId"
+     WHERE d."linkTokenId" = $1 AND c."organizerId" = $2
+     ORDER BY d."donationDate" DESC`,
+    [linkTokenId, organizerId]
+  );
+
+  return result.rows;
+};
+
+/**
+ * Get donations by contact for attribution tracking
+ * @param {string} contactId - Contact ID
+ * @param {string} organizerId - Organizer ID (for authorization)
+ * @returns {Promise<Array>} Array of donations
+ */
+export const getDonationsByContact = async (contactId, organizerId) => {
+  const result = await db.query(
+    `SELECT d.*, c."title" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+            dm."messageText", dm."status" as "messageStatus",
+            lt."type" as "linkType", lt."utmSource", lt."utmMedium", lt."utmCampaign",
+            cont."name" as "contactName", cont."email" as "contactEmail"
+     FROM "donations" d
+     LEFT JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+     LEFT JOIN "transactions" t ON d."paymentTransactionId" = t."transactionId"
+     LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "linkTokens" lt ON d."linkTokenId" = lt."linkTokenId"
+     LEFT JOIN "contacts" cont ON d."contactId" = cont."contactId"
+     JOIN "segments" s ON cont."segmentId" = s."segmentId"
+     WHERE d."contactId" = $1 AND s."organizerId" = $2
+     ORDER BY d."donationDate" DESC`,
+    [contactId, organizerId]
+  );
+
+  return result.rows;
+};
+
+/**
+ * Get donation attribution statistics by campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for authorization)
+ * @returns {Promise<Object>} Attribution statistics
+ */
+export const getDonationAttributionStats = async (campaignId, organizerId) => {
+  const result = await db.query(
+    `SELECT 
+      COUNT(*) as "totalDonations",
+      COUNT(d."linkTokenId") as "attributedDonations",
+      SUM(CASE WHEN d."status" = 'completed' THEN d."amount" ELSE 0 END) as "totalAmount",
+      SUM(CASE WHEN d."status" = 'completed' AND d."linkTokenId" IS NOT NULL THEN d."amount" ELSE 0 END) as "attributedAmount",
+      COUNT(DISTINCT d."contactId") as "uniqueContacts",
+      lt."type" as "linkType",
+      lt."utmSource",
+      COUNT(*) as "donationsPerSource"
+     FROM "donations" d
+     LEFT JOIN "linkTokens" lt ON d."linkTokenId" = lt."linkTokenId"
+     JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+     WHERE d."campaignId" = $1 AND c."organizerId" = $2
+     GROUP BY lt."type", lt."utmSource"
+     ORDER BY "donationsPerSource" DESC`,
+    [campaignId, organizerId]
+  );
+
+  return result.rows;
 };
