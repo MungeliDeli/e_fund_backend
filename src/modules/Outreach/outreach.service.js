@@ -40,6 +40,7 @@ import {
   getDonationAttributionStats,
   getDonationsByContact,
 } from "../donor/donation/donation.repository.js";
+import { getSocialMediaStats } from "./socialMedia/socialMedia.service.js";
 import {
   NotFoundError,
   ConflictError,
@@ -379,6 +380,9 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
       organizerId
     );
 
+    // Get social media statistics
+    const socialMediaStats = await getSocialMediaStats(campaignId, organizerId);
+
     // Calculate analytics
     const analytics = {
       campaignId,
@@ -391,6 +395,8 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
       totalSends: emailStats.sends || 0,
       totalDonations: donationStats.totalDonations || 0,
       totalDonationAmount: donationStats.totalAmount || 0,
+      totalSocialShares: socialMediaStats.totalSocialShares || 0,
+      totalSocialClicks: socialMediaStats.totalSocialClicks || 0,
       openRate:
         emailStats.sends > 0
           ? (((emailStats.opens || 0) / emailStats.sends) * 100).toFixed(2)
@@ -410,10 +416,19 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
               100
             ).toFixed(2)
           : 0,
+      socialMediaEngagement:
+        socialMediaStats.totalSocialShares > 0
+          ? (
+              (socialMediaStats.totalSocialClicks /
+                socialMediaStats.totalSocialShares) *
+              100
+            ).toFixed(2)
+          : 0,
       byType: {},
       byContact: {},
       emailEvents: emailStats,
       donationAttribution: donationStats,
+      socialMediaStats: socialMediaStats,
     };
 
     // Group by type

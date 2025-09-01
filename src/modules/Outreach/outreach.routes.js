@@ -33,6 +33,7 @@ import {
   validateContactId,
   validateLinkTokenFilters,
 } from "./outreach.validation.js";
+import { socialMediaRoutes } from "./socialMedia/index.js";
 
 const router = Router();
 
@@ -71,5 +72,8 @@ router.get(
   validateContactId,
   catchAsync(getContactAnalyticsController)
 );
+
+// Mount social media routes
+router.use("/social-media", socialMediaRoutes);
 
 export default router;
