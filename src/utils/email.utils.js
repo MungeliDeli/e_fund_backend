@@ -77,6 +77,7 @@
  */
 
 import nodemailer from "nodemailer";
+import logger from "./logger.js";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -140,4 +141,40 @@ export async function sendSetupEmail(to, token) {
  */
 export async function sendGenericEmail(to, subject, html) {
   return sendMail({ to, subject, html });
+}
+
+/**
+ * Sends an outreach email with tracking pixel and personalized content.
+ * Used for campaign invitations, updates, and thank-you messages.
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} html - Email HTML content (should include tracking pixel)
+ * @param {Object} options - Additional options
+ * @param {string} options.linkTokenId - Link token ID for tracking
+ * @param {string} options.contactId - Contact ID for attribution
+ * @returns {Promise<Object>} Email sending result
+ */
+export async function sendOutreachEmail(to, subject, html, options = {}) {
+  try {
+    const result = await sendMail({ to, subject, html });
+
+    logger.info("Outreach email sent successfully", {
+      to,
+      subject,
+      linkTokenId: options.linkTokenId,
+      contactId: options.contactId,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error("Failed to send outreach email", {
+      error: error.message,
+      to,
+      subject,
+      linkTokenId: options.linkTokenId,
+      contactId: options.contactId,
+    });
+
+    throw error;
+  }
 }
