@@ -142,8 +142,40 @@ const linkTokenIdSchema = Joi.object({
   }),
 });
 
+// Contact ID parameter schema
+const contactIdSchema = Joi.object({
+  contactId: Joi.string().uuid().required().messages({
+    "string.guid": "Contact ID must be a valid UUID",
+    "any.required": "Contact ID is required",
+  }),
+});
+
+// Link token filters query schema
+const linkTokenFiltersSchema = Joi.object({
+  type: Joi.string()
+    .valid("invite", "update", "thanks", "share")
+    .optional()
+    .messages({
+      "any.only": "Type must be one of: invite, update, thanks, share",
+    }),
+  contactId: Joi.string().uuid().optional().messages({
+    "string.guid": "Contact ID must be a valid UUID",
+  }),
+  segmentId: Joi.string().uuid().optional().messages({
+    "string.guid": "Segment ID must be a valid UUID",
+  }),
+  hasClicks: Joi.boolean().optional().messages({
+    "boolean.base": "hasClicks must be a boolean",
+  }),
+});
+
 // Validation middleware exports
 export const validateCreateLinkToken = validate(createLinkTokenSchema);
 export const validateSendEmail = validate(sendEmailSchema);
 export const validateCampaignId = validate(campaignIdSchema, "params");
 export const validateLinkTokenId = validate(linkTokenIdSchema, "params");
+export const validateContactId = validate(contactIdSchema, "params");
+export const validateLinkTokenFilters = validate(
+  linkTokenFiltersSchema,
+  "query"
+);

@@ -18,9 +18,11 @@ import {
   createOutreachLinkToken,
   sendOutreachEmailService,
   getOutreachAnalytics,
+  getContactAnalytics,
+  getOutreachLinkTokens,
   deleteOutreachLinkToken,
 } from "./outreach.service.js";
-import { successResponse } from "../../utils/response.utils.js";
+import { sendSuccessResponse } from "../../utils/response.utils.js";
 import logger from "../../utils/logger.js";
 
 /**
@@ -39,7 +41,7 @@ export const createLinkToken = async (req, res) => {
     organizerId,
   });
 
-  return successResponse(
+  return sendSuccessResponse(
     res,
     201,
     "Link token created successfully",
@@ -66,7 +68,68 @@ export const sendEmail = async (req, res) => {
     organizerId,
   });
 
-  return successResponse(res, 200, "Outreach email sent successfully", result);
+  return sendSuccessResponse(
+    res,
+    200,
+    "Outreach email sent successfully",
+    result
+  );
+};
+
+/**
+ * Get outreach link tokens for a campaign
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getLinkTokens = async (req, res) => {
+  const { campaignId } = req.params;
+  const organizerId = req.user.userId;
+  const filters = req.query;
+
+  const linkTokens = await getOutreachLinkTokens(
+    campaignId,
+    organizerId,
+    filters
+  );
+
+  logger.info("Outreach link tokens retrieved via controller", {
+    campaignId,
+    organizerId,
+    totalTokens: linkTokens.length,
+    filters,
+  });
+
+  return sendSuccessResponse(
+    res,
+    200,
+    "Outreach link tokens retrieved successfully",
+    linkTokens
+  );
+};
+
+/**
+ * Get contact analytics for outreach
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getContactAnalyticsController = async (req, res) => {
+  const { contactId } = req.params;
+  const organizerId = req.user.userId;
+
+  const analytics = await getContactAnalytics(contactId, organizerId);
+
+  logger.info("Contact analytics retrieved via controller", {
+    contactId,
+    organizerId,
+    totalDonations: analytics.totalDonations,
+  });
+
+  return sendSuccessResponse(
+    res,
+    200,
+    "Contact analytics retrieved successfully",
+    analytics
+  );
 };
 
 /**
@@ -86,7 +149,7 @@ export const getAnalytics = async (req, res) => {
     totalLinkTokens: analytics.totalLinkTokens,
   });
 
-  return successResponse(
+  return sendSuccessResponse(
     res,
     200,
     "Outreach analytics retrieved successfully",
@@ -110,5 +173,5 @@ export const deleteLinkToken = async (req, res) => {
     organizerId,
   });
 
-  return successResponse(res, 200, "Link token deleted successfully");
+  return sendSuccessResponse(res, 200, "Link token deleted successfully");
 };

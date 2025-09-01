@@ -20,6 +20,8 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 import {
   createLinkToken,
   sendEmail,
+  getLinkTokens,
+  getContactAnalyticsController,
   getAnalytics,
   deleteLinkToken,
 } from "./outreach.controller.js";
@@ -28,6 +30,8 @@ import {
   validateSendEmail,
   validateCampaignId,
   validateLinkTokenId,
+  validateContactId,
+  validateLinkTokenFilters,
 } from "./outreach.validation.js";
 
 const router = Router();
@@ -40,6 +44,12 @@ router.post(
   "/link-tokens",
   validateCreateLinkToken,
   catchAsync(createLinkToken)
+);
+router.get(
+  "/campaigns/:campaignId/link-tokens",
+  validateCampaignId,
+  validateLinkTokenFilters,
+  catchAsync(getLinkTokens)
 );
 router.delete(
   "/link-tokens/:linkTokenId",
@@ -55,6 +65,11 @@ router.get(
   "/analytics/:campaignId",
   validateCampaignId,
   catchAsync(getAnalytics)
+);
+router.get(
+  "/contacts/:contactId/analytics",
+  validateContactId,
+  catchAsync(getContactAnalyticsController)
 );
 
 export default router;

@@ -21,7 +21,10 @@ import {
   getLinkTokensByCampaign,
   deleteLinkToken,
 } from "./linkTokens/linkToken.repository.js";
-import { recordEmailEvent } from "./emailEvents/emailEvent.repository.js";
+import {
+  recordEmailEvent,
+  getEmailEventStatsByCampaign,
+} from "./emailEvents/emailEvent.repository.js";
 import { sendOutreachEmail } from "../../utils/email.utils.js";
 import {
   createInvitationTemplate,
@@ -31,8 +34,12 @@ import {
 } from "../../utils/emailTemplates.js";
 import { getContactById } from "./contacts/contact.repository.js";
 import { getSegmentById } from "./segments/segment.repository.js";
-import { getCampaignById } from "../campaign/campaigns/campaign.repository.js";
+import { findCampaignById } from "../campaign/campaigns/campaign.repository.js";
 import { getUserById } from "../users/user.service.js";
+import {
+  getDonationAttributionStats,
+  getDonationsByContact,
+} from "../donor/donation/donation.repository.js";
 import {
   NotFoundError,
   ConflictError,
@@ -61,8 +68,8 @@ export const createOutreachLinkToken = async (linkTokenData, organizerId) => {
     }
 
     // Verify campaign exists and belongs to organizer
-    const campaign = await getCampaignById(campaignId, organizerId);
-    if (!campaign) {
+    const campaign = await findCampaignById(campaignId);
+    if (!campaign || campaign.organizerId !== organizerId) {
       throw new NotFoundError("Campaign not found");
     }
 
@@ -171,8 +178,8 @@ export const sendOutreachEmailService = async (emailData, organizerId) => {
     }
 
     // Verify campaign exists and belongs to organizer
-    const campaign = await getCampaignById(campaignId, organizerId);
-    if (!campaign) {
+    const campaign = await findCampaignById(campaignId);
+    if (!campaign || campaign.organizerId !== organizerId) {
       throw new NotFoundError("Campaign not found");
     }
 
@@ -355,13 +362,22 @@ export const sendOutreachEmailService = async (emailData, organizerId) => {
 export const getOutreachAnalytics = async (campaignId, organizerId) => {
   try {
     // Verify campaign exists and belongs to organizer
-    const campaign = await getCampaignById(campaignId, organizerId);
-    if (!campaign) {
+    const campaign = await findCampaignById(campaignId);
+    if (!campaign || campaign.organizerId !== organizerId) {
       throw new NotFoundError("Campaign not found");
     }
 
     // Get link tokens for campaign
     const linkTokens = await getLinkTokensByCampaign(campaignId, organizerId);
+
+    // Get email event statistics
+    const emailStats = await getEmailEventStatsByCampaign(campaignId);
+
+    // Get donation attribution statistics
+    const donationStats = await getDonationAttributionStats(
+      campaignId,
+      organizerId
+    );
 
     // Calculate analytics
     const analytics = {
@@ -371,10 +387,33 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
         (sum, token) => sum + token.clicksCount,
         0
       ),
-      totalOpens: 0, // Would need to query emailEvents table
-      totalSends: 0, // Would need to query emailEvents table
+      totalOpens: emailStats.opens || 0,
+      totalSends: emailStats.sends || 0,
+      totalDonations: donationStats.totalDonations || 0,
+      totalDonationAmount: donationStats.totalAmount || 0,
+      openRate:
+        emailStats.sends > 0
+          ? (((emailStats.opens || 0) / emailStats.sends) * 100).toFixed(2)
+          : 0,
+      clickRate:
+        emailStats.sends > 0
+          ? (
+              (linkTokens.reduce((sum, token) => sum + token.clicksCount, 0) /
+                emailStats.sends) *
+              100
+            ).toFixed(2)
+          : 0,
+      conversionRate:
+        emailStats.sends > 0
+          ? (
+              ((donationStats.totalDonations || 0) / emailStats.sends) *
+              100
+            ).toFixed(2)
+          : 0,
       byType: {},
       byContact: {},
+      emailEvents: emailStats,
+      donationAttribution: donationStats,
     };
 
     // Group by type
@@ -426,6 +465,140 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
     }
 
     throw new Error("Failed to get outreach analytics");
+  }
+};
+
+/**
+ * Get contact-level analytics for outreach
+ * @param {string} contactId - Contact ID
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<Object>} Contact analytics data
+ */
+export const getContactAnalytics = async (contactId, organizerId) => {
+  try {
+    // Verify contact exists and belongs to organizer
+    const contact = await getContactById(contactId, organizerId);
+    if (!contact) {
+      throw new NotFoundError("Contact not found");
+    }
+
+    // Get donations by contact
+    const donations = await getDonationsByContact(contactId, organizerId);
+
+    // Calculate contact analytics
+    const analytics = {
+      contactId,
+      contactName: contact.name,
+      contactEmail: contact.email,
+      totalDonations: donations.length,
+      totalDonationAmount: donations.reduce(
+        (sum, donation) => sum + parseFloat(donation.amount),
+        0
+      ),
+      averageDonationAmount:
+        donations.length > 0
+          ? (
+              donations.reduce(
+                (sum, donation) => sum + parseFloat(donation.amount),
+                0
+              ) / donations.length
+            ).toFixed(2)
+          : 0,
+      lastDonationDate: donations.length > 0 ? donations[0].createdAt : null,
+      donations: donations,
+    };
+
+    logger.info("Contact analytics retrieved successfully", {
+      contactId,
+      organizerId,
+      totalDonations: analytics.totalDonations,
+    });
+
+    return analytics;
+  } catch (error) {
+    logger.error("Failed to get contact analytics", {
+      error: error.message,
+      contactId,
+      organizerId,
+    });
+
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+
+    throw new Error("Failed to get contact analytics");
+  }
+};
+
+/**
+ * Get link tokens for a campaign with optional filtering
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @param {Object} filters - Optional filters
+ * @returns {Promise<Array>} Array of link tokens
+ */
+export const getOutreachLinkTokens = async (
+  campaignId,
+  organizerId,
+  filters = {}
+) => {
+  try {
+    // Verify campaign exists and belongs to organizer
+    const campaign = await findCampaignById(campaignId);
+    if (!campaign || campaign.organizerId !== organizerId) {
+      throw new NotFoundError("Campaign not found");
+    }
+
+    // Get link tokens for campaign
+    const linkTokens = await getLinkTokensByCampaign(campaignId, organizerId);
+
+    // Apply filters if provided
+    let filteredTokens = linkTokens;
+
+    if (filters.type) {
+      filteredTokens = filteredTokens.filter(
+        (token) => token.type === filters.type
+      );
+    }
+
+    if (filters.contactId) {
+      filteredTokens = filteredTokens.filter(
+        (token) => token.contactId === filters.contactId
+      );
+    }
+
+    if (filters.segmentId) {
+      filteredTokens = filteredTokens.filter(
+        (token) => token.segmentId === filters.segmentId
+      );
+    }
+
+    if (filters.hasClicks) {
+      filteredTokens = filteredTokens.filter((token) => token.clicksCount > 0);
+    }
+
+    logger.info("Outreach link tokens retrieved successfully", {
+      campaignId,
+      organizerId,
+      totalTokens: linkTokens.length,
+      filteredTokens: filteredTokens.length,
+      filters,
+    });
+
+    return filteredTokens;
+  } catch (error) {
+    logger.error("Failed to get outreach link tokens", {
+      error: error.message,
+      campaignId,
+      organizerId,
+      filters,
+    });
+
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+
+    throw new Error("Failed to get outreach link tokens");
   }
 };
 
