@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNZA Fundraiser - Empowering Campus Causes</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Customizing Tailwind colors to fit the green theme and avoid too much white */
+            --color-primary-green-dark: #166534; /* Deeper green for main background */
+            --color-primary-green-light: #22c55e; /* Vibrant green for accents/buttons */
+            --color-text-light: #e0f2f7; /* Off-white for text on dark backgrounds */
+            --color-card-bg: #29313a; /* Darker grey for card backgrounds */
+        }
+
+        /* Applying custom colors directly if Tailwind classes are not sufficient */
+        .bg-primary-green-dark { background-color: var(--color-primary-green-dark); }
+        .bg-card-bg { background-color: var(--color-card-bg); }
+        .text-text-light { color: var(--color-text-light); }
+
+        /* Custom animation for subtle header glow */
+        @keyframes header-glow {
+            0% { box-shadow: 0 0 0px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); }
+        }
+        .header-scrolled {
+            animation: header-glow 0.3s forwards;
+            background-color: var(--color-primary-green-dark); /* Ensure it's dark when scrolled */
+        }
+        
+        /* Subtle diagonal pattern for unique background */
+        .pattern-background {
+            background-image: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 25%, transparent 25%),
+                              linear-gradient(225deg, rgba(34, 197, 94, 0.1) 25%, transparent 25%),
+                              linear-gradient(45deg, rgba(34, 197, 94, 0.1) 25%, transparent 25%),
+                              linear-gradient(315deg, rgba(34, 197, 94, 0.1) 25%, var(--color-card-bg) 25%);
+            background-size: 50px 50px;
+            background-position: 0 0, 10px 0, 10px -10px, -10px 10px;
+        }
+
+        /* Ensuring images are responsive and rounded */
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.75rem; /* rounded-xl */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 text-text-light">
+
+    <!-- Header Section -->
+    <header id="main-header" class="fixed top-0 left-0 w-full z-50 transition-all duration-300 py-4">
+        <nav class="container mx-auto px-6 flex justify-between items-center">
+            <!-- Logo -->
+            <a href="#" class="flex items-center space-x-2">
+                <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253M12 6.253C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253m-13 13C5.477 19.168 6.253 20.754 7.5 20.754c1.247 0 2.023-.776 2.75-.776m-2.75-.776h-2.25M15 12h-6m6 0c1.247 0 2.023-.776 2.75-.776m-2.75-.776v-.75m-6 0v-.75m-6 0c.727 0 1.503-.776 2.75-.776M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253M12 6.253C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253m-13 13C5.477 19.168 6.253 20.754 7.5 20.754c1.247 0 2.023-.776 2.75-.776m-2.75-.776h-2.25M15 12h-6m6 0c1.247 0 2.023-.776 2.75-.776m-2.75-.776v-.75m-6 0v-.75"></path>
+                </svg>
+                <span class="text-2xl font-bold text-text-light">UNZA Fundraiser</span>
+            </a>
+
+            <!-- Navigation Links -->
+            <div class="hidden md:flex space-x-8">
+                <a href="#how-it-works" class="text-text-light hover:text-green-400 transition-colors">How It Works</a>
+                <a href="#campaigns" class="text-text-light hover:text-green-400 transition-colors">Campaigns</a>
+                <a href="#about" class="text-text-light hover:text-green-400 transition-colors">About Us</a>
+                <a href="#contact" class="text-text-light hover:text-green-400 transition-colors">Contact</a>
+            </div>
+
+            <!-- Auth Buttons -->
+            <div class="flex items-center space-x-4">
+                <a href="#" class="text-text-light hover:text-green-400 transition-colors">Login</a>
+                <a href="#" class="px-5 py-2 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 transition-all transform hover:scale-105">Register</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="relative bg-gradient-to-br from-green-900 to-gray-800 text-text-light py-24 md:py-32 overflow-hidden">
+            <!-- Subtle background pattern for creativity -->
+            <div class="absolute inset-0 pattern-background opacity-20"></div>
+
+            <div class="container mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
+                <div class="md:w-1/2 text-center md:text-left">
+                    <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 text-green-200">
+                        Empower <span class="text-green-400">Campus Causes</span> at UNZA
+                    </h1>
+                    <p class="text-lg md:text-xl mb-8 text-green-100 opacity-90">
+                        Streamlining fundraising for student projects, events, emergencies, and more. Secure, transparent, and built for the UNZA community.
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center md:justify-start gap-4">
+                        <a href="#" class="px-8 py-4 bg-green-500 text-white text-lg font-bold rounded-full shadow-xl hover:bg-green-600 transition-all transform hover:scale-105">
+                            Start a Campaign
+                        </a>
+                        <a href="#" class="px-8 py-4 border border-green-400 text-green-100 text-lg font-bold rounded-full hover:bg-green-800 hover:border-green-500 transition-all transform hover:scale-105">
+                            Explore Campaigns
+                        </a>
+                    </div>
+                </div>
+                <div class="md:w-1/2 flex justify-center md:justify-end">
+                    <!-- Placeholder image for visual appeal -->
+                    <img src="https://placehold.co/600x400/166534/E0F2F7?text=UNZA+Community" alt="UNZA Community working together" class="rounded-xl shadow-2xl transition-all duration-300 hover:scale-105 border-4 border-green-600">
+                </div>
+            </div>
+        </section>
+
+        <!-- Problem/Solution Section -->
+        <section id="how-it-works" class="bg-card-bg py-20 px-6">
+            <div class="container mx-auto">
+                <h2 class="text-4xl font-bold text-center mb-12 text-green-300">Why UNZA Fundraiser?</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                    <div class="space-y-6 text-lg">
+                        <p class="mb-4 text-green-100">
+                            Traditional fundraising at the University of Zambia has often been fragmented, relying on informal methods like WhatsApp groups and manual tracking. This leads to a lack of transparency, difficulty in tracking donations, and a general erosion of trust.
+                        </p>
+                        <p class="mb-4 text-green-100">
+                            The Online Campus Fundraiser System is here to change that. We provide a <span class="font-semibold text-green-400">centralized, secure, and transparent digital platform</span>.
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-green-200">
+                            <li>Secure donations & ticketing</li>
+                            <li>Real-time progress tracking</li>
+                            <li>Enhanced participation & trust</li>
+                            <li>Improved financial accountability</li>
+                        </ul>
+                    </div>
+                    <div class="flex justify-center">
+                        <!-- Placeholder for an illustrative image or SVG -->
+                        <img src="https://placehold.co/500x350/22C55E/166534?text=Streamlined+Process" alt="Streamlined fundraising process" class="rounded-xl shadow-lg border-2 border-green-500">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="bg-gray-800 py-20 px-6">
+            <div class="container mx-auto">
+                <h2 class="text-4xl font-bold text-center mb-12 text-green-300">How It Works</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <!-- Step 1 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-8 flex flex-col items-center text-center transition-transform transform hover:scale-105 border-b-4 border-green-600">
+                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-6 text-white text-3xl font-bold">1</div>
+                        <h3 class="text-2xl font-semibold mb-4 text-green-200">Register & Create</h3>
+                        <p class="text-green-100">Sign up as an individual user. Organization profiles are added by admins. Easily create and submit your campaign for verification.</p>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-8 flex flex-col items-center text-center transition-transform transform hover:scale-105 border-b-4 border-green-600">
+                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-6 text-white text-3xl font-bold">2</div>
+                        <h3 class="text-2xl font-semibold mb-4 text-green-200">Donate & Participate</h3>
+                        <p class="text-green-100">Browse verified campaigns, make secure donations, or purchase tickets for campus events with ease.</p>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-8 flex flex-col items-center text-center transition-transform transform hover:scale-105 border-b-4 border-green-600">
+                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-6 text-white text-3xl font-bold">3</div>
+                        <h3 class="text-2xl font-semibold mb-4 text-green-200">Track & Grow</h3>
+                        <p class="text-green-100">Monitor your campaign's progress in real-time, manage contributions, and receive instant transaction notifications.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Campaign Categories Section -->
+        <section id="campaigns" class="bg-primary-green-dark py-20 px-6">
+            <div class="container mx-auto">
+                <h2 class="text-4xl font-bold text-center mb-12 text-green-200">Explore Campus Campaigns</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Campaign Type Card 1 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-6 text-center group transition-transform transform hover:scale-105">
+                        <div class="text-green-400 mb-4 group-hover:text-green-300 transition-colors">
+                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 21h.01M19 10V5a2 2 0 00-2-2H7a2 2 0 00-2 2v5c0 1.1.9 2 2 2h2.5L7 20h9l-2.5-8H19a2 2 0 002-2z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2 text-green-200">Student Projects</h3>
+                        <p class="text-green-100">Support innovative student initiatives, research, and academic endeavors.</p>
+                    </div>
+                    <!-- Campaign Type Card 2 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-6 text-center group transition-transform transform hover:scale-105">
+                        <div class="text-green-400 mb-4 group-hover:text-green-300 transition-colors">
+                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h2a2 2 0 002-2V7a2 2 0 00-2-2h-3V3m-2 14l-4-4m0 0l-4 4m4-4v6m-4-2H5a2 2 0 00-2 2v2a2 2 0 002 2h14a2 2 0 002-2v-2a2 2 0 00-2-2h-2m-4 2v6h-4V5a2 2 0 012-2h2.586a1 1 0 01.707.293l4.414 4.414A1 1 0 0115.414 10H14a2 2 0 00-2 2v4a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2 text-green-200">Church & Fellowship</h3>
+                        <p class="text-green-100">Contribute to spiritual development and community building events.</p>
+                    </div>
+                    <!-- Campaign Type Card 3 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-6 text-center group transition-transform transform hover:scale-105">
+                        <div class="text-green-400 mb-4 group-hover:text-green-300 transition-colors">
+                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2 text-green-200">Emergency Support</h3>
+                        <p class="text-green-100">Provide urgent aid for critical situations like funerals or unforeseen crises.</p>
+                    </div>
+                    <!-- Campaign Type Card 4 -->
+                    <div class="bg-card-bg rounded-xl shadow-xl p-6 text-center group transition-transform transform hover:scale-105">
+                        <div class="text-green-400 mb-4 group-hover:text-green-300 transition-colors">
+                            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2 text-green-200">Ticketed Events</h3>
+                        <p class="text-green-100">Purchase tickets for social gatherings, concerts, and campus activities.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action Section -->
+        <section class="bg-gray-900 py-20 px-6">
+            <div class="container mx-auto text-center">
+                <h2 class="text-4xl font-bold mb-6 text-green-300">Ready to Make an Impact?</h2>
+                <p class="text-xl mb-10 text-green-100">Join the UNZA Fundraiser community today and help bring ideas to life!</p>
+                <div class="flex flex-col sm:flex-row justify-center gap-6">
+                    <a href="#" class="px-10 py-4 bg-green-500 text-white text-xl font-bold rounded-full shadow-lg hover:bg-green-600 transition-all transform hover:scale-110">
+                        Register Now
+                    </a>
+                    <a href="#" class="px-10 py-4 border border-green-400 text-green-100 text-xl font-bold rounded-full hover:bg-green-800 hover:border-green-500 transition-all transform hover:scale-110">
+                        Contact Support
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer Section -->
+    <footer id="contact" class="bg-gray-800 text-text-light py-10 px-6">
+        <div class="container mx-auto text-center">
+            <p class="text-lg mb-4 text-green-200">&copy; 2025 UNZA Fundraiser System. All rights reserved.</p>
+            <div class="flex justify-center space-x-6">
+                <a href="#" class="text-green-400 hover:text-green-300 transition-colors">Privacy Policy</a>
+                <a href="#" class="text-green-400 hover:text-green-300 transition-colors">Terms of Service</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // JavaScript for subtle header background change on scroll
+        window.addEventListener('scroll', () => {
+            const header = document.getElementById('main-header');
+            if (window.scrollY > 50) {
+                header.classList.add('bg-primary-green-dark', 'shadow-xl', 'header-scrolled');
+            } else {
+                header.classList.remove('bg-primary-green-dark', 'shadow-xl', 'header-scrolled');
+            }
+        });
+    </script>
+</body>
+</html>
