@@ -101,6 +101,38 @@ export const getDonationsByUser = async (req, res) => {
   );
 };
 
+export const getDonationsByOrganizer = async (req, res) => {
+  const { organizerId } = req.params;
+  const { limit = 50, offset = 0 } = req.query;
+
+  const donations = await donationService.getDonationsByOrganizer(
+    organizerId,
+    parseInt(limit),
+    parseInt(offset)
+  );
+
+  return ResponseFactory.ok(
+    res,
+    "Organizer donations retrieved successfully",
+    donations
+  );
+};
+
+export const getAllDonations = async (req, res) => {
+  const { limit = 50, offset = 0 } = req.query;
+
+  const donations = await donationService.getAllDonations(
+    parseInt(limit),
+    parseInt(offset)
+  );
+
+  return ResponseFactory.ok(
+    res,
+    "All donations retrieved successfully",
+    donations
+  );
+};
+
 export const updateCampaignStatistics = async (req, res) => {
   const { campaignId } = req.params;
   const { amount } = req.body;

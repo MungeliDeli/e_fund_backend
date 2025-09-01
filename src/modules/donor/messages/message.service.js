@@ -1,6 +1,7 @@
 import * as messageRepository from "./message.repository.js";
 import { AppError } from "../../../utils/appError.js";
 import logger from "../../../utils/logger.js";
+import { isCampaignOwner } from "../../campaign/campaigns/campaign.repository.js";
 
 export const getMessagesByCampaign = async (
   campaignId,
@@ -181,4 +182,254 @@ export const createMessage = async (messageData, client = null) => {
     }
     throw new AppError("Failed to create donation message", 500);
   }
+};
+
+/**
+ * Get messages by campaign for organizers with permission verification
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @param {Object} options - Query options
+ * @returns {Promise<Array>} Messages for the campaign
+ */
+export const getMessagesByCampaignForOrganizer = async (
+  campaignId,
+  organizerId,
+  options = {}
+) => {
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only view messages for your own campaigns.",
+      403
+    );
+  }
+
+  const { status, limit = 50, offset = 0 } = options;
+  const messages = await messageRepository.getMessagesByCampaign(
+    campaignId,
+    status,
+    limit,
+    offset
+  );
+
+  return messages;
+};
+
+/**
+ * Get pending messages count for organizers with permission verification
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @returns {Promise<number>} Count of pending messages
+ */
+export const getPendingMessagesCountForOrganizer = async (
+  campaignId,
+  organizerId
+) => {
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only view messages for your own campaigns.",
+      403
+    );
+  }
+
+  const count = await messageRepository.getPendingMessagesCount(campaignId);
+  return count;
+};
+
+/**
+ * Moderate message for organizers with permission verification
+ * @param {string} messageId - Message ID
+ * @param {string} status - New status (approved/rejected)
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @param {boolean} isFeatured - Whether to feature the message
+ * @returns {Promise<Object>} Updated message
+ */
+export const moderateMessageForOrganizer = async (
+  messageId,
+  status,
+  organizerId,
+  isFeatured = false
+) => {
+  // Get the message to verify campaign ownership
+  const existingMessage = await messageRepository.getMessageById(messageId);
+  if (!existingMessage) {
+    throw new AppError("Message not found", 404);
+  }
+
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(
+    existingMessage.campaignId,
+    organizerId
+  );
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only moderate messages for your own campaigns.",
+      403
+    );
+  }
+
+  // Validate status transition
+  if (
+    existingMessage.status === "approved" ||
+    existingMessage.status === "rejected"
+  ) {
+    throw new AppError("Message has already been moderated", 400);
+  }
+
+  // Only approved messages can be featured
+  if (isFeatured && status !== "approved") {
+    throw new AppError("Only approved messages can be featured", 400);
+  }
+
+  const updatedMessage = await messageRepository.updateMessageStatus(
+    messageId,
+    status,
+    organizerId,
+    isFeatured
+  );
+
+  logger.info(`Message moderated by organizer`, {
+    messageId,
+    campaignId: existingMessage.campaignId,
+    status,
+    moderatedBy: organizerId,
+    isFeatured,
+  });
+
+  return updatedMessage;
+};
+
+/**
+ * Bulk approve all pending messages for a campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @returns {Promise<Object>} Result of bulk operation
+ */
+export const bulkApproveAllMessages = async (campaignId, organizerId) => {
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only moderate messages for your own campaigns.",
+      403
+    );
+  }
+
+  const result = await messageRepository.bulkUpdateMessageStatus(
+    campaignId,
+    "approved",
+    organizerId,
+    false // isFeatured remains false for bulk approve
+  );
+
+  logger.info(`Bulk approved all pending messages`, {
+    campaignId,
+    moderatedBy: organizerId,
+    updatedCount: result.updatedCount,
+  });
+
+  return result;
+};
+
+/**
+ * Bulk reject all pending messages for a campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @returns {Promise<Object>} Result of bulk operation
+ */
+export const bulkRejectAllMessages = async (campaignId, organizerId) => {
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only moderate messages for your own campaigns.",
+      403
+    );
+  }
+
+  const result = await messageRepository.bulkUpdateMessageStatus(
+    campaignId,
+    "rejected",
+    organizerId,
+    false // isFeatured remains false for bulk reject
+  );
+
+  logger.info(`Bulk rejected all pending messages`, {
+    campaignId,
+    moderatedBy: organizerId,
+    updatedCount: result.updatedCount,
+  });
+
+  return result;
+};
+
+/**
+ * Toggle featured status for organizers with permission verification
+ * @param {string} messageId - Message ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @returns {Promise<Object>} Updated message
+ */
+export const toggleFeaturedStatusForOrganizer = async (
+  messageId,
+  organizerId
+) => {
+  const message = await messageRepository.getMessageById(messageId);
+
+  if (!message) {
+    throw new AppError("Message not found", 404);
+  }
+
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(message.campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only manage messages for your own campaigns.",
+      403
+    );
+  }
+
+  if (message.status !== "approved") {
+    throw new AppError("Only approved messages can be featured", 400);
+  }
+
+  const newFeaturedStatus = !message.isFeatured;
+
+  const updatedMessage = await messageRepository.updateMessageStatus(
+    messageId,
+    message.status,
+    organizerId,
+    newFeaturedStatus
+  );
+
+  logger.info(`Message featured status toggled by organizer`, {
+    messageId,
+    campaignId: message.campaignId,
+    isFeatured: newFeaturedStatus,
+    moderatedBy: organizerId,
+  });
+
+  return updatedMessage;
+};
+
+/**
+ * Get campaign message statistics for organizers
+ * @param {string} campaignId - Campaign ID
+ * @param {string} organizerId - Organizer ID (for permission check)
+ * @returns {Promise<Object>} Message statistics
+ */
+export const getCampaignMessageStats = async (campaignId, organizerId) => {
+  // Verify organizer owns the campaign
+  const isOwner = await isCampaignOwner(campaignId, organizerId);
+  if (!isOwner) {
+    throw new AppError(
+      "Access denied. You can only view statistics for your own campaigns.",
+      403
+    );
+  }
+
+  const stats = await messageRepository.getCampaignMessageStats(campaignId);
+  return stats;
 };

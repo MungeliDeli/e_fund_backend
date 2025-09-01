@@ -3,12 +3,13 @@ import logger from "../../../utils/logger.js";
 
 export const createDonation = async (donationData, client = null) => {
   const query = `INSERT INTO "donations" (
-    "campaignId", "donorUserId", "amount", "isAnonymous", 
+    "campaignId", "organizerId", "donorUserId", "amount", "isAnonymous", 
     "status", "paymentTransactionId"
-  ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`;
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
 
   const params = [
     donationData.campaignId,
+    donationData.organizerId,
     donationData.donorUserId || null,
     donationData.amount,
     donationData.isAnonymous || false,
@@ -44,16 +45,50 @@ export const getDonationsByCampaign = async (
   limit = 50,
   offset = 0
 ) => {
+  console.log("campaignId", campaignId);
   const result = await db.query(
-    `SELECT d.*, t."gatewayTransactionId", t."gatewayUsed", t."currency",
-            dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+    `SELECT d.*, dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
      FROM "donations" d
-     LEFT JOIN "transactions" t ON d."paymentTransactionId" = t."transactionId"
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
-     WHERE d."campaignId" = $1 AND d."status" = 'completed'
+     WHERE d."campaignId" = $1
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,
     [campaignId, limit, offset]
+  );
+
+  return result.rows;
+};
+
+export const getDonationsByOrganizer = async (
+  organizerId,
+  limit = 50,
+  offset = 0
+) => {
+  const result = await db.query(
+    `SELECT d.*, c.name AS "campaignName",
+            dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+     FROM "donations" d
+     JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+     LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     WHERE d."organizerId" = $1
+     ORDER BY d."donationDate" DESC
+     LIMIT $2 OFFSET $3`,
+    [organizerId, limit, offset]
+  );
+
+  return result.rows;
+};
+
+export const getAllDonations = async (limit = 50, offset = 0) => {
+  const result = await db.query(
+    `SELECT d.*, c.name AS "campaignName",
+            dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+     FROM "donations" d
+     JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+     LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     ORDER BY d."donationDate" DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
   );
 
   return result.rows;

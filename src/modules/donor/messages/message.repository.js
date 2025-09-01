@@ -34,10 +34,8 @@ export const getMessagesByCampaign = async (
 
 export const getMessageById = async (messageId) => {
   const result = await db.query(
-    `SELECT dm.*, u."email" as "donorEmail", c."title" as "campaignTitle"
+    `SELECT dm.*
      FROM "donationMessages" dm
-     LEFT JOIN "users" u ON dm."donorUserId" = u."userId"
-     LEFT JOIN "campaigns" c ON dm."campaignId" = c."campaignId"
      WHERE dm."messageId" = $1`,
     [messageId]
   );
@@ -121,4 +119,60 @@ export const createMessage = async (messageData, client = null) => {
     const result = await db.query(query, params);
     return result.rows[0];
   }
+};
+
+/**
+ * Bulk update message status for all pending messages in a campaign
+ * @param {string} campaignId - Campaign ID
+ * @param {string} status - New status (approved/rejected)
+ * @param {string} moderatedByUserId - User ID who performed the moderation
+ * @param {boolean} isFeatured - Whether to feature the messages
+ * @returns {Promise<Object>} Result of bulk operation
+ */
+export const bulkUpdateMessageStatus = async (
+  campaignId,
+  status,
+  moderatedByUserId,
+  isFeatured = false
+) => {
+  const result = await db.query(
+    `UPDATE "donationMessages" 
+     SET "status" = $1, "moderatedByUserId" = $2, "moderatedAt" = CURRENT_TIMESTAMP, "isFeatured" = $3
+     WHERE "campaignId" = $4 AND "status" = 'pendingModeration'
+     RETURNING "messageId"`,
+    [status, moderatedByUserId, isFeatured, campaignId]
+  );
+
+  return {
+    updatedCount: result.rowCount,
+    updatedMessageIds: result.rows.map((row) => row.messageId),
+  };
+};
+
+/**
+ * Get campaign message statistics
+ * @param {string} campaignId - Campaign ID
+ * @returns {Promise<Object>} Message statistics
+ */
+export const getCampaignMessageStats = async (campaignId) => {
+  const result = await db.query(
+    `SELECT 
+       COUNT(*) as "totalMessages",
+       COUNT(CASE WHEN "status" = 'pendingModeration' THEN 1 END) as "pendingCount",
+       COUNT(CASE WHEN "status" = 'approved' THEN 1 END) as "approvedCount",
+       COUNT(CASE WHEN "status" = 'rejected' THEN 1 END) as "rejectedCount",
+       COUNT(CASE WHEN "isFeatured" = true THEN 1 END) as "featuredCount"
+     FROM "donationMessages" 
+     WHERE "campaignId" = $1`,
+    [campaignId]
+  );
+
+  const stats = result.rows[0];
+  return {
+    totalMessages: parseInt(stats.totalMessages) || 0,
+    pendingCount: parseInt(stats.pendingCount) || 0,
+    approvedCount: parseInt(stats.approvedCount) || 0,
+    rejectedCount: parseInt(stats.rejectedCount) || 0,
+    featuredCount: parseInt(stats.featuredCount) || 0,
+  };
 };

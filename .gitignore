@@ -36,4 +36,5 @@ coverage/
 scripts/*.local.js
 
 # Implementation plans
-DONATION_FEATURE_PLAN.md 
+DONATION_FEATURE_PLAN.md
+MESSAGES_MANAGEMENT_IMPLEMENTATION.md 

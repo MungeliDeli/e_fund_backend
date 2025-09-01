@@ -27,6 +27,7 @@ import notificationRoutes from "./modules/notifications/notification.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import { donationRoutes, messageRoutes } from "./modules/donor/index.js";
 import { transactionRoutes } from "./modules/payment/index.js";
+import analyticsRoutes from "./modules/analytics/analytics.routes.js";
 
 /**
  * Express Application Setup
@@ -107,6 +108,7 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1", notificationRoutes);
 app.use("/api/v1/audit", auditRoutes);
+app.use("/api/v1", analyticsRoutes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);

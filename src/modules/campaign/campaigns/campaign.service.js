@@ -61,6 +61,13 @@ function formatCampaign(campaign) {
     organizerEmail: campaign.organizerEmail,
     organizerType: campaign.organizerType,
     organizerName: campaign.organizerName,
+    // Newly exposed aggregated data
+    donationCount:
+      typeof campaign.donationCount === "number"
+        ? campaign.donationCount
+        : campaign.donationCount != null
+        ? parseInt(campaign.donationCount, 10)
+        : 0,
   };
 }
 

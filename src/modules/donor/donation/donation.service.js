@@ -48,6 +48,19 @@ export const createDonation = async (donationData, userId = null) => {
         paymentTransactionId: transaction.transactionId, // ✅ Now we have the transaction ID
       };
 
+      // Fetch campaign to set organizerId on donation for faster organizer queries
+      try {
+        const campaign = await getCampaignById(donationData.campaignId);
+        if (campaign && campaign.organizerId) {
+          donationPayload.organizerId = campaign.organizerId;
+        }
+      } catch (e) {
+        logger.warn("Failed to resolve organizerId for donation payload", {
+          campaignId: donationData.campaignId,
+          error: e.message,
+        });
+      }
+
       const donation = await donationRepository.createDonation(
         donationPayload,
         client
@@ -492,6 +505,25 @@ export const getDonationsByUser = async (userId, limit = 50, offset = 0) => {
     offset
   );
 
+  return donations;
+};
+
+export const getDonationsByOrganizer = async (
+  organizerId,
+  limit = 50,
+  offset = 0
+) => {
+  const donations = await donationRepository.getDonationsByOrganizer(
+    organizerId,
+    limit,
+    offset
+  );
+
+  return donations;
+};
+
+export const getAllDonations = async (limit = 50, offset = 0) => {
+  const donations = await donationRepository.getAllDonations(limit, offset);
   return donations;
 };
 

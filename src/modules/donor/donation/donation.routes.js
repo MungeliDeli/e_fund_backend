@@ -8,6 +8,8 @@ import {
   createDonation,
   getDonationById,
   getDonationsByCampaign,
+  getDonationsByOrganizer,
+  getAllDonations,
   updateDonationStatus,
   updateReceiptSent,
   getDonationStats,
@@ -40,6 +42,12 @@ router.get("/:donationId", validateDonationId, catchAsync(getDonationById));
 
 // Authenticated routes
 router.get("/user/:userId", authenticate, catchAsync(getDonationsByUser));
+router.get(
+  "/organizer/:organizerId",
+  authenticate,
+  catchAsync(getDonationsByOrganizer)
+);
+router.get("/", authenticate, catchAsync(getAllDonations));
 
 // Organizer/Admin routes (require authentication)
 router.post(

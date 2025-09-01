@@ -242,7 +242,7 @@ export const findCampaignById = async (campaignId) => {
     }
 
     const campaign = result.rows[0];
-    
+
     // Parse JSON fields if they exist and are strings
     if (
       campaign.customPageSettings &&
@@ -361,10 +361,17 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
       SELECT 
         c.*,
         u.email as organizerEmail,
-        op."organizationName" as organizerName
+        op."organizationName" as organizerName,
+        COALESCE(dc."completedDonations", 0) AS "donationCount"
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      LEFT JOIN (
+        SELECT "campaignId", COUNT(*) AS "completedDonations"
+        FROM "donations"
+       
+        GROUP BY "campaignId"
+      ) dc ON dc."campaignId" = c."campaignId"
       WHERE ${whereClauses.join(" AND ")}
       ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}
@@ -557,10 +564,17 @@ export const findAllCampaigns = async (filters = {}) => {
       SELECT 
         c.*,
         u.email as organizerEmail,
-        op."organizationName" as organizerName
+        op."organizationName" as organizerName,
+        COALESCE(dc."completedDonations", 0) AS "donationCount"
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      LEFT JOIN (
+        SELECT "campaignId", COUNT(*) AS "completedDonations"
+        FROM "donations"
+        WHERE "status" = 'completed'
+        GROUP BY "campaignId"
+      ) dc ON dc."campaignId" = c."campaignId"
       ${whereClause}
       ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}
