@@ -157,38 +157,72 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
 /**
  * Get link token by ID
  * @param {string} linkTokenId - Link token ID
- * @param {string} organizerId - Organizer ID (for authorization)
+ * @param {string} organizerId - Organizer ID (for authorization, null for public tracking)
  * @returns {Promise<Object>} Link token object
  */
 export const getLinkTokenById = async (linkTokenId, organizerId) => {
   try {
-    const queryText = `
-      SELECT 
-        lt."linkTokenId",
-        lt."campaignId",
-        lt."contactId",
-        lt."segmentId",
-        lt."type",
-        lt."prefillAmount",
-        lt."personalizedMessage",
-        lt."utmSource",
-        lt."utmMedium",
-        lt."utmCampaign",
-        lt."utmContent",
-        lt."clicksCount",
-        lt."createdAt",
-        lt."lastClickedAt",
-        c."name" as "contactName",
-        c."email" as "contactEmail",
-        s."name" as "segmentName"
-      FROM "linkTokens" lt
-      JOIN "campaigns" camp ON lt."campaignId" = camp."campaignId"
-      LEFT JOIN "contacts" c ON lt."contactId" = c."contactId"
-      LEFT JOIN "segments" s ON lt."segmentId" = s."segmentId"
-      WHERE lt."linkTokenId" = $1 AND camp."organizerId" = $2
-    `;
+    let queryText;
+    let params;
 
-    const result = await query(queryText, [linkTokenId, organizerId]);
+    if (organizerId) {
+      // With organizer authorization check
+      queryText = `
+        SELECT 
+          lt."linkTokenId",
+          lt."campaignId",
+          lt."contactId",
+          lt."segmentId",
+          lt."type",
+          lt."prefillAmount",
+          lt."personalizedMessage",
+          lt."utmSource",
+          lt."utmMedium",
+          lt."utmCampaign",
+          lt."utmContent",
+          lt."clicksCount",
+          lt."createdAt",
+          lt."lastClickedAt",
+          c."name" as "contactName",
+          c."email" as "contactEmail",
+          s."name" as "segmentName"
+        FROM "linkTokens" lt
+        JOIN "campaigns" camp ON lt."campaignId" = camp."campaignId"
+        LEFT JOIN "contacts" c ON lt."contactId" = c."contactId"
+        LEFT JOIN "segments" s ON lt."segmentId" = s."segmentId"
+        WHERE lt."linkTokenId" = $1 AND camp."organizerId" = $2
+      `;
+      params = [linkTokenId, organizerId];
+    } else {
+      // Public access for tracking (no organizer check)
+      queryText = `
+        SELECT 
+          lt."linkTokenId",
+          lt."campaignId",
+          lt."contactId",
+          lt."segmentId",
+          lt."type",
+          lt."prefillAmount",
+          lt."personalizedMessage",
+          lt."utmSource",
+          lt."utmMedium",
+          lt."utmCampaign",
+          lt."utmContent",
+          lt."clicksCount",
+          lt."createdAt",
+          lt."lastClickedAt",
+          c."name" as "contactName",
+          c."email" as "contactEmail",
+          s."name" as "segmentName"
+        FROM "linkTokens" lt
+        LEFT JOIN "contacts" c ON lt."contactId" = c."contactId"
+        LEFT JOIN "segments" s ON lt."segmentId" = s."segmentId"
+        WHERE lt."linkTokenId" = $1
+      `;
+      params = [linkTokenId];
+    }
+
+    const result = await query(queryText, params);
 
     if (result.rows.length === 0) {
       throw new NotFoundError("Link token not found");
