@@ -147,6 +147,48 @@ export const getContactsBySegment = async (segmentId, organizerId) => {
 };
 
 /**
+ * Get all contacts for an organizer across all segments
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<Array>} Array of contacts
+ */
+export const getAllContactsByOrganizer = async (organizerId) => {
+  try {
+    const queryText = `
+      SELECT 
+        c."contactId",
+        c.name,
+        c.email,
+        c.description,
+        c."emailsOpened",
+        c."createdAt",
+        c."updatedAt",
+        c."segmentId",
+        s.name as segmentName
+      FROM "contacts" c
+      JOIN "segments" s ON c."segmentId" = s."segmentId"
+      WHERE s."organizerId" = $1
+      ORDER BY c."createdAt" DESC
+    `;
+
+    const result = await query(queryText, [organizerId]);
+
+    logger.info("All contacts retrieved successfully", {
+      organizerId,
+      count: result.rows.length,
+    });
+
+    return result.rows;
+  } catch (error) {
+    logger.error("Failed to get all contacts in repository", {
+      error: error.message,
+      organizerId,
+    });
+
+    throw new DatabaseError("Failed to get all contacts", error);
+  }
+};
+
+/**
  * Get a contact by ID
  * @param {string} contactId - Contact ID
  * @param {string} organizerId - Organizer ID (for authorization)

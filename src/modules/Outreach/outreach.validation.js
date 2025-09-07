@@ -26,9 +26,13 @@ const createLinkTokenSchema = Joi.object({
   contactId: Joi.string().uuid().optional().messages({
     "string.guid": "Contact ID must be a valid UUID",
   }),
-  segmentId: Joi.string().uuid().optional().messages({
-    "string.guid": "Segment ID must be a valid UUID",
-  }),
+  segmentId: Joi.alternatives()
+    .try(Joi.string().uuid(), Joi.string().valid("all"))
+    .optional()
+    .messages({
+      "string.guid": "Segment ID must be a valid UUID or 'all'",
+      "any.only": "Segment ID must be a valid UUID or 'all'",
+    }),
   type: Joi.string()
     .valid("invite", "update", "thanks", "share")
     .required()
@@ -41,7 +45,7 @@ const createLinkTokenSchema = Joi.object({
     "number.positive": "Prefill amount must be positive",
     "number.precision": "Prefill amount can have up to 2 decimal places",
   }),
-  personalizedMessage: Joi.string().max(1000).optional().messages({
+  personalizedMessage: Joi.string().max(1000).allow("").optional().messages({
     "string.max": "Personalized message cannot exceed 1000 characters",
   }),
   utmSource: Joi.string().max(100).optional().messages({
@@ -81,14 +85,18 @@ const sendEmailSchema = Joi.object({
   contactId: Joi.string().uuid().optional().messages({
     "string.guid": "Contact ID must be a valid UUID",
   }),
-  segmentId: Joi.string().uuid().optional().messages({
-    "string.guid": "Segment ID must be a valid UUID",
-  }),
+  segmentId: Joi.alternatives()
+    .try(Joi.string().uuid(), Joi.string().valid("all"))
+    .optional()
+    .messages({
+      "string.guid": "Segment ID must be a valid UUID or 'all'",
+      "any.only": "Segment ID must be a valid UUID or 'all'",
+    }),
   type: Joi.string().valid("invite", "update", "thanks").required().messages({
     "any.only": "Type must be one of: invite, update, thanks",
     "any.required": "Type is required",
   }),
-  personalizedMessage: Joi.string().max(1000).optional().messages({
+  personalizedMessage: Joi.string().max(1000).allow("").optional().messages({
     "string.max": "Personalized message cannot exceed 1000 characters",
   }),
   prefillAmount: Joi.number().positive().precision(2).optional().messages({

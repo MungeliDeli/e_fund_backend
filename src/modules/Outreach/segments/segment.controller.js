@@ -55,11 +55,10 @@ export const createSegment = async (req, res) => {
 export const getSegments = async (req, res) => {
   const organizerId = req.user.userId;
 
-  console.log("organizerId", organizerId);
   logger.info("Getting segments request", { organizerId });
 
   const segments = await segmentService.getSegmentsByOrganizer(organizerId);
-  console.log("segments", segments);
+
   ResponseFactory.ok(res, "Segments retrieved successfully", segments);
 };
 

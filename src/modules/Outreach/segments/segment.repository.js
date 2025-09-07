@@ -92,7 +92,7 @@ export const getSegmentsByOrganizer = async (organizerId) => {
     `;
 
     const result = await query(queryText, [organizerId]);
-    console.log("result", result);
+
     logger.info("Segments retrieved successfully", {
       organizerId,
       count: result.rows.length,

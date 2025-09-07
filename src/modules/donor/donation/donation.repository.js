@@ -165,7 +165,7 @@ export const getDonationStats = async (campaignId) => {
 
 export const getDonationsByUser = async (userId, limit = 50, offset = 0) => {
   const result = await db.query(
-    `SELECT d.*, c."title" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+    `SELECT d.*, c."name" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
             dm."messageText", dm."status" as "messageStatus"
      FROM "donations" d
      LEFT JOIN "campaigns" c ON d."campaignId" = c."campaignId"
@@ -243,7 +243,7 @@ export const recalculateCampaignStatistics = async (
  */
 export const getDonationsByLinkToken = async (linkTokenId, organizerId) => {
   const result = await db.query(
-    `SELECT d.*, c."title" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+    `SELECT d.*, c."name" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
             dm."messageText", dm."status" as "messageStatus",
             lt."type" as "linkType", lt."utmSource", lt."utmMedium", lt."utmCampaign",
             cont."name" as "contactName", cont."email" as "contactEmail"
@@ -269,7 +269,7 @@ export const getDonationsByLinkToken = async (linkTokenId, organizerId) => {
  */
 export const getDonationsByContact = async (contactId, organizerId) => {
   const result = await db.query(
-    `SELECT d.*, c."title" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+    `SELECT d.*, c."name" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
             dm."messageText", dm."status" as "messageStatus",
             lt."type" as "linkType", lt."utmSource", lt."utmMedium", lt."utmCampaign",
             cont."name" as "contactName", cont."email" as "contactEmail"

@@ -23,6 +23,7 @@ import {
   getLinkTokens,
   getContactAnalyticsController,
   getAnalytics,
+  getOrganizerAnalyticsController,
   deleteLinkToken,
 } from "./outreach.controller.js";
 import {
@@ -34,6 +35,7 @@ import {
   validateLinkTokenFilters,
 } from "./outreach.validation.js";
 import { socialMediaRoutes } from "./socialMedia/index.js";
+import outreachCampaignRoutes from "./outreachCampaign/outreachCampaign.routes.js";
 
 const router = Router();
 
@@ -60,6 +62,7 @@ router.delete(
 
 // Email sending
 router.post("/send-email", validateSendEmail, catchAsync(sendEmail));
+router.get("/analytics/organizer", catchAsync(getOrganizerAnalyticsController));
 
 // Analytics
 router.get(
@@ -75,5 +78,8 @@ router.get(
 
 // Mount social media routes
 router.use("/social-media", socialMediaRoutes);
+
+// Mount outreach campaign routes
+router.use("/", outreachCampaignRoutes);
 
 export default router;

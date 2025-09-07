@@ -17,8 +17,13 @@
 import { incrementClickCount } from "../linkTokens/linkToken.repository.js";
 import { recordEmailEvent } from "../emailEvents/emailEvent.repository.js";
 import { getLinkTokenById } from "../linkTokens/linkToken.repository.js";
+import { refreshStatsForOutreachCampaign } from "../outreachCampaign/outreachCampaignStatsRefresh.service.js";
 import logger from "../../../utils/logger.js";
 import { NotFoundError } from "../../../utils/appError.js";
+import {
+  markRecipientOpenedByLinkToken,
+  markRecipientClickedByLinkToken,
+} from "../outreachCampaign/outreachCampaignRecipients.repository.js";
 
 /**
  * Generate a 1x1 transparent PNG pixel for email tracking
@@ -35,19 +40,37 @@ export const generateTrackingPixel = async (req, res) => {
     const linkToken = await getLinkTokenById(linkTokenId, null); // No organizer check for public tracking
 
     // Record email open event
-    await recordEmailEvent({
+    const openEvent = await recordEmailEvent({
       linkTokenId,
       contactId: linkToken.contactId,
       type: "open",
       userAgent,
       ipAddress,
     });
+    // Sync recipients table
+    try {
+      await markRecipientOpenedByLinkToken(linkTokenId, linkToken.contactId);
+    } catch (e) {
+      logger.error("Failed to mark recipient opened", { e: e.message });
+    }
 
     logger.info("Email open tracked successfully", {
       linkTokenId,
       contactId: linkToken.contactId,
       ipAddress,
     });
+
+    // Refresh stats asynchronously if this is a new open event
+    if (openEvent && linkToken.outreachCampaignId) {
+      refreshStatsForOutreachCampaign(linkToken.outreachCampaignId).catch(
+        (error) => {
+          logger.error("Failed to refresh stats after email open", {
+            error: error.message,
+            outreachCampaignId: linkToken.outreachCampaignId,
+          });
+        }
+      );
+    }
 
     // Generate 1x1 transparent PNG
     const pixelData = Buffer.from(
@@ -102,11 +125,8 @@ export const handleClickTracking = async (req, res) => {
     // Verify link token exists
     const linkToken = await getLinkTokenById(linkTokenId, null); // No organizer check for public tracking
 
-    // Increment click count
-    await incrementClickCount(linkTokenId);
-
-    // Record click event
-    await recordEmailEvent({
+    // Record click event (only if first time for this recipient)
+    const clickEvent = await recordEmailEvent({
       linkTokenId,
       contactId: linkToken.contactId,
       type: "click",
@@ -114,17 +134,45 @@ export const handleClickTracking = async (req, res) => {
       ipAddress,
     });
 
+    // Only increment click count if this is a new click event
+    if (clickEvent) {
+      await incrementClickCount(linkTokenId);
+      // Sync recipients table
+      try {
+        await markRecipientClickedByLinkToken(linkTokenId, linkToken.contactId);
+      } catch (e) {
+        logger.error("Failed to mark recipient clicked", { e: e.message });
+      }
+    }
+
     logger.info("Link click tracked successfully", {
       linkTokenId,
       contactId: linkToken.contactId,
       ipAddress,
       redirectUrl: redirect,
+      isNewClick: !!clickEvent,
     });
 
+    // Refresh stats asynchronously if this is a new click event
+    if (clickEvent && linkToken.outreachCampaignId) {
+      refreshStatsForOutreachCampaign(linkToken.outreachCampaignId).catch(
+        (error) => {
+          logger.error("Failed to refresh stats after email click", {
+            error: error.message,
+            outreachCampaignId: linkToken.outreachCampaignId,
+          });
+        }
+      );
+    }
+
     // Build redirect URL with UTM parameters
-    let finalRedirectUrl =
-      redirect ||
-      `${process.env.FRONTEND_URL}/campaigns/${linkToken.campaignId}`;
+    let finalRedirectUrl = redirect;
+    // If no explicit redirect provided, fall back to public share URL if available
+    if (!finalRedirectUrl) {
+      // Attempt to use share slug if present on token (requires repository join in future)
+      // Fallback to organizer route by id only as last resort
+      finalRedirectUrl = `${process.env.FRONTEND_URL}`;
+    }
 
     // Add UTM parameters if they exist
     const utmParams = new URLSearchParams();

@@ -50,7 +50,14 @@ export const generateSocialMediaLinks = async (
       utmMedium = "social",
     } = options;
 
-    const baseUrl = `${process.env.FRONTEND_URL}/campaigns/${campaignId}`;
+    const baseUrl = `${process.env.FRONTEND_URL}/campaign/${
+      campaign.shareLink
+    }-${(campaign.name || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 80)}`;
     const campaignTitle = encodeURIComponent(campaign.title);
     const campaignDescription = encodeURIComponent(
       campaign.description?.substring(0, 100) || ""
@@ -213,6 +220,11 @@ const createTrackingLink = async (
   utmContent
 ) => {
   try {
+    // Ensure campaign exists to construct public share URL
+    const campaign = await findCampaignById(campaignId);
+    if (!campaign) {
+      throw new NotFoundError("Campaign not found");
+    }
     const linkTokenData = {
       campaignId,
       type: "share",
@@ -225,7 +237,14 @@ const createTrackingLink = async (
     const linkToken = await createLinkToken(linkTokenData, organizerId);
 
     const trackingUrl = generateTrackingLink(
-      `${process.env.FRONTEND_URL}/campaigns/${campaignId}`,
+      `${process.env.FRONTEND_URL}/campaign/${campaign.shareLink}-${(
+        campaign.name || ""
+      )
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .slice(0, 80)}`,
       linkToken.linkTokenId,
       {
         utm_source: utmSource,

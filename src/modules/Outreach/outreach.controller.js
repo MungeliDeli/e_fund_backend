@@ -21,6 +21,7 @@ import {
   getContactAnalytics,
   getOutreachLinkTokens,
   deleteOutreachLinkToken,
+  getOrganizerAnalytics,
 } from "./outreach.service.js";
 import { sendSuccessResponse } from "../../utils/response.utils.js";
 import logger from "../../utils/logger.js";
@@ -153,6 +154,31 @@ export const getAnalytics = async (req, res) => {
     res,
     200,
     "Outreach analytics retrieved successfully",
+    analytics
+  );
+};
+
+/**
+ * Get organizer-level outreach analytics
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getOrganizerAnalyticsController = async (req, res) => {
+  const organizerId = req.user.userId;
+  const filters = req.query;
+
+  const analytics = await getOrganizerAnalytics(organizerId, filters);
+
+  logger.info("Organizer analytics retrieved via controller", {
+    organizerId,
+    totalEmailsSent: analytics.emailsSent,
+    totalRevenue: analytics.revenue,
+  });
+
+  return sendSuccessResponse(
+    res,
+    200,
+    "Organizer analytics retrieved successfully",
     analytics
   );
 };

@@ -85,8 +85,6 @@ export const getSegmentsByOrganizer = async (organizerId) => {
       organizerId
     );
 
-    console.log("segments", segments);
-
     logger.info("Segments retrieved successfully", {
       organizerId,
       count: segments.length,

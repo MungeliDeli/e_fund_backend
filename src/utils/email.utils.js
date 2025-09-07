@@ -167,6 +167,7 @@ export async function sendOutreachEmail(to, subject, html, options = {}) {
 
     return result;
   } catch (error) {
+    console.log("error sending outreach email by function", error, to);
     logger.error("Failed to send outreach email", {
       error: error.message,
       to,
