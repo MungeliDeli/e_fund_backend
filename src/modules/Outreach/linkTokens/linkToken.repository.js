@@ -40,6 +40,7 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
       utmMedium,
       utmCampaign,
       utmContent,
+      outreachCampaignId,
     } = linkTokenData;
 
     // Verify campaign exists and belongs to organizer
@@ -73,8 +74,8 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
       }
     }
 
-    // Verify segment exists and belongs to organizer if provided
-    if (segmentId) {
+    // Verify segment exists and belongs to organizer if provided (skip validation for "all")
+    if (segmentId && segmentId !== "all") {
       const segmentCheckQuery = `
         SELECT "segmentId" FROM "segments" 
         WHERE "segmentId" = $1 AND "organizerId" = $2
@@ -89,43 +90,19 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
       }
     }
 
-    // Check for existing link token with same campaign-contact-type or campaign-segment-type
-    let existingCheckQuery;
-    let existingCheckParams;
-
-    if (contactId) {
-      existingCheckQuery = `
-        SELECT "linkTokenId" FROM "linkTokens" 
-        WHERE "campaignId" = $1 AND "contactId" = $2 AND "type" = $3
-      `;
-      existingCheckParams = [campaignId, contactId, type];
-    } else {
-      existingCheckQuery = `
-        SELECT "linkTokenId" FROM "linkTokens" 
-        WHERE "campaignId" = $1 AND "segmentId" = $2 AND "type" = $3
-      `;
-      existingCheckParams = [campaignId, segmentId, type];
-    }
-
-    const existingCheckResult = await client.query(
-      existingCheckQuery,
-      existingCheckParams
-    );
-
-    if (existingCheckResult.rows.length > 0) {
-      throw new ConflictError(
-        "Link token already exists for this campaign, contact/segment, and type"
-      );
-    }
+    // For outreach emails, we allow multiple link tokens for the same campaign-contact-type
+    // This enables organizers to send multiple emails to the same contact for the same campaign
+    // No duplicate check needed for outreach functionality
 
     // Insert new link token
     const insertQuery = `
       INSERT INTO "linkTokens" (
         "campaignId", "contactId", "segmentId", "type", 
         "prefillAmount", "personalizedMessage", 
-        "utmSource", "utmMedium", "utmCampaign", "utmContent"
+        "utmSource", "utmMedium", "utmCampaign", "utmContent",
+        "outreachCampaignId"
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -140,6 +117,7 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
       utmMedium,
       utmCampaign,
       utmContent,
+      outreachCampaignId || null,
     ]);
 
     logger.info("Link token created successfully", {
@@ -183,6 +161,7 @@ export const getLinkTokenById = async (linkTokenId, organizerId) => {
           lt."clicksCount",
           lt."createdAt",
           lt."lastClickedAt",
+          lt."outreachCampaignId",
           c."name" as "contactName",
           c."email" as "contactEmail",
           s."name" as "segmentName"
@@ -211,6 +190,7 @@ export const getLinkTokenById = async (linkTokenId, organizerId) => {
           lt."clicksCount",
           lt."createdAt",
           lt."lastClickedAt",
+          lt."outreachCampaignId",
           c."name" as "contactName",
           c."email" as "contactEmail",
           s."name" as "segmentName"
@@ -257,20 +237,6 @@ export const getLinkTokenById = async (linkTokenId, organizerId) => {
  */
 export const getLinkTokensByCampaign = async (campaignId, organizerId) => {
   try {
-    // Verify campaign exists and belongs to organizer
-    const campaignCheckQuery = `
-      SELECT "campaignId" FROM "campaigns" 
-      WHERE "campaignId" = $1 AND "organizerId" = $2
-    `;
-    const campaignCheckResult = await query(campaignCheckQuery, [
-      campaignId,
-      organizerId,
-    ]);
-
-    if (campaignCheckResult.rows.length === 0) {
-      throw new NotFoundError("Campaign not found");
-    }
-
     const queryText = `
       SELECT 
         lt."linkTokenId",
@@ -286,6 +252,7 @@ export const getLinkTokensByCampaign = async (campaignId, organizerId) => {
         lt."clicksCount",
         lt."createdAt",
         lt."lastClickedAt",
+        lt."outreachCampaignId",
         c."name" as "contactName",
         c."email" as "contactEmail",
         s."name" as "segmentName"
@@ -404,4 +371,66 @@ export const deleteLinkToken = async (linkTokenId, organizerId) => {
 
     return true;
   });
+};
+
+/**
+ * Unsafe delete for compensation flows when email sending fails.
+ * No organizer check; deletes by ID only.
+ */
+export const deleteLinkTokenUnsafe = async (linkTokenId) => {
+  return await transaction(async (client) => {
+    const result = await client.query(
+      `DELETE FROM "linkTokens" WHERE "linkTokenId" = $1`,
+      [linkTokenId]
+    );
+    return result.rowCount > 0;
+  });
+};
+
+/**
+ * Get link tokens by outreach campaign
+ * @param {string} outreachCampaignId - Outreach campaign ID
+ * @param {string} organizerId - Organizer ID
+ * @returns {Promise<Array>} Array of link tokens
+ */
+export const getLinkTokensByOutreachCampaign = async (
+  outreachCampaignId,
+  organizerId
+) => {
+  try {
+    const queryText = `
+      SELECT 
+        lt."linkTokenId",
+        lt."campaignId",
+        lt."contactId",
+        lt."segmentId",
+        lt."type",
+        lt."prefillAmount",
+        lt."personalizedMessage",
+        lt."utmSource",
+        lt."utmMedium",
+        lt."utmCampaign",
+        lt."utmContent",
+        lt."clicksCount",
+        lt."createdAt",
+        lt."lastClickedAt",
+        lt."outreachCampaignId",
+        c."name" as "contactName",
+        c."email" as "contactEmail",
+        s."name" as "segmentName"
+      FROM "linkTokens" lt
+      JOIN "campaigns" cpg ON lt."campaignId" = cpg."campaignId"
+      LEFT JOIN "contacts" c ON lt."contactId" = c."contactId"
+      LEFT JOIN "segments" s ON lt."segmentId" = s."segmentId"
+      WHERE lt."outreachCampaignId" = $1 AND cpg."organizerId" = $2
+      ORDER BY lt."createdAt" DESC
+    `;
+    const result = await query(queryText, [outreachCampaignId, organizerId]);
+    return result.rows;
+  } catch (error) {
+    throw new DatabaseError(
+      "Failed to get link tokens by outreach campaign",
+      error
+    );
+  }
 };

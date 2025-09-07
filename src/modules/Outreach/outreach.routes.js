@@ -20,7 +20,10 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 import {
   createLinkToken,
   sendEmail,
+  getLinkTokens,
+  getContactAnalyticsController,
   getAnalytics,
+  getOrganizerAnalyticsController,
   deleteLinkToken,
 } from "./outreach.controller.js";
 import {
@@ -28,7 +31,11 @@ import {
   validateSendEmail,
   validateCampaignId,
   validateLinkTokenId,
+  validateContactId,
+  validateLinkTokenFilters,
 } from "./outreach.validation.js";
+import { socialMediaRoutes } from "./socialMedia/index.js";
+import outreachCampaignRoutes from "./outreachCampaign/outreachCampaign.routes.js";
 
 const router = Router();
 
@@ -41,6 +48,12 @@ router.post(
   validateCreateLinkToken,
   catchAsync(createLinkToken)
 );
+router.get(
+  "/campaigns/:campaignId/link-tokens",
+  validateCampaignId,
+  validateLinkTokenFilters,
+  catchAsync(getLinkTokens)
+);
 router.delete(
   "/link-tokens/:linkTokenId",
   validateLinkTokenId,
@@ -49,6 +62,7 @@ router.delete(
 
 // Email sending
 router.post("/send-email", validateSendEmail, catchAsync(sendEmail));
+router.get("/analytics/organizer", catchAsync(getOrganizerAnalyticsController));
 
 // Analytics
 router.get(
@@ -56,5 +70,16 @@ router.get(
   validateCampaignId,
   catchAsync(getAnalytics)
 );
+router.get(
+  "/contacts/:contactId/analytics",
+  validateContactId,
+  catchAsync(getContactAnalyticsController)
+);
+
+// Mount social media routes
+router.use("/social-media", socialMediaRoutes);
+
+// Mount outreach campaign routes
+router.use("/", outreachCampaignRoutes);
 
 export default router;

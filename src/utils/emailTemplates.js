@@ -17,6 +17,11 @@
 
 const APP_NAME = process.env.APP_NAME || "FundFlow";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+// Base URL where tracking endpoints are hosted (backend). Defaults to local backend.
+const TRACKING_BASE_URL =
+  process.env.TRACKING_BASE_URL ||
+  process.env.BACKEND_URL ||
+  "http://localhost:3000";
 
 /**
  * Base email template wrapper
@@ -26,7 +31,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
  */
 function createBaseTemplate(content, linkTokenId) {
   const trackingPixel = linkTokenId
-    ? `<img src="${FRONTEND_URL}/t/pixel/${linkTokenId}.png" alt="" width="1" height="1" style="display:none" />`
+    ? `<img src="${TRACKING_BASE_URL}/t/pixel/${linkTokenId}.png" alt="" width="1" height="1" style="display:none" />`
     : "";
 
   return `
@@ -333,7 +338,7 @@ export function createThankYouTemplate(data) {
  * @returns {string} Complete tracking link
  */
 export function generateTrackingLink(baseUrl, linkTokenId, utmParams = {}) {
-  const trackingUrl = `${FRONTEND_URL}/t/click/${linkTokenId}`;
+  const trackingUrl = `${TRACKING_BASE_URL}/t/click/${linkTokenId}`;
 
   const params = new URLSearchParams({
     ...utmParams,

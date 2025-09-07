@@ -26,9 +26,13 @@ const createLinkTokenSchema = Joi.object({
   contactId: Joi.string().uuid().optional().messages({
     "string.guid": "Contact ID must be a valid UUID",
   }),
-  segmentId: Joi.string().uuid().optional().messages({
-    "string.guid": "Segment ID must be a valid UUID",
-  }),
+  segmentId: Joi.alternatives()
+    .try(Joi.string().uuid(), Joi.string().valid("all"))
+    .optional()
+    .messages({
+      "string.guid": "Segment ID must be a valid UUID or 'all'",
+      "any.only": "Segment ID must be a valid UUID or 'all'",
+    }),
   type: Joi.string()
     .valid("invite", "update", "thanks", "share")
     .required()
@@ -41,7 +45,7 @@ const createLinkTokenSchema = Joi.object({
     "number.positive": "Prefill amount must be positive",
     "number.precision": "Prefill amount can have up to 2 decimal places",
   }),
-  personalizedMessage: Joi.string().max(1000).optional().messages({
+  personalizedMessage: Joi.string().max(1000).allow("").optional().messages({
     "string.max": "Personalized message cannot exceed 1000 characters",
   }),
   utmSource: Joi.string().max(100).optional().messages({
@@ -81,14 +85,18 @@ const sendEmailSchema = Joi.object({
   contactId: Joi.string().uuid().optional().messages({
     "string.guid": "Contact ID must be a valid UUID",
   }),
-  segmentId: Joi.string().uuid().optional().messages({
-    "string.guid": "Segment ID must be a valid UUID",
-  }),
+  segmentId: Joi.alternatives()
+    .try(Joi.string().uuid(), Joi.string().valid("all"))
+    .optional()
+    .messages({
+      "string.guid": "Segment ID must be a valid UUID or 'all'",
+      "any.only": "Segment ID must be a valid UUID or 'all'",
+    }),
   type: Joi.string().valid("invite", "update", "thanks").required().messages({
     "any.only": "Type must be one of: invite, update, thanks",
     "any.required": "Type is required",
   }),
-  personalizedMessage: Joi.string().max(1000).optional().messages({
+  personalizedMessage: Joi.string().max(1000).allow("").optional().messages({
     "string.max": "Personalized message cannot exceed 1000 characters",
   }),
   prefillAmount: Joi.number().positive().precision(2).optional().messages({
@@ -142,8 +150,40 @@ const linkTokenIdSchema = Joi.object({
   }),
 });
 
+// Contact ID parameter schema
+const contactIdSchema = Joi.object({
+  contactId: Joi.string().uuid().required().messages({
+    "string.guid": "Contact ID must be a valid UUID",
+    "any.required": "Contact ID is required",
+  }),
+});
+
+// Link token filters query schema
+const linkTokenFiltersSchema = Joi.object({
+  type: Joi.string()
+    .valid("invite", "update", "thanks", "share")
+    .optional()
+    .messages({
+      "any.only": "Type must be one of: invite, update, thanks, share",
+    }),
+  contactId: Joi.string().uuid().optional().messages({
+    "string.guid": "Contact ID must be a valid UUID",
+  }),
+  segmentId: Joi.string().uuid().optional().messages({
+    "string.guid": "Segment ID must be a valid UUID",
+  }),
+  hasClicks: Joi.boolean().optional().messages({
+    "boolean.base": "hasClicks must be a boolean",
+  }),
+});
+
 // Validation middleware exports
 export const validateCreateLinkToken = validate(createLinkTokenSchema);
 export const validateSendEmail = validate(sendEmailSchema);
 export const validateCampaignId = validate(campaignIdSchema, "params");
 export const validateLinkTokenId = validate(linkTokenIdSchema, "params");
+export const validateContactId = validate(contactIdSchema, "params");
+export const validateLinkTokenFilters = validate(
+  linkTokenFiltersSchema,
+  "query"
+);
