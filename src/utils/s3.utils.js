@@ -98,14 +98,49 @@ export async function uploadCampaignMediaToS3({
 }) {
   const ext = path.extname(fileName);
   const key = `${folder}/${campaignId}${mediaType}${ext}`;
-  
+
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
     Body: fileBuffer,
     ContentType: mimeType,
   });
-  
+
+  await s3.send(command);
+  return key;
+}
+
+/**
+ * Upload post media to S3 with post-specific key
+ * @param {Object} params
+ * @param {Buffer} params.fileBuffer - File data
+ * @param {string} params.fileName - Original file name (for extension)
+ * @param {string} params.mimeType - MIME type
+ * @param {string} params.postId - Post ID for key generation
+ * @param {string} params.mediaType - Media type ('image' or 'video')
+ * @param {string} [params.folder] - Optional folder prefix (default: 'posts')
+ * @returns {Promise<string>} S3 key of the uploaded file
+ */
+export async function uploadPostMediaToS3({
+  fileBuffer,
+  fileName,
+  mimeType,
+  postId = null,
+  mediaType,
+  folder = "posts",
+}) {
+  const ext = path.extname(fileName);
+  // Use postId if provided, otherwise use a temporary UUID
+  const id = postId || uuidv4();
+  const key = `${folder}/${id}/${uuidv4()}${ext}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: mimeType,
+  });
+
   await s3.send(command);
   return key;
 }

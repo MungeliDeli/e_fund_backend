@@ -20,7 +20,7 @@ import {
   getEmailEventsByOutreachCampaign,
   getEmailEventStatsByCampaign,
 } from "../emailEvents/emailEvent.repository.js";
-import { getDonationsByLinkToken } from "../../donor/donation/donation.repository.js";
+import { getDonationAggregatesByOutreachCampaign } from "./outreachCampaignRecipients.repository.js";
 import logger from "../../../utils/logger.js";
 import { NotFoundError, DatabaseError } from "../../../utils/appError.js";
 
@@ -93,45 +93,31 @@ export const getOutreachCampaignStats = async (
       }
     });
 
-    // Get donation data for all link tokens
-    const donations = [];
-    let totalDonationAmount = 0;
-
-    for (const linkToken of linkTokens) {
-      const linkTokenDonations = await getDonationsByLinkToken(
-        linkToken.linkTokenId
-      );
-      donations.push(...linkTokenDonations);
-      totalDonationAmount += linkTokenDonations.reduce(
-        (sum, donation) => sum + parseFloat(donation.amount || 0),
-        0
-      );
-    }
+    // Donation aggregates from recipients table (authoritative for outreach totals)
+    const { donations: donationsCount, totalAmount: totalDonationAmount } =
+      await getDonationAggregatesByOutreachCampaign(outreachCampaignId);
 
     // Calculate rates
     const sends = linkTokens.length;
     const openRate = sends > 0 ? (uniqueOpens.size / sends) * 100 : 0;
     const clickRate = sends > 0 ? (uniqueClicks.size / sends) * 100 : 0;
-    const conversionRate = sends > 0 ? (donations.length / sends) * 100 : 0;
+    const conversionRate = sends > 0 ? (donationsCount / sends) * 100 : 0;
 
     // Build recipient details
     const recipients = linkTokens.map((linkToken) => {
       const recipientEvents = emailEvents.filter(
         (event) => event.linkTokenId === linkToken.linkTokenId
       );
-      const recipientDonations = donations.filter(
-        (donation) => donation.linkTokenId === linkToken.linkTokenId
-      );
+      // Recipients view: use recipients table for donation status/amount
+      // Fallback to email events of type 'donation' is possible but not required here
 
       const hasOpened = recipientEvents.some((event) => event.type === "open");
       const hasClicked = recipientEvents.some(
         (event) => event.type === "click"
       );
-      const hasDonated = recipientDonations.length > 0;
-      const donatedAmount = recipientDonations.reduce(
-        (sum, donation) => sum + parseFloat(donation.amount || 0),
-        0
-      );
+      // We will project hasDonated/donatedAmount from recipients fetch on controller layer
+      const hasDonated = undefined;
+      const donatedAmount = undefined;
 
       const lastEvent =
         recipientEvents.length > 0
@@ -173,7 +159,7 @@ export const getOutreachCampaignStats = async (
         uniqueOpens: uniqueOpens.size,
         uniqueClicks: uniqueClicks.size,
         totalClicks,
-        donations: donations.length,
+        donations: donationsCount,
         totalAmount: totalDonationAmount,
       },
       rates: {
@@ -189,7 +175,7 @@ export const getOutreachCampaignStats = async (
       sends,
       uniqueOpens: uniqueOpens.size,
       uniqueClicks: uniqueClicks.size,
-      donations: donations.length,
+      donations: donationsCount,
     });
 
     return stats;
@@ -198,6 +184,7 @@ export const getOutreachCampaignStats = async (
       outreachCampaignId,
       error: error.message,
     });
+    console.log("analytics error", error);
 
     if (error instanceof NotFoundError) {
       throw error;

@@ -107,6 +107,24 @@ export const markRecipientClickedByLinkToken = async (
   await query(sql, [linkTokenId, contactId]);
 };
 
+export const getDonationAggregatesByOutreachCampaign = async (
+  outreachCampaignId
+) => {
+  const sql = `
+    SELECT 
+      COUNT(*) FILTER (WHERE "donated" = TRUE) AS "donations",
+      COALESCE(SUM("donatedAmount"), 0) AS "totalAmount"
+    FROM "outreachCampaignRecipients"
+    WHERE "outreachCampaignId" = $1
+  `;
+  const res = await query(sql, [outreachCampaignId]);
+  const row = res.rows[0] || {};
+  return {
+    donations: Number(row.donations || 0),
+    totalAmount: Number(row.totalAmount || 0),
+  };
+};
+
 export const markRecipientSendResultByCampaignContact = async (
   outreachCampaignId,
   contactId,

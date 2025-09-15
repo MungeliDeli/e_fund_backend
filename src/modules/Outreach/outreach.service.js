@@ -53,6 +53,10 @@ import {
 } from "../donor/donation/donation.repository.js";
 import { getSocialMediaStats } from "./socialMedia/socialMedia.service.js";
 import {
+  getOutreachCampaignsCountByCampaign,
+  getRecipientDonationAggregatesByCampaign,
+} from "./outreachAnalytics.repository.js";
+import {
   NotFoundError,
   ConflictError,
   ValidationError,
@@ -379,7 +383,6 @@ export const sendOutreachEmailService = async (emailData, organizerId) => {
       results,
     };
   } catch (error) {
-
     logger.error("Failed to send outreach emails", {
       error: error.message,
       emailData,
@@ -413,13 +416,20 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
     // Get link tokens for campaign
     const linkTokens = await getLinkTokensByCampaign(campaignId, organizerId);
 
-    // Get email event statistics
+    // Get email event statistics (sent/open/click from emailEvents table)
     const emailStats = await getEmailEventStatsByCampaign(campaignId);
+    const totalSends = emailStats?.sent?.count || 0;
+    const totalOpens = emailStats?.open?.count || 0;
+    const totalClicks = emailStats?.click?.count || 0;
 
-    // Get donation attribution statistics
-    const donationStats = await getDonationAttributionStats(
-      campaignId,
-      organizerId
+    // Aggregated outreach campaigns count
+    const outreachCampaigns = await getOutreachCampaignsCountByCampaign(
+      campaignId
+    );
+
+    // Donations/revenue aggregated from recipients across all outreach campaigns
+    const recipientAgg = await getRecipientDonationAggregatesByCampaign(
+      campaignId
     );
 
     // Get social media statistics
@@ -429,34 +439,22 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
     const analytics = {
       campaignId,
       totalLinkTokens: linkTokens.length,
-      totalClicks: linkTokens.reduce(
-        (sum, token) => sum + token.clicksCount,
-        0
-      ),
-      totalOpens: emailStats.opens || 0,
-      totalSends: emailStats.sends || 0,
-      totalDonations: donationStats.totalDonations || 0,
-      totalDonationAmount: donationStats.totalAmount || 0,
+      totalLinkTokens: linkTokens.length,
+      outreachCampaigns,
+      totalClicks,
+      totalOpens,
+      totalSends,
+      totalDonations: recipientAgg.donations || 0,
+      totalDonationAmount: recipientAgg.totalAmount || 0,
       totalSocialShares: socialMediaStats.totalSocialShares || 0,
       totalSocialClicks: socialMediaStats.totalSocialClicks || 0,
-      openRate:
-        emailStats.sends > 0
-          ? (((emailStats.opens || 0) / emailStats.sends) * 100).toFixed(2)
-          : 0,
-      clickRate:
-        emailStats.sends > 0
-          ? (
-              (linkTokens.reduce((sum, token) => sum + token.clicksCount, 0) /
-                emailStats.sends) *
-              100
-            ).toFixed(2)
-          : 0,
+      openRate: emailStats?.openRate || 0,
+      clickRate: emailStats?.clickRate || 0,
       conversionRate:
         emailStats.sends > 0
-          ? (
-              ((donationStats.totalDonations || 0) / emailStats.sends) *
-              100
-            ).toFixed(2)
+          ? (((recipientAgg.donations || 0) / emailStats.sends) * 100).toFixed(
+              2
+            )
           : 0,
       socialMediaEngagement:
         socialMediaStats.totalSocialShares > 0
@@ -469,7 +467,10 @@ export const getOutreachAnalytics = async (campaignId, organizerId) => {
       byType: {},
       byContact: {},
       emailEvents: emailStats,
-      donationAttribution: donationStats,
+      donationAttribution: {
+        totalDonations: recipientAgg.donations || 0,
+        totalAmount: recipientAgg.totalAmount || 0,
+      },
       socialMediaStats: socialMediaStats,
     };
 
@@ -1028,8 +1029,7 @@ export const sendOutreachInvitations = async (
           if (linkToken?.linkTokenId) {
             await deleteLinkTokenUnsafe(linkToken.linkTokenId);
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }
 

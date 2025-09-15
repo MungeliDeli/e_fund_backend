@@ -57,7 +57,7 @@ function createBaseTemplate(content, linkTokenId) {
           box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         .header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #007a35 0%, #009e47 100%);
           color: white;
           padding: 30px 20px;
           text-align: center;
@@ -76,7 +76,7 @@ function createBaseTemplate(content, linkTokenId) {
         }
         .cta-button {
           display: inline-block;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #007a35 0%, #009e47 100%);
           color: white;
           text-decoration: none;
           padding: 15px 30px;
@@ -87,7 +87,7 @@ function createBaseTemplate(content, linkTokenId) {
           text-align: center;
         }
         .cta-button:hover {
-          background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+          background: linear-gradient(135deg, #00652c 0%, #008a3f 100%);
         }
         .footer {
           background-color: #f8f9fa;
@@ -98,7 +98,7 @@ function createBaseTemplate(content, linkTokenId) {
         }
         .personalized-message {
           background-color: #f8f9fa;
-          border-left: 4px solid #667eea;
+          border-left: 4px solid #007a35;
           padding: 15px;
           margin: 20px 0;
           font-style: italic;
@@ -112,7 +112,7 @@ function createBaseTemplate(content, linkTokenId) {
         .amount-highlight {
           font-size: 24px;
           font-weight: bold;
-          color: #667eea;
+          color: #007a35;
         }
         @media (max-width: 600px) {
           .container {
