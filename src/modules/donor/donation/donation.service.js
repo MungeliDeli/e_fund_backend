@@ -9,11 +9,32 @@ import notificationService from "../../notifications/notification.service.js";
 import { AppError } from "../../../utils/appError.js";
 import logger from "../../../utils/logger.js";
 import { transaction } from "../../../db/index.js";
+import { getLinkTokenById } from "../../Outreach/linkTokens/linkToken.repository.js";
+import { recordEmailEvent } from "../../Outreach/emailEvents/emailEvent.repository.js";
+import { markRecipientClickedByLinkToken } from "../../Outreach/outreachCampaign/outreachCampaignRecipients.repository.js";
+import { query } from "../../../db/index.js";
 
 export const createDonation = async (donationData, userId = null) => {
   try {
     // Use database transaction to ensure data consistency
     const result = await transaction(async (client) => {
+      // 0. Outreach attribution: resolve contactId from linkTokenId if provided
+      let resolvedLinkTokenId = donationData.linkTokenId || null;
+      let resolvedContactId = donationData.contactId || null;
+      if (resolvedLinkTokenId && !resolvedContactId) {
+        try {
+          const token = await getLinkTokenById(resolvedLinkTokenId, null);
+          resolvedContactId = token?.contactId || null;
+        } catch (e) {
+          logger.warn(
+            "Provided linkTokenId not found; proceeding without contactId",
+            {
+              linkTokenId: resolvedLinkTokenId,
+              error: e.message,
+            }
+          );
+        }
+      }
       // 1. Create transaction record FIRST
       const transactionPayload = {
         userId: userId,
@@ -39,13 +60,17 @@ export const createDonation = async (donationData, userId = null) => {
       });
 
       // 2. Create donation record WITH transaction ID
+      // Force anonymous if no authenticated user
+      const isAnonymousEffective = userId ? !!donationData.isAnonymous : true;
       const donationPayload = {
         campaignId: donationData.campaignId,
         donorUserId: userId, // Can be null for anonymous donations
         amount: donationData.amount,
-        isAnonymous: donationData.isAnonymous || false,
+        isAnonymous: isAnonymousEffective,
         status: "pending",
         paymentTransactionId: transaction.transactionId, // ✅ Now we have the transaction ID
+        linkTokenId: resolvedLinkTokenId,
+        contactId: resolvedContactId,
       };
 
       // Fetch campaign to set organizerId on donation for faster organizer queries
@@ -81,7 +106,7 @@ export const createDonation = async (donationData, userId = null) => {
           donorUserId: userId, // Can be null for anonymous donations
           messageText: donationData.messageText.trim(),
           status: "pendingModeration", // Will be moderated later
-          isAnonymous: donationData.isAnonymous || false,
+          isAnonymous: isAnonymousEffective,
         };
 
         try {
@@ -140,7 +165,7 @@ export const createDonation = async (donationData, userId = null) => {
           donationData.amount,
           donationData.currency || "USD",
           donationData.messageText,
-          donationData.isAnonymous || false,
+          isAnonymousEffective,
           donationData.phoneNumber
         );
       } catch (notificationError) {
@@ -152,7 +177,7 @@ export const createDonation = async (donationData, userId = null) => {
       }
 
       // 7. Send notifications to donor (if registered user)
-      if (userId && !donationData.isAnonymous) {
+      if (userId && !isAnonymousEffective) {
         try {
           await sendDonorNotifications(
             userId,
@@ -169,7 +194,7 @@ export const createDonation = async (donationData, userId = null) => {
             donationId: donation.donationId,
           });
         }
-      } else if (donationData.isAnonymous) {
+      } else if (isAnonymousEffective) {
         // Handle anonymous donor differently - generate receipt but don't send notifications
         try {
           await sendAnonymousDonorReceipt(
@@ -296,6 +321,42 @@ export const simulatePaymentProcessing = async (donation, txn) => {
       donation.donationId,
       "completed"
     );
+
+    // 2b) Outreach: mark donation in recipients and record donation emailEvent
+    try {
+      if (donation.linkTokenId) {
+        // Record emailEvent of type 'donation'
+        await recordEmailEvent({
+          linkTokenId: donation.linkTokenId,
+          contactId: donation.contactId || null,
+          type: "donation",
+          userAgent: null,
+          ipAddress: null,
+        });
+        // Update recipients aggregate fields
+        const sql = `
+          UPDATE "outreachCampaignRecipients" r
+          SET "donated" = TRUE,
+              "donatedAmount" = COALESCE(r."donatedAmount", 0) + $3,
+              "updatedAt" = NOW()
+          FROM "linkTokens" lt
+          WHERE lt."linkTokenId" = $1
+            AND r."contactId" = COALESCE($2, r."contactId")
+            AND r."outreachCampaignId" = lt."outreachCampaignId";
+        `;
+        await query(sql, [
+          donation.linkTokenId,
+          donation.contactId || null,
+          donation.amount,
+        ]);
+      }
+    } catch (e) {
+      logger.warn("Failed to update outreach donation attribution", {
+        error: e.message,
+        linkTokenId: donation.linkTokenId,
+        contactId: donation.contactId,
+      });
+    }
 
     // Log successful donation in audit logs
     try {

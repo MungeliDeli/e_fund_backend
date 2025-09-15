@@ -71,36 +71,46 @@ export const generateSocialMediaLinks = async (
         ? `${customMessage}\n\n${campaign.title}\n${baseUrl}`
         : `Check out this amazing campaign: ${campaign.title}\n${baseUrl}`;
 
+      const { shareUrl, linkTokenId } = await createShareUrlForPlatform(
+        campaignId,
+        organizerId,
+        "whatsapp",
+        utmSource,
+        utmMedium
+      );
       socialLinks.whatsapp = {
-        url: `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`,
+        url: shareUrl,
         platform: "whatsapp",
         type: "share",
-        trackingUrl: await createTrackingLink(
+        trackingUrl: await createTrackingRedirectForExistingToken(
           campaignId,
-          organizerId,
-          "whatsapp",
+          linkTokenId,
           utmSource,
           utmMedium,
+          `social_whatsapp`,
           "whatsapp_share"
         ),
       };
     }
 
     if (platform === "all" || platform === "facebook") {
-      const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-        baseUrl
-      )}`;
-
+      const { shareUrl, linkTokenId } = await createShareUrlForPlatform(
+        campaignId,
+        organizerId,
+        "facebook",
+        utmSource,
+        utmMedium
+      );
       socialLinks.facebook = {
-        url: facebookUrl,
+        url: shareUrl,
         platform: "facebook",
         type: "share",
-        trackingUrl: await createTrackingLink(
+        trackingUrl: await createTrackingRedirectForExistingToken(
           campaignId,
-          organizerId,
-          "facebook",
+          linkTokenId,
           utmSource,
           utmMedium,
+          `social_facebook`,
           "facebook_share"
         ),
       };
@@ -110,40 +120,46 @@ export const generateSocialMediaLinks = async (
       const twitterMessage = customMessage
         ? `${customMessage} ${campaign.title}`
         : `Check out this campaign: ${campaign.title}`;
-      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-        twitterMessage
-      )}&url=${encodeURIComponent(baseUrl)}`;
-
+      const { shareUrl, linkTokenId } = await createShareUrlForPlatform(
+        campaignId,
+        organizerId,
+        "twitter",
+        utmSource,
+        utmMedium
+      );
       socialLinks.twitter = {
-        url: twitterUrl,
+        url: shareUrl,
         platform: "twitter",
         type: "share",
-        trackingUrl: await createTrackingLink(
+        trackingUrl: await createTrackingRedirectForExistingToken(
           campaignId,
-          organizerId,
-          "twitter",
+          linkTokenId,
           utmSource,
           utmMedium,
+          `social_twitter`,
           "twitter_share"
         ),
       };
     }
 
     if (platform === "all" || platform === "linkedin") {
-      const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-        baseUrl
-      )}`;
-
+      const { shareUrl, linkTokenId } = await createShareUrlForPlatform(
+        campaignId,
+        organizerId,
+        "linkedin",
+        utmSource,
+        utmMedium
+      );
       socialLinks.linkedin = {
-        url: linkedinUrl,
+        url: shareUrl,
         platform: "linkedin",
         type: "share",
-        trackingUrl: await createTrackingLink(
+        trackingUrl: await createTrackingRedirectForExistingToken(
           campaignId,
-          organizerId,
-          "linkedin",
+          linkTokenId,
           utmSource,
           utmMedium,
+          `social_linkedin`,
           "linkedin_share"
         ),
       };
@@ -154,18 +170,23 @@ export const generateSocialMediaLinks = async (
         ? `${customMessage}\n\n${campaign.title}\n${baseUrl}`
         : `Check out this campaign: ${campaign.title}\n${baseUrl}`;
 
+      const { shareUrl, linkTokenId } = await createShareUrlForPlatform(
+        campaignId,
+        organizerId,
+        "telegram",
+        utmSource,
+        utmMedium
+      );
       socialLinks.telegram = {
-        url: `https://t.me/share/url?url=${encodeURIComponent(
-          baseUrl
-        )}&text=${encodeURIComponent(telegramMessage)}`,
+        url: shareUrl,
         platform: "telegram",
         type: "share",
-        trackingUrl: await createTrackingLink(
+        trackingUrl: await createTrackingRedirectForExistingToken(
           campaignId,
-          organizerId,
-          "telegram",
+          linkTokenId,
           utmSource,
           utmMedium,
+          `social_telegram`,
           "telegram_share"
         ),
       };
@@ -211,32 +232,20 @@ export const generateSocialMediaLinks = async (
  * @param {string} utmContent - UTM content parameter
  * @returns {Promise<string>} Tracking URL
  */
-const createTrackingLink = async (
+const createTrackingRedirectForExistingToken = async (
   campaignId,
-  organizerId,
-  platform,
+  linkTokenId,
   utmSource,
   utmMedium,
+  utmCampaign,
   utmContent
 ) => {
   try {
-    // Ensure campaign exists to construct public share URL
     const campaign = await findCampaignById(campaignId);
     if (!campaign) {
       throw new NotFoundError("Campaign not found");
     }
-    const linkTokenData = {
-      campaignId,
-      type: "share",
-      utmSource,
-      utmMedium,
-      utmCampaign: `social_${platform}`,
-      utmContent,
-    };
-
-    const linkToken = await createLinkToken(linkTokenData, organizerId);
-
-    const trackingUrl = generateTrackingLink(
+    return generateTrackingLink(
       `${process.env.FRONTEND_URL}/campaign/${campaign.shareLink}-${(
         campaign.name || ""
       )
@@ -245,26 +254,58 @@ const createTrackingLink = async (
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "")
         .slice(0, 80)}`,
-      linkToken.linkTokenId,
+      linkTokenId,
       {
         utm_source: utmSource,
         utm_medium: utmMedium,
-        utm_campaign: `social_${platform}`,
+        utm_campaign: utmCampaign,
         utm_content: utmContent,
       }
     );
-
-    return trackingUrl;
   } catch (error) {
-    logger.error("Failed to create tracking link for social media", {
+    logger.error("Failed to create tracking redirect for existing token", {
       error: error.message,
       campaignId,
-      organizerId,
-      platform,
+      linkTokenId,
     });
     throw error;
   }
 };
+
+/**
+ * Create backend share URL for a platform using a link token of type 'share'.
+ * Returns a URL like `${process.env.BACKEND_URL}/share/:linkTokenId` which
+ * serves crawler-friendly OG tags and redirects humans to click tracking.
+ */
+const createShareUrlForPlatform = async (
+  campaignId,
+  organizerId,
+  platform,
+  utmSource,
+  utmMedium
+) => {
+  const linkToken = await createLinkToken(
+    {
+      campaignId,
+      type: "share",
+      utmSource,
+      utmMedium,
+      utmCampaign: `social_${platform}`,
+      utmContent: `${platform}_share`,
+    },
+    organizerId
+  );
+  const backendUrl = process.env.BACKEND_URL || process.env.API_URL;
+  return {
+    shareUrl: `${backendUrl}/share/${linkToken.linkTokenId}`,
+    linkTokenId: linkToken.linkTokenId,
+  };
+};
+
+/**
+ * Create backend share URL for a platform for public generation (no auth).
+ */
+// Public share URL generation removed
 
 /**
  * Get social media sharing statistics for a campaign

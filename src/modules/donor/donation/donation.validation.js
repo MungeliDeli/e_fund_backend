@@ -87,6 +87,13 @@ const createDonationSchema = Joi.object({
   subscribeToCampaign: Joi.boolean().default(true).messages({
     "boolean.base": "subscribeToCampaign must be a boolean value",
   }),
+  // Optional outreach attribution
+  linkTokenId: Joi.string().uuid().optional().messages({
+    "string.guid": "linkTokenId must be a valid UUID",
+  }),
+  contactId: Joi.string().uuid().optional().messages({
+    "string.guid": "contactId must be a valid UUID",
+  }),
 });
 
 const updateDonationStatusSchema = Joi.object({
@@ -162,25 +169,9 @@ export const validateCampaignState = async (req, res, next) => {
       );
     }
 
-    // Check if campaign has ended
-    if (campaign.endDate && new Date(campaign.endDate) < new Date()) {
-      return next(
-        new AppError(
-          "Campaign has ended and is no longer accepting donations",
-          422
-        )
-      );
-    }
+    
 
-    // Check if campaign has started
-    if (campaign.startDate && new Date(campaign.startDate) > new Date()) {
-      return next(
-        new AppError(
-          "Campaign has not started yet and is not accepting donations",
-          422
-        )
-      );
-    }
+   
 
     // Check if campaign is suspended (additional safety check)
     if (campaign.status === "cancelled" || campaign.status === "rejected") {

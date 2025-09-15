@@ -104,8 +104,14 @@ const userRepository = {
    */
   async updateProfileMediaId(userId, field, mediaId, client) {
     const executor = client || { query };
+    // Validate and safely inject the column identifier
+    const allowedFields = ["profilePictureMediaId", "coverPictureMediaId"];
+    if (!allowedFields.includes(field)) {
+      throw new DatabaseError(`Invalid profile media field: ${field}`);
+    }
+
     const queryText = `
-      UPDATE "individualProfiles" SET ${field} = $1 WHERE "userId" = $2
+      UPDATE "individualProfiles" SET "${field}" = $1 WHERE "userId" = $2
     `;
     await executor.query(queryText, [mediaId, userId]);
   },

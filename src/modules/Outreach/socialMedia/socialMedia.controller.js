@@ -74,3 +74,8 @@ export const getStats = async (req, res) => {
     stats
   );
 };
+
+/**
+ * Generate a public share URL for a campaign (no auth)
+ */
+// Public share endpoint removed

@@ -1,34 +1,34 @@
 /**
  * Application Logging Module
- * 
+ *
  * This module provides a comprehensive logging system for the application using Winston.
  * It handles different types of logs (info, error, debug, security) and provides
  * specialized logging for different parts of the application (API, database, security).
- * 
+ *
  * LOGGING LEVELS:
  * - error: Critical errors that need immediate attention
  * - warn: Warning messages for potential issues
  * - info: General information about application flow
  * - debug: Detailed debugging information
  * - security: Security-related events and audit logs
- * 
+ *
  * SPECIALIZED LOGGERS:
  * - api: API request/response logging
  * - db: Database operation logging
  * - security: Security event logging (login attempts, token generation, etc.)
- * 
+ *
  * LOG FORMATS:
  * - Console: Human-readable format for development
  * - File: JSON format for production and analysis
  * - Combined: Both console and file output
- * 
+ *
  * LOG CATEGORIES:
  * - Application logs: General application events
  * - API logs: HTTP request/response logging
  * - Database logs: SQL queries and database operations
  * - Security logs: Authentication, authorization, and security events
  * - Error logs: Application errors and exceptions
- * 
+ *
  * LOG FEATURES:
  * - Timestamp inclusion
  * - Log level categorization
@@ -37,7 +37,7 @@
  * - Environment-specific configurations
  * - Performance monitoring
  * - Security auditing
- * 
+ *
  * API LOGGING:
  * - Request method and URL
  * - Response status code
@@ -45,7 +45,7 @@
  * - User agent and IP address
  * - Request body (sanitized)
  * - Response size
- * 
+ *
  * DATABASE LOGGING:
  * - SQL query logging
  * - Query execution time
@@ -53,7 +53,7 @@
  * - Database connection events
  * - Transaction logging
  * - Error logging with context
- * 
+ *
  * SECURITY LOGGING:
  * - Login attempts (success/failure)
  * - Token generation and validation
@@ -61,25 +61,25 @@
  * - Account activation events
  * - Authorization failures
  * - Rate limiting events
- * 
+ *
  * FILE MANAGEMENT:
  * - Daily log rotation
  * - Maximum file size limits
  * - Log retention policies
  * - Separate files for different log types
  * - Compressed archive files
- * 
+ *
  * ENVIRONMENT CONFIGURATION:
  * - Development: Console and file logging
  * - Production: File-only logging with rotation
  * - Testing: Minimal logging for performance
- * 
+ *
  * INTEGRATION:
  * - Works with Express middleware
  * - Compatible with error handling
  * - Supports monitoring tools
  * - Enables debugging and troubleshooting
- * 
+ *
  * @author FundFlow Team
  * @version 1.0.0
  * @since 2024
@@ -119,12 +119,27 @@ const format = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
   winston.format.errors({ stack: true }),
   winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) =>
-      `${info.timestamp} ${info.level}: ${info.message}${
-        info.stack ? "\n" + info.stack : ""
-      }`
-  )
+  winston.format.printf((info) => {
+    let logMessage = `${info.timestamp} ${info.level}: ${info.message}`;
+
+    // Add any additional properties (context) if they exist
+    const contextProps = { ...info };
+    delete contextProps.timestamp;
+    delete contextProps.level;
+    delete contextProps.message;
+    delete contextProps.stack;
+
+    if (Object.keys(contextProps).length > 0) {
+      logMessage += ` | ${JSON.stringify(contextProps)}`;
+    }
+
+    // Add stack trace if it exists
+    if (info.stack) {
+      logMessage += `\n${info.stack}`;
+    }
+
+    return logMessage;
+  })
 );
 
 // Define file format (no colors for files)

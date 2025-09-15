@@ -77,7 +77,7 @@ router.use(authenticate);
 router.post(
   "/",
   upload,
-  validateCreateCampaign, // Re-enabled now that campaignSettings is working
+  validateCreateCampaign, 
   catchAsync(createCampaign)
 );
 router.get("/my-campaigns", catchAsync(getCampaignsByOrganizer));

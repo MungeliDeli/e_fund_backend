@@ -30,6 +30,7 @@ import auditRoutes from "./modules/audit/audit.routes.js";
 import { donationRoutes, messageRoutes } from "./modules/donor/index.js";
 import { transactionRoutes } from "./modules/payment/index.js";
 import analyticsRoutes from "./modules/analytics/analytics.routes.js";
+import postRoutes from "./modules/feed/post.routes.js";
 
 /**
  * Express Application Setup
@@ -110,9 +111,10 @@ app.use("/t", trackingRoutes);
 app.use("/api/v1/donations", donationRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
-app.use("/api/v1", notificationRoutes);
 app.use("/api/v1/audit", auditRoutes);
+app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1", analyticsRoutes);
+app.use("/api/v1", notificationRoutes);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);

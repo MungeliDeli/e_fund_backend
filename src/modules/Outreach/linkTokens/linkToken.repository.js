@@ -133,6 +133,59 @@ export const createLinkToken = async (linkTokenData, organizerId) => {
 };
 
 /**
+ * Create a new public share link token (no organizer auth)
+ * @param {Object} linkTokenData - Link token data
+ * @returns {Promise<Object>} Created link token
+ */
+export const createPublicShareLinkToken = async (linkTokenData) => {
+  return await transaction(async (client) => {
+    const { campaignId, type, utmSource, utmMedium, utmCampaign, utmContent } =
+      linkTokenData;
+
+    // Verify campaign exists (public; no organizer check)
+    const campaignCheckQuery = `
+      SELECT "campaignId" FROM "campaigns" 
+      WHERE "campaignId" = $1
+    `;
+    const campaignCheckResult = await client.query(campaignCheckQuery, [
+      campaignId,
+    ]);
+
+    if (campaignCheckResult.rows.length === 0) {
+      throw new NotFoundError("Campaign not found");
+    }
+
+    const insertQuery = `
+      INSERT INTO "linkTokens" (
+        "campaignId", "contactId", "segmentId", "type", 
+        "prefillAmount", "personalizedMessage", 
+        "utmSource", "utmMedium", "utmCampaign", "utmContent",
+        "outreachCampaignId"
+      )
+      VALUES ($1, NULL, NULL, $2, NULL, NULL, $3, $4, $5, $6, NULL)
+      RETURNING *
+    `;
+
+    const result = await client.query(insertQuery, [
+      campaignId,
+      type,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+    ]);
+
+    logger.info("Public share link token created", {
+      linkTokenId: result.rows[0].linkTokenId,
+      campaignId,
+      type,
+    });
+
+    return result.rows[0];
+  });
+};
+
+/**
  * Get link token by ID
  * @param {string} linkTokenId - Link token ID
  * @param {string} organizerId - Organizer ID (for authorization, null for public tracking)

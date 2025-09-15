@@ -191,7 +191,11 @@ export const handleClickTracking = async (req, res) => {
     if (linkToken.personalizedMessage)
       utmParams.append("message", linkToken.personalizedMessage);
 
-    // Append UTM parameters to redirect URL
+    // Include attribution identifiers for frontend (lt = linkTokenId, cid = contactId)
+    utmParams.append("lt", linkToken.linkTokenId || linkTokenId);
+    if (linkToken.contactId) utmParams.append("cid", linkToken.contactId);
+
+    // Append parameters to redirect URL
     if (utmParams.toString()) {
       const separator = finalRedirectUrl.includes("?") ? "&" : "?";
       finalRedirectUrl += `${separator}${utmParams.toString()}`;

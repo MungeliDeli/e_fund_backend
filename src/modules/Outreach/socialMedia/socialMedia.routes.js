@@ -11,26 +11,15 @@
 import { Router } from "express";
 import { catchAsync } from "../../../middlewares/errorHandler.js";
 import { authenticate } from "../../../middlewares/auth.middleware.js";
-import { generateLinks, getStats } from "./socialMedia.controller.js";
-import {
-  validateCampaignId,
-  validateSocialMediaOptions,
-} from "./socialMedia.validation.js";
+import { getStats } from "./socialMedia.controller.js";
+import { validateCampaignId } from "./socialMedia.validation.js";
 
 const router = Router();
 
-// Apply authentication to all routes
+// Authenticated-only routes (share routes removed)
 router.use(authenticate);
 
-// Social media link generation
-router.post(
-  "/campaigns/:campaignId/generate-links",
-  validateCampaignId,
-  validateSocialMediaOptions,
-  catchAsync(generateLinks)
-);
-
-// Social media statistics
+// Keep stats endpoint for analytics pages
 router.get(
   "/campaigns/:campaignId/social-stats",
   validateCampaignId,
