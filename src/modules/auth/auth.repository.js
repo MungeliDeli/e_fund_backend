@@ -155,9 +155,9 @@ class AuthRepository {
       // Insert into organizationProfiles table
       const profileQuery = `
         INSERT INTO "organizationProfiles" (
-          "userId", "organizationName", "organizationShortName", "organizationType", "officialEmail", "officialWebsiteUrl", "profilePictureMediaId", "coverPictureMediaId", address, "missionDescription", "establishmentDate", "campusAffiliationScope", "affiliatedSchoolsNames", "affiliatedDepartmentNames", "primaryContactPersonName", "primaryContactPersonEmail", "primaryContactPersonPhone", "createdByAdminId"
+          "userId", "organizationName", "organizationShortName", "organizationType", "officialEmail", "officialWebsiteUrl", "profilePictureMediaId", "coverPictureMediaId", address, "missionDescription", "establishmentDate", "campusAffiliationScope", "primaryContactPersonName", "primaryContactPersonEmail", "primaryContactPersonPhone", "createdByAdminId"
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
         ) RETURNING *
       `;
       const profileValues = [
@@ -173,8 +173,6 @@ class AuthRepository {
         profileData.missionDescription,
         profileData.establishmentDate,
         profileData.campusAffiliationScope,
-        profileData.affiliatedSchoolsNames,
-        profileData.affiliatedDepartmentNames,
         profileData.primaryContactPersonName,
         profileData.primaryContactPersonEmail,
         profileData.primaryContactPersonPhone,

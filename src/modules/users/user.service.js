@@ -83,8 +83,6 @@ function formatProfile(user, profile, isOwner) {
       missionDescription: profile.missionDescription,
       establishmentDate: profile.establishmentDate,
       campusAffiliationScope: profile.campusAffiliationScope,
-      affiliatedSchoolsNames: profile.affiliatedSchoolsNames,
-      affiliatedDepartmentNames: profile.affiliatedDepartmentNames,
       createdAt: profile.createdAt,
     };
     if (isOwner) {

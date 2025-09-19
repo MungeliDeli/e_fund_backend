@@ -288,8 +288,6 @@ class AuthService {
       missionDescription,
       establishmentDate,
       campusAffiliationScope,
-      affiliatedSchoolsNames,
-      affiliatedDepartmentNames,
       primaryContactPersonName,
       primaryContactPersonEmail,
       primaryContactPersonPhone,
@@ -366,12 +364,6 @@ class AuthService {
           establishmentDate: establishmentDate ? establishmentDate : null,
           campusAffiliationScope: campusAffiliationScope
             ? campusAffiliationScope.trim()
-            : null,
-          affiliatedSchoolsNames: affiliatedSchoolsNames
-            ? affiliatedSchoolsNames.trim()
-            : null,
-          affiliatedDepartmentNames: affiliatedDepartmentNames
-            ? affiliatedDepartmentNames.trim()
             : null,
           primaryContactPersonName: primaryContactPersonName
             ? primaryContactPersonName.trim()
