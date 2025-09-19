@@ -33,6 +33,15 @@ const JPEG_QUALITY = 80;
 // Helper to filter fields for public/private view
 function formatProfile(user, profile, isOwner) {
   if (!user || !profile) return null;
+
+  // Generate public URLs for profile and cover pictures
+  const profilePictureUrl = profile.profilePictureFileName
+    ? getPublicS3Url(profile.profilePictureFileName)
+    : null;
+  const coverPictureUrl = profile.coverPictureFileName
+    ? getPublicS3Url(profile.coverPictureFileName)
+    : null;
+
   if (user.userType === "individualUser") {
     // Individual user profile
     const publicFields = {
@@ -43,8 +52,8 @@ function formatProfile(user, profile, isOwner) {
       gender: profile.gender,
       country: profile.country,
       city: profile.city,
-      profilePictureMediaId: profile.profilePictureMediaId,
-      coverPictureMediaId: profile.coverPictureMediaId,
+      profilePictureUrl,
+      coverPictureUrl,
       createdAt: profile.createdAt,
     };
     if (isOwner) {
@@ -68,8 +77,8 @@ function formatProfile(user, profile, isOwner) {
       organizationShortName: profile.organizationShortName,
       organizationType: profile.organizationType,
       officialWebsiteUrl: profile.officialWebsiteUrl,
-      profilePictureMediaId: profile.profilePictureMediaId,
-      coverPictureMediaId: profile.coverPictureMediaId,
+      profilePictureUrl,
+      coverPictureUrl,
       address: profile.address,
       missionDescription: profile.missionDescription,
       establishmentDate: profile.establishmentDate,

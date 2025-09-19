@@ -37,13 +37,35 @@ export const getUserWithProfileById = async (userId) => {
     let profile = null;
     if (user.userType === "individualUser") {
       const profileResult = await query(
-        `SELECT "firstName", "lastName", "phoneNumber", gender, "dateOfBirth", country, city, address, "profilePictureMediaId", "coverPictureMediaId", "createdAt" FROM "individualProfiles" WHERE "userId" = $1`,
+        `SELECT 
+          p."firstName", p."lastName", p."phoneNumber", p.gender, p."dateOfBirth", 
+          p.country, p.city, p.address, p."profilePictureMediaId", p."coverPictureMediaId", 
+          p."createdAt",
+          pp."fileName" AS profilePictureFileName,
+          cp."fileName" AS coverPictureFileName
+        FROM "individualProfiles" p
+        LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
+        LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
+        WHERE p."userId" = $1`,
         [userId]
       );
       profile = profileResult.rows[0] || null;
     } else if (user.userType === "organizationUser") {
       const profileResult = await query(
-        `SELECT "organizationName", "organizationShortName", "organizationType", "officialEmail", "officialWebsiteUrl", "profilePictureMediaId", "coverPictureMediaId", address, "missionDescription", "establishmentDate", "campusAffiliationScope", "affiliatedSchoolsNames", "affiliatedDepartmentNames", "primaryContactPersonName", "primaryContactPersonEmail", "primaryContactPersonPhone", "createdByAdminId", "createdAt" FROM "organizationProfiles" WHERE "userId" = $1`,
+        `SELECT 
+          p."organizationName", p."organizationShortName", p."organizationType", 
+          p."officialEmail", p."officialWebsiteUrl", p."profilePictureMediaId", 
+          p."coverPictureMediaId", p.address, p."missionDescription", 
+          p."establishmentDate", p."campusAffiliationScope", p."affiliatedSchoolsNames", 
+          p."affiliatedDepartmentNames", p."primaryContactPersonName", 
+          p."primaryContactPersonEmail", p."primaryContactPersonPhone", 
+          p."createdByAdminId", p."createdAt",
+          pp."fileName" AS profilePictureFileName,
+          cp."fileName" AS coverPictureFileName
+        FROM "organizationProfiles" p
+        LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
+        LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
+        WHERE p."userId" = $1`,
         [userId]
       );
       profile = profileResult.rows[0] || null;

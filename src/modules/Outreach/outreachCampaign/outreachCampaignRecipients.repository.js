@@ -34,7 +34,8 @@ export const addRecipientsForAllContacts = async (
       INSERT INTO "outreachCampaignRecipients" ("outreachCampaignId", "contactId", "email")
       SELECT $1, c."contactId", c."email"
       FROM "contacts" c
-      WHERE c."organizerId" = $2 AND c."email" IS NOT NULL AND c."email" <> ''
+      JOIN "segments" s ON c."segmentId" = s."segmentId"
+      WHERE s."organizerId" = $2 AND c."email" IS NOT NULL AND c."email" <> ''
       ON CONFLICT ("outreachCampaignId", "contactId") DO NOTHING
       RETURNING *;
     `;
