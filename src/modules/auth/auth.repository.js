@@ -908,6 +908,46 @@ class AuthRepository {
       throw new DatabaseError("Failed to update media entityId", error);
     }
   }
+
+  /**
+   * Updates organization profile media IDs
+   * @param {string} organizationId - Organization user ID
+   * @param {string} profilePictureMediaId - Profile picture media ID
+   * @param {string} coverPictureMediaId - Cover picture media ID
+   * @param {object} client - DB client (transaction)
+   * @returns {Promise<void>}
+   */
+  async updateOrganizationProfileMediaIds(
+    organizationId,
+    profilePictureMediaId,
+    coverPictureMediaId,
+    client = null
+  ) {
+    try {
+      const executor = client ? client : { query };
+      const queryText = `
+        UPDATE "organizationProfiles"
+        SET "profilePictureMediaId" = $1, "coverPictureMediaId" = $2
+        WHERE "userId" = $3
+      `;
+      await executor.query(queryText, [
+        profilePictureMediaId,
+        coverPictureMediaId,
+        organizationId,
+      ]);
+    } catch (error) {
+      logger.error("Failed to update organization profile media IDs", {
+        error: error.message,
+        organizationId,
+        profilePictureMediaId,
+        coverPictureMediaId,
+      });
+      throw new DatabaseError(
+        "Failed to update organization profile media IDs",
+        error
+      );
+    }
+  }
 }
 
 export default new AuthRepository();

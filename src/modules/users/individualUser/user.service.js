@@ -17,22 +17,27 @@
  */
 
 import { getUserWithProfileById } from "./user.repository.js";
-import { NotFoundError, DatabaseError } from "../../utils/appError.js";
-import { uploadFileToS3, getPublicS3Url } from "../../utils/s3.utils.js";
+import { NotFoundError, DatabaseError } from "../../../utils/appError.js";
+import { uploadFileToS3, getPublicS3Url } from "../../../utils/s3.utils.js";
 import { v4 as uuidv4 } from "uuid";
 import userRepository from "./user.repository.js";
-import logger from "../../utils/logger.js";
-import { query, transaction } from "../../db/index.js";
+import logger from "../../../utils/logger.js";
+import { query, transaction } from "../../../db/index.js";
 import sharp from "sharp";
-import { logUserAction } from "../audit/audit.utils.js";
-import { USER_ACTIONS } from "../audit/audit.constants.js";
+import { logUserAction } from "../../audit/audit.utils.js";
+import { USER_ACTIONS } from "../../audit/audit.constants.js";
 
 const MAX_IMAGE_DIMENSION = 1024;
 const JPEG_QUALITY = 80;
 
-// Helper to filter fields for public/private view
+// Helper to filter fields for public/private view (individual users only)
 function formatProfile(user, profile, isOwner) {
   if (!user || !profile) return null;
+
+  // Only handle individual users
+  if (user.userType !== "individualUser") {
+    return null;
+  }
 
   // Generate public URLs for profile and cover pictures
   const profilePictureUrl = profile.profilePictureFileName
@@ -42,64 +47,33 @@ function formatProfile(user, profile, isOwner) {
     ? getPublicS3Url(profile.coverPictureFileName)
     : null;
 
-  if (user.userType === "individualUser") {
-    // Individual user profile
-    const publicFields = {
-      userId: user.userId,
-      userType: user.userType,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      gender: profile.gender,
-      country: profile.country,
-      city: profile.city,
-      profilePictureUrl,
-      coverPictureUrl,
-      createdAt: profile.createdAt,
-    };
-    if (isOwner) {
-      return {
-        ...publicFields,
-        email: user.email,
-        phoneNumber: profile.phoneNumber,
-        dateOfBirth: profile.dateOfBirth,
-        address: profile.address,
-        isEmailVerified: user.isEmailVerified,
-        isActive: user.isActive,
-      };
-    }
-    return publicFields;
-  } else if (user.userType === "organizationUser") {
-    // Organization user profile
-    const publicFields = {
-      userId: user.userId,
-      userType: user.userType,
-      organizationName: profile.organizationName,
-      organizationShortName: profile.organizationShortName,
-      organizationType: profile.organizationType,
-      officialWebsiteUrl: profile.officialWebsiteUrl,
-      profilePictureUrl,
-      coverPictureUrl,
+  // Individual user profile
+  const publicFields = {
+    userId: user.userId,
+    userType: user.userType,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    gender: profile.gender,
+    country: profile.country,
+    city: profile.city,
+    profilePictureUrl,
+    coverPictureUrl,
+    createdAt: profile.createdAt,
+  };
+
+  if (isOwner) {
+    return {
+      ...publicFields,
+      email: user.email,
+      phoneNumber: profile.phoneNumber,
+      dateOfBirth: profile.dateOfBirth,
       address: profile.address,
-      missionDescription: profile.missionDescription,
-      establishmentDate: profile.establishmentDate,
-      campusAffiliationScope: profile.campusAffiliationScope,
-      createdAt: profile.createdAt,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
     };
-    if (isOwner) {
-      return {
-        ...publicFields,
-        email: user.email,
-        officialEmail: profile.officialEmail,
-        primaryContactPersonName: profile.primaryContactPersonName,
-        primaryContactPersonEmail: profile.primaryContactPersonEmail,
-        primaryContactPersonPhone: profile.primaryContactPersonPhone,
-        isEmailVerified: user.isEmailVerified,
-        isActive: user.isActive,
-      };
-    }
-    return publicFields;
   }
-  return null;
+
+  return publicFields;
 }
 
 /**
@@ -111,6 +85,12 @@ function formatProfile(user, profile, isOwner) {
 export const getUserById = async (userId, isOwner = false) => {
   const { user, profile } = await getUserWithProfileById(userId);
   if (!user || !profile) throw new NotFoundError("User/profile not found");
+
+  // Only handle individual users in this service
+  if (user.userType !== "individualUser") {
+    throw new NotFoundError("Individual user not found");
+  }
+
   return formatProfile(user, profile, isOwner);
 };
 
@@ -122,7 +102,16 @@ export const getUserById = async (userId, isOwner = false) => {
  */
 export const updateUserProfile = async (userId, profileData) => {
   try {
-    logger.info("Updating user profile in service", { userId });
+    logger.info("Updating individual user profile in service", { userId });
+
+    // Get user info to verify it's an individual user
+    const { user } = await getUserWithProfileById(userId);
+
+    if (user.userType !== "individualUser") {
+      throw new DatabaseError(
+        "Only individual users can update profiles through this service"
+      );
+    }
 
     const updatedProfile = await userRepository.updateUserProfile(
       userId,
@@ -134,9 +123,14 @@ export const updateUserProfile = async (userId, profileData) => {
     }
 
     // After updating, refetch the full profile to return consistent data
-    const { user, profile } = await getUserWithProfileById(userId);
+    const { user: updatedUser, profile: updatedProfileData } =
+      await getUserWithProfileById(userId);
     // isOwner is true since the user is updating their own profile
-    const formattedProfile = formatProfile(user, profile, true);
+    const formattedProfile = formatProfile(
+      updatedUser,
+      updatedProfileData,
+      true
+    );
 
     // Log audit event for profile update
     if (global.req) {
@@ -145,7 +139,7 @@ export const updateUserProfile = async (userId, profileData) => {
         USER_ACTIONS.USER_PROFILE_UPDATED,
         userId,
         {
-          userType: user.userType,
+          userType: updatedUser.userType,
           updatedFields: Object.keys(profileData),
         }
       );
@@ -153,14 +147,14 @@ export const updateUserProfile = async (userId, profileData) => {
 
     return formattedProfile;
   } catch (error) {
-    logger.error("Failed to update user profile in service", {
+    logger.error("Failed to update individual user profile in service", {
       error: error.message,
       userId,
     });
     if (error instanceof NotFoundError) {
       throw error;
     }
-    throw new DatabaseError("Failed to update user profile.", error);
+    throw new DatabaseError("Failed to update individual user profile.", error);
   }
 };
 
@@ -356,34 +350,4 @@ export const getMediaUrl = async (mediaId) => {
     logger.error("Failed to get media URL", { error: error.message, mediaId });
     throw error;
   }
-};
-
-/**
- * Get a list of organization users (organizers) with optional filters
- * @param {Object} filters - { verified, active, search }
- * @returns {Promise<Array>} List of formatted organizer profiles
- */
-export const getOrganizers = async (filters = {}) => {
-  const organizers = await userRepository.findOrganizers(filters);
-  // Format for frontend table (add status, active, logoImageUrl, etc.)
-  return organizers.map((org) => {
-    let logoImageUrl = null;
-    if (org.profilePictureFileName) {
-      logoImageUrl = getPublicS3Url(org.profilePictureFileName);
-    }
-    return {
-      userId: org.userId,
-      organizationName: org.organizationName,
-      organizationShortName: org.organizationShortName,
-      organizationType: org.organizationType,
-      email: org.officialEmail || org.email,
-      status: org.isEmailVerified ? "VERIFIED" : "PENDING",
-      active: !!org.isActive,
-      profilePictureMediaId: org.profilePictureMediaId,
-      coverPictureMediaId: org.coverPictureMediaId,
-      createdAt: org.createdAt,
-      officialWebsiteUrl: org.officialWebsiteUrl,
-      logoImageUrl,
-    };
-  });
 };

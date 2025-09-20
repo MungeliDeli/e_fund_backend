@@ -16,15 +16,11 @@
  */
 
 import { Router } from "express";
-import {
-  getUserProfile,
-  getMyProfile,
-  getOrganizers,
-} from "./user.controller.js";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { getUserProfile, getMyProfile } from "./user.controller.js";
+import { authenticate } from "../../../middlewares/auth.middleware.js";
 import multer from "multer";
-import { logRequestCount } from "../../middlewares/requestLogger.middleware.js";
-import { catchAsync } from "../../middlewares/errorHandler.js";
+import { logRequestCount } from "../../../middlewares/requestLogger.middleware.js";
+import { catchAsync } from "../../../middlewares/errorHandler.js";
 import {
   updateProfileImage,
   getMediaUrl,
@@ -49,8 +45,6 @@ router.use(logRequestCount);
 router.get("/:userId/profile", validateUserId, catchAsync(getUserProfile));
 // Private profile (owner only)
 router.get("/me", authenticate, catchAsync(getMyProfile));
-// Public: Get all organizers (with optional filters)
-router.get("/organizers", catchAsync(getOrganizers));
 // Get signed URL for media file
 router.get("/media/:mediaId/url", validateMediaId, catchAsync(getMediaUrl));
 // Update profile/cover photo

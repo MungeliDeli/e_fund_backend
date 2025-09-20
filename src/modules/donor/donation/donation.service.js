@@ -4,7 +4,7 @@ import * as messageService from "../messages/message.service.js";
 import { logServiceEvent } from "../../audit/audit.utils.js";
 import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
 import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
-import { getUserById } from "../../users/user.service.js";
+import { getUserById } from "../../users/individualUser/user.service.js";
 import notificationService from "../../notifications/notification.service.js";
 import { AppError } from "../../../utils/appError.js";
 import logger from "../../../utils/logger.js";

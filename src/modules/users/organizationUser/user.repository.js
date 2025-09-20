@@ -1,32 +1,33 @@
 /**
- * User Repository
+ * Organization User Repository
  *
- * Handles all database operations for user profile management, including fetching user
+ * Handles all database operations for organization user profile management, including fetching organization
  * and profile data, and creating/updating media records. Provides a data access layer
- * for the User Service, abstracting SQL queries and transactions.
+ * for the Organization User Service, abstracting SQL queries and transactions.
  *
  * Key Features:
- * - Fetch user and profile data by userId
+ * - Fetch organization user and profile data by userId
  * - Create media records for profile/cover images
- * - Update profile media IDs in the database
+ * - Update organization profile media IDs in the database
+ * - Organization profile update operations
  * - Error handling and logging
  *
  * @author FundFlow Team
  * @version 1.0.0
  */
 
-import { query } from "../../db/index.js";
-import { DatabaseError, NotFoundError } from "../../utils/appError.js";
-import logger from "../../utils/logger.js";
+import { query } from "../../../db/index.js";
+import { DatabaseError, NotFoundError } from "../../../utils/appError.js";
+import logger from "../../../utils/logger.js";
 
 /**
- * Fetch user and profile data by userId
+ * Fetch organization user and profile data by userId
  * @param {string} userId - User ID
  * @returns {Promise<{user: Object, profile: Object}>}
  */
 export const getUserWithProfileById = async (userId) => {
   try {
-    logger.info("Fetching user/profile by ID", { userId });
+    logger.info("Fetching organization user/profile by ID", { userId });
     // Fetch user
     const userResult = await query(
       `SELECT "userId", email, "userType", "isEmailVerified", "isActive", "createdAt" FROM "users" WHERE "userId" = $1`,
@@ -34,49 +35,39 @@ export const getUserWithProfileById = async (userId) => {
     );
     if (userResult.rowCount === 0) throw new NotFoundError("User not found");
     const user = userResult.rows[0];
-    let profile = null;
-    if (user.userType === "individualUser") {
-      const profileResult = await query(
-        `SELECT 
-          p."firstName", p."lastName", p."phoneNumber", p.gender, p."dateOfBirth", 
-          p.country, p.city, p.address, p."profilePictureMediaId", p."coverPictureMediaId", 
-          p."createdAt",
-          pp."fileName" AS profilePictureFileName,
-          cp."fileName" AS coverPictureFileName
-        FROM "individualProfiles" p
-        LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
-        LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
-        WHERE p."userId" = $1`,
-        [userId]
-      );
-      profile = profileResult.rows[0] || null;
-    } else if (user.userType === "organizationUser") {
-      const profileResult = await query(
-        `SELECT 
-          p."organizationName", p."organizationShortName", p."organizationType", 
-          p."officialEmail", p."officialWebsiteUrl", p."profilePictureMediaId", 
-          p."coverPictureMediaId", p.address, p."missionDescription", 
-          p."establishmentDate", p."campusAffiliationScope", 
-          p."primaryContactPersonName", 
-          p."primaryContactPersonEmail", p."primaryContactPersonPhone", 
-          p."createdByAdminId", p."createdAt",
-          pp."fileName" AS profilePictureFileName,
-          cp."fileName" AS coverPictureFileName
-        FROM "organizationProfiles" p
-        LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
-        LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
-        WHERE p."userId" = $1`,
-        [userId]
-      );
-      profile = profileResult.rows[0] || null;
+
+    // Only handle organization users
+    if (user.userType !== "organizationUser") {
+      throw new NotFoundError("Organization user not found");
     }
+
+    let profile = null;
+    const profileResult = await query(
+      `SELECT 
+        p."organizationName", p."organizationShortName", p."organizationType", 
+        p."officialEmail", p."officialWebsiteUrl", p."profilePictureMediaId", 
+        p."coverPictureMediaId", p.address, p."missionDescription", 
+        p."establishmentDate", p."campusAffiliationScope", 
+        p."primaryContactPersonName", 
+        p."primaryContactPersonEmail", p."primaryContactPersonPhone", 
+        p."createdByAdminId", p."createdAt",
+        pp."fileName" AS "profilePictureFileName",
+        cp."fileName" AS "coverPictureFileName"
+      FROM "organizationProfiles" p
+      LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
+      WHERE p."userId" = $1`,
+      [userId]
+    );
+    profile = profileResult.rows[0] || null;
+
     return { user, profile };
   } catch (error) {
-    logger.error("Failed to fetch user/profile", {
+    logger.error("Failed to fetch organization user/profile", {
       error: error.message,
       userId,
     });
-    throw new DatabaseError("Failed to fetch user/profile", error);
+    throw new DatabaseError("Failed to fetch organization user/profile", error);
   }
 };
 
@@ -116,8 +107,9 @@ const userRepository = {
       uploadedByUserId,
     ]);
   },
+
   /**
-   * Update the profile's media ID field (profilePictureMediaId or coverPictureMediaId)
+   * Update the organization profile's media ID field (profilePictureMediaId or coverPictureMediaId)
    * @param {string} userId - User ID
    * @param {string} field - Field to update
    * @param {string} mediaId - Media record ID
@@ -133,24 +125,47 @@ const userRepository = {
     }
 
     const queryText = `
-      UPDATE "individualProfiles" SET "${field}" = $1 WHERE "userId" = $2
+      UPDATE "organizationProfiles" SET "${field}" = $1 WHERE "userId" = $2
     `;
     await executor.query(queryText, [mediaId, userId]);
   },
+
   /**
-   * Fetch a media record by mediaId
-   * @param {string} mediaId - Media record ID
-   * @returns {Promise<Object|null>} Media record or null if not found
+   * Update organization profile information
+   * @param {string} userId - The ID of the user to update
+   * @param {Object} profileData - The organization profile data to update
+   * @param {Object} [client] - Optional DB client for transaction
+   * @returns {Promise<Object>} Updated organization profile
    */
-  async updateUserProfile(userId, profileData) {
-    const { firstName, lastName, country, city, address } = profileData;
+  async updateOrganizationProfile(userId, profileData, client = null) {
+    const {
+      organizationName,
+      organizationShortName,
+      organizationType,
+      officialEmail,
+      officialWebsiteUrl,
+      address,
+      missionDescription,
+      establishmentDate,
+      campusAffiliationScope,
+      primaryContactPersonName,
+      primaryContactPersonEmail,
+      primaryContactPersonPhone,
+    } = profileData;
 
     const fields = {
-      firstName: firstName,
-      lastName: lastName,
-      country,
-      city,
+      organizationName,
+      organizationShortName,
+      organizationType,
+      officialEmail,
+      officialWebsiteUrl,
       address,
+      missionDescription,
+      establishmentDate,
+      campusAffiliationScope,
+      primaryContactPersonName,
+      primaryContactPersonEmail,
+      primaryContactPersonPhone,
     };
 
     const setClauses = [];
@@ -159,41 +174,49 @@ const userRepository = {
 
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) {
-        setClauses.push(`${key} = $${valueIndex++}`);
+        setClauses.push(`"${key}" = $${valueIndex++}`);
         values.push(value);
       }
     }
 
     if (setClauses.length === 0) {
-      return null; // Or throw an error if no fields are being updated
+      return null; // No fields to update
     }
 
     values.push(userId);
     const queryText = `
-      UPDATE "individualProfiles"
+      UPDATE "organizationProfiles"
       SET ${setClauses.join(", ")}
       WHERE "userId" = $${valueIndex}
       RETURNING *;
     `;
 
     try {
-      const result = await query(queryText, values);
+      const executor = client || { query };
+      const result = await executor.query(queryText, values);
       if (result.rowCount === 0) {
-        throw new NotFoundError("Profile not found for the given user ID.");
+        throw new NotFoundError(
+          "Organization profile not found for the given user ID."
+        );
       }
       return result.rows[0];
     } catch (error) {
-      logger.error("Failed to update user profile in repository", {
+      logger.error("Failed to update organization profile in repository", {
         error: error.message,
         userId,
       });
       if (error instanceof NotFoundError) {
         throw error;
       }
-      throw new DatabaseError("Failed to update user profile.", error);
+      throw new DatabaseError("Failed to update organization profile.", error);
     }
   },
 
+  /**
+   * Fetch a media record by mediaId
+   * @param {string} mediaId - Media record ID
+   * @returns {Promise<Object|null>} Media record or null if not found
+   */
   async getMediaRecord(mediaId) {
     try {
       const queryText = `

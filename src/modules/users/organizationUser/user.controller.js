@@ -1,13 +1,14 @@
 /**
- * User Controller
+ * Organization User Controller
  *
- * Handles HTTP requests for user profile management, including public/private profile
- * fetching and profile/cover image upload. Delegates business logic to the User Service
+ * Handles HTTP requests for organization user profile management, including public/private profile
+ * fetching and profile/cover image upload. Delegates business logic to the Organization User Service
  * and formats API responses.
  *
  * Key Features:
- * - Public and private profile endpoints
+ * - Public and private organization profile endpoints
  * - Profile and cover image upload endpoint
+ * - Organization listing endpoint
  * - Consistent API response formatting
  * - Error handling and validation
  *
@@ -16,13 +17,13 @@
  */
 
 import { getUserById } from "./user.service.js";
-import { ResponseFactory } from "../../utils/response.utils.js";
-import { NotFoundError } from "../../utils/appError.js";
+import { ResponseFactory } from "../../../utils/response.utils.js";
+import { NotFoundError } from "../../../utils/appError.js";
 import * as userService from "./user.service.js";
-import logger from "../../utils/logger.js";
+import logger from "../../../utils/logger.js";
 
 /**
- * Get a public user profile (anyone can access)
+ * Get a public organization user profile (anyone can access)
  * @param {import('express').Request} req - Express request object
  * @param {import('express').Response} res - Express response object
  * @returns {Promise<void>}
@@ -30,12 +31,16 @@ import logger from "../../utils/logger.js";
 export const getUserProfile = async (req, res) => {
   const userId = req.params.userId;
   const profile = await getUserById(userId, false);
-  if (!profile) throw new NotFoundError("User/profile not found");
-  ResponseFactory.ok(res, "User public profile fetched successfully", profile);
+  if (!profile) throw new NotFoundError("Organization user/profile not found");
+  ResponseFactory.ok(
+    res,
+    "Organization user public profile fetched successfully",
+    profile
+  );
 };
 
 /**
- * Get the private profile of the authenticated user (owner only)
+ * Get the private profile of the authenticated organization user (owner only)
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @returns {Promise<void>}
@@ -43,8 +48,12 @@ export const getUserProfile = async (req, res) => {
 export const getMyProfile = async (req, res) => {
   const userId = req.user.userId;
   const profile = await getUserById(userId, true);
-  if (!profile) throw new NotFoundError("User/profile not found");
-  ResponseFactory.ok(res, "User private profile fetched successfully", profile);
+  if (!profile) throw new NotFoundError("Organization user/profile not found");
+  ResponseFactory.ok(
+    res,
+    "Organization user private profile fetched successfully",
+    profile
+  );
 };
 
 /**
@@ -61,7 +70,7 @@ export const getMediaUrl = async (req, res) => {
 };
 
 /**
- * Update the profile and/or cover image for the authenticated user
+ * Update the profile and/or cover image for the authenticated organization user
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @returns {Promise<void>}
@@ -78,13 +87,13 @@ export const updateProfileImage = async (req, res) => {
   );
   ResponseFactory.ok(
     res,
-    "Profile image(s) updated successfully",
+    "Organization profile image(s) updated successfully",
     updatedProfile
   );
 };
 
 /**
- * Update the profile information for the authenticated user
+ * Update the profile information for the authenticated organization user
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @returns {Promise<void>}
@@ -95,7 +104,36 @@ export const updateUserProfile = async (req, res) => {
 
   ResponseFactory.ok(
     res,
-    "Profile information updated successfully",
+    "Organization profile information updated successfully",
+    updatedProfile
+  );
+};
+
+/**
+ * Update organization profile with both data and images
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const updateOrganizationProfileWithImages = async (req, res) => {
+  const userId = req.user.userId;
+  const files = req.files || {};
+  const profilePictureFile = files.profilePicture?.[0] || null;
+  const coverPictureFile = files.coverPicture?.[0] || null;
+
+  // Extract profile data from body (excluding files)
+  const profileData = { ...req.body };
+
+  const updatedProfile = await userService.updateOrganizationProfileWithImages(
+    userId,
+    profileData,
+    profilePictureFile,
+    coverPictureFile
+  );
+
+  ResponseFactory.ok(
+    res,
+    "Organization profile updated successfully",
     updatedProfile
   );
 };

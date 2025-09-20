@@ -18,7 +18,8 @@ import setAuditContext from "./middlewares/auditContext.middleware.js";
 
 // Import routes
 import authRoutes from "./modules/auth/auth.routes.js";
-import userRoutes from "./modules/users/user.routes.js";
+import userRoutes from "./modules/users/individualUser/user.routes.js";
+import organizationUserRoutes from "./modules/users/organizationUser/user.routes.js";
 import categoryRoutes from "./modules/campaign/categories/category.routes.js";
 import campaignRoutes from "./modules/campaign/campaigns/campaign.routes.js";
 import segmentRoutes from "./modules/Outreach/segments/segment.routes.js";
@@ -102,6 +103,7 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/organizations", organizationUserRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 app.use("/api/v1/outreach/segments", segmentRoutes);

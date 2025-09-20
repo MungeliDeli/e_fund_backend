@@ -46,7 +46,7 @@ import {
 import { getSegmentById } from "./segments/segment.repository.js";
 import { findCampaignById } from "../campaign/campaigns/campaign.repository.js";
 import { getCampaignsByOrganizer } from "../campaign/campaigns/campaign.service.js";
-import { getUserById } from "../users/user.service.js";
+import { getUserById } from "../users/individualUser/user.service.js";
 import {
   getDonationAttributionStats,
   getDonationsByContact,
