@@ -209,6 +209,82 @@ class PostRepository {
     const result = await db.query(query, [campaignId, organizerId]);
     return result.rows.length > 0;
   }
+
+  async createCampaignPost(campaignData) {
+    const {
+      campaignId,
+      organizerId,
+      title,
+      body,
+      media,
+      status = "published",
+    } = campaignData;
+
+    const query = `
+      INSERT INTO "posts" (
+        "organizerId",
+        "type",
+        "title",
+        "body",
+        "campaignId",
+        "isPinnedToCampaign",
+        "media",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ) VALUES ($1, 'campaign', $2, $3, $4, true, $5, $6, NOW(), NOW())
+      RETURNING *
+    `;
+
+    const values = [
+      organizerId,
+      title || null,
+      body || null,
+      campaignId,
+      JSON.stringify(media || []),
+      status,
+    ];
+
+    const result = await db.query(query, values);
+    return result.rows[0];
+  }
+
+  async getCampaignPostByCampaignId(campaignId) {
+    const query = `
+      SELECT 
+        p.*,
+        u."email",
+        u."userType",
+        COALESCE(ip."firstName", op."primaryContactPersonName") as "firstName",
+        COALESCE(ip."lastName", '') as "lastName",
+        op."organizationName",
+        c."name" as "campaignTitle",
+        c."shareLink" as "campaignShareLink"
+      FROM "posts" p
+      LEFT JOIN "users" u ON p."organizerId" = u."userId"
+      LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
+      LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      WHERE p."campaignId" = $1 
+        AND p."type" = 'campaign'
+        AND p."isSoftDeleted" = false
+    `;
+
+    const result = await db.query(query, [campaignId]);
+    return result.rows[0];
+  }
+
+  async updateCampaignPostStatus(campaignId, status) {
+    const query = `
+      UPDATE "posts" 
+      SET "status" = $1, "updatedAt" = NOW()
+      WHERE "campaignId" = $2 AND "type" = 'campaign'
+      RETURNING *
+    `;
+
+    const result = await db.query(query, [status, campaignId]);
+    return result.rows[0];
+  }
 }
 
 export default new PostRepository();

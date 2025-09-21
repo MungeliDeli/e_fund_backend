@@ -25,6 +25,11 @@ import {
   updateProfileImage,
   getMediaUrl,
   updateUserProfile,
+  getAllUsersController,
+  toggleUserStatusController,
+  makeUserAdminController,
+  getAllAdminsController,
+  removeAdminPrivilegesController,
 } from "./user.controller.js";
 import {
   validateUpdateProfile,
@@ -64,6 +69,36 @@ router.put(
   authenticate,
   validateUpdateProfile,
   catchAsync(updateUserProfile)
+);
+
+// Admin route to get all users
+router.get("/", authenticate, catchAsync(getAllUsersController));
+
+// Admin route to toggle user status
+router.patch(
+  "/:userId/status",
+  authenticate,
+  validateUserId,
+  catchAsync(toggleUserStatusController)
+);
+
+// Super admin route to make user admin
+router.patch(
+  "/:userId/make-admin",
+  authenticate,
+  validateUserId,
+  catchAsync(makeUserAdminController)
+);
+
+// Admin route to get all admins
+router.get("/admins", authenticate, catchAsync(getAllAdminsController));
+
+// Super admin route to remove admin privileges
+router.patch(
+  "/:userId/remove-admin",
+  authenticate,
+  validateUserId,
+  catchAsync(removeAdminPrivilegesController)
 );
 
 export default router;

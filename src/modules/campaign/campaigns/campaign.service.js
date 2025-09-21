@@ -33,6 +33,7 @@ import {
   uploadCampaignMediaToS3,
   getPublicS3Url,
 } from "../../../utils/s3.utils.js";
+import postService from "../../feed/post.service.js";
 
 /**
  * Format campaign data for API response
@@ -335,6 +336,30 @@ export const createCampaign = async (
     // Fetch complete campaign data with categories
     const completeCampaign = await getCampaignById(result.campaignId);
 
+    // Create campaign post if campaign is in a published state
+    try {
+      const publishedStatuses = ["active", "successful", "closed"];
+      if (publishedStatuses.includes(result.status)) {
+        await postService.createCampaignPost({
+          campaignId: result.campaignId,
+          organizerId,
+          customPageSettings: updatedCustomPageSettings,
+          status: result.status,
+        });
+        logger.info("Campaign post created automatically", {
+          campaignId: result.campaignId,
+          organizerId,
+        });
+      }
+    } catch (postError) {
+      logger.error("Failed to create campaign post", {
+        error: postError.message,
+        campaignId: result.campaignId,
+        organizerId,
+      });
+      // Don't throw error - campaign creation should still succeed
+    }
+
     logger.info("Campaign created successfully", {
       campaignId: result.campaignId,
       organizerId,
@@ -467,6 +492,69 @@ export const updateCampaign = async (
 
     // Fetch complete campaign data with categories
     const completeCampaign = await getCampaignById(campaignId);
+
+    // Handle campaign post creation/update based on status changes
+    try {
+      if (updateData.status) {
+        const publishedStatuses = ["active", "successful", "closed"];
+        const archivedStatuses = [
+          "pendingApproval",
+          "pendingStart",
+          "cancelled",
+          "rejected",
+        ];
+
+        // Check if campaign post exists
+        const existingPost = await postService.getCampaignPostByCampaignId(
+          campaignId
+        );
+
+        if (publishedStatuses.includes(updateData.status)) {
+          if (existingPost) {
+            // Update existing post status to published
+            await postService.updateCampaignPostStatus(
+              campaignId,
+              updateData.status
+            );
+            logger.info("Campaign post status updated to published", {
+              campaignId,
+              organizerId,
+            });
+          } else {
+            // Create new campaign post
+            await postService.createCampaignPost({
+              campaignId,
+              organizerId,
+              customPageSettings: completeCampaign.customPageSettings,
+              status: updateData.status,
+            });
+            logger.info("Campaign post created automatically", {
+              campaignId,
+              organizerId,
+            });
+          }
+        } else if (archivedStatuses.includes(updateData.status)) {
+          if (existingPost) {
+            // Update existing post status to archived
+            await postService.updateCampaignPostStatus(
+              campaignId,
+              updateData.status
+            );
+            logger.info("Campaign post status updated to archived", {
+              campaignId,
+              organizerId,
+            });
+          }
+        }
+      }
+    } catch (postError) {
+      logger.error("Failed to handle campaign post", {
+        error: postError.message,
+        campaignId,
+        organizerId,
+      });
+      // Don't throw error - campaign update should still succeed
+    }
 
     logger.info("Campaign updated successfully", { campaignId, organizerId });
 
@@ -963,6 +1051,28 @@ export const publishPendingStartCampaign = async (campaignId, organizerId) => {
         status: "active",
       }
     );
+
+    // Create campaign post when manually publishing
+    try {
+      const completeCampaign = await getCampaignById(campaignId);
+      await postService.createCampaignPost({
+        campaignId,
+        organizerId,
+        customPageSettings: completeCampaign.customPageSettings,
+        status: "active",
+      });
+      logger.info("Campaign post created on manual publish", {
+        campaignId,
+        organizerId,
+      });
+    } catch (postError) {
+      logger.error("Failed to create campaign post on manual publish", {
+        error: postError.message,
+        campaignId,
+        organizerId,
+      });
+      // Don't throw error - campaign publishing should still succeed
+    }
 
     // Build public link and title slug
     const titleSlug = (campaign.name || "")

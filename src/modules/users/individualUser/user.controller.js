@@ -15,7 +15,14 @@
  * @version 1.0.0
  */
 
-import { getUserById } from "./user.service.js";
+import {
+  getUserById,
+  getAllUsers,
+  toggleUserStatus,
+  makeUserAdmin,
+  getAllAdmins,
+  removeAdminPrivileges,
+} from "./user.service.js";
 import { ResponseFactory } from "../../../utils/response.utils.js";
 import { NotFoundError } from "../../../utils/appError.js";
 import * as userService from "./user.service.js";
@@ -98,4 +105,123 @@ export const updateUserProfile = async (req, res) => {
     "Profile information updated successfully",
     updatedProfile
   );
+};
+
+/**
+ * Get all individual users with optional filters (admin only)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const getAllUsersController = async (req, res) => {
+  const filters = {
+    emailVerified: req.query.emailVerified,
+    active: req.query.active,
+    search: req.query.search,
+  };
+
+  // Convert string values to boolean
+  if (filters.emailVerified !== undefined) {
+    filters.emailVerified = filters.emailVerified === "true";
+  }
+  if (filters.active !== undefined) {
+    filters.active = filters.active === "true";
+  }
+
+  const users = await getAllUsers(filters);
+  ResponseFactory.ok(res, "Users fetched successfully", users);
+};
+
+/**
+ * Toggle user active status (admin only)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const toggleUserStatusController = async (req, res) => {
+  const { userId } = req.params;
+  const { isActive } = req.body;
+
+  if (typeof isActive !== "boolean") {
+    return ResponseFactory.badRequest(res, "isActive must be a boolean value");
+  }
+
+  const updatedUser = await toggleUserStatus(userId, isActive);
+  ResponseFactory.ok(
+    res,
+    `User ${isActive ? "activated" : "deactivated"} successfully`,
+    updatedUser
+  );
+};
+
+/**
+ * Make user an admin (super admin only)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const makeUserAdminController = async (req, res) => {
+  const { userId } = req.params;
+  const { adminRole = "supportAdmin" } = req.body;
+
+  // Check if current user is super admin
+  if (req.user.userType !== "superAdmin") {
+    return ResponseFactory.forbidden(
+      res,
+      "Only super admins can promote users to admin"
+    );
+  }
+
+  const updatedUser = await makeUserAdmin(userId, adminRole);
+  ResponseFactory.ok(
+    res,
+    `User promoted to ${adminRole} successfully`,
+    updatedUser
+  );
+};
+
+/**
+ * Get all admin users with optional filters (admin only)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const getAllAdminsController = async (req, res) => {
+  const filters = {
+    emailVerified: req.query.emailVerified,
+    active: req.query.active,
+    search: req.query.search,
+  };
+
+  // Convert string values to boolean
+  if (filters.emailVerified !== undefined) {
+    filters.emailVerified = filters.emailVerified === "true";
+  }
+  if (filters.active !== undefined) {
+    filters.active = filters.active === "true";
+  }
+
+  const admins = await getAllAdmins(filters);
+  ResponseFactory.ok(res, "Admins fetched successfully", admins);
+};
+
+/**
+ * Remove admin privileges from user (super admin only)
+ * @param {import('express').Request} req - Express request object
+ * @param {import('express').Response} res - Express response object
+ * @returns {Promise<void>}
+ */
+export const removeAdminPrivilegesController = async (req, res) => {
+  const { userId } = req.params;
+
+  // Check if current user is super admin
+  if (req.user.userType !== "superAdmin") {
+    return ResponseFactory.forbidden(
+      res,
+      "Only super admins can remove admin privileges"
+    );
+  }
+
+  const updatedUser = await removeAdminPrivileges(userId);
+  ResponseFactory.ok(res, "Admin privileges removed successfully", updatedUser);
 };

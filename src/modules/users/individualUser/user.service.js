@@ -351,3 +351,389 @@ export const getMediaUrl = async (mediaId) => {
     throw error;
   }
 };
+
+/**
+ * Fetch all individual users with optional filters (admin only)
+ * @param {Object} filters - { emailVerified, active, search }
+ * @returns {Promise<Array>} List of individual users
+ */
+export const getAllUsers = async (filters = {}) => {
+  try {
+    logger.info("Fetching all individual users with filters", { filters });
+
+    let whereConditions = ['u."userType" = $1'];
+    let queryParams = ["individualUser"];
+    let paramIndex = 2;
+
+    // Add email verification filter
+    if (filters.emailVerified !== undefined) {
+      whereConditions.push(`u."isEmailVerified" = $${paramIndex}`);
+      queryParams.push(
+        filters.emailVerified === true || filters.emailVerified === "true"
+      );
+      paramIndex++;
+    }
+
+    // Add active status filter
+    if (filters.active !== undefined) {
+      whereConditions.push(`u."isActive" = $${paramIndex}`);
+      queryParams.push(filters.active === true || filters.active === "true");
+      paramIndex++;
+    }
+
+    // Add search filter
+    if (filters.search) {
+      whereConditions.push(`(
+        LOWER(p."firstName") LIKE LOWER($${paramIndex}) OR 
+        LOWER(p."lastName") LIKE LOWER($${paramIndex}) OR 
+        LOWER(u.email) LIKE LOWER($${paramIndex})
+      )`);
+      queryParams.push(`%${filters.search}%`);
+      paramIndex++;
+    }
+
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
+
+    const queryText = `
+      SELECT 
+        u."userId",
+        u.email,
+        u."isEmailVerified",
+        u."isActive",
+        u."createdAt",
+        p."firstName",
+        p."lastName",
+        p.gender,
+        p.country,
+        p.city,
+        p."profilePictureMediaId",
+        p."coverPictureMediaId",
+        pp."fileName" AS "profilePictureFileName",
+        cp."fileName" AS "coverPictureFileName"
+      FROM "users" u
+      LEFT JOIN "individualProfiles" p ON u."userId" = p."userId"
+      LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
+      ${whereClause}
+      ORDER BY u."createdAt" DESC
+    `;
+
+    const result = await query(queryText, queryParams);
+
+    // Format the results
+    const users = result.rows.map((row) => {
+      const profilePictureUrl = row.profilePictureFileName
+        ? getPublicS3Url(row.profilePictureFileName)
+        : null;
+      const coverPictureUrl = row.coverPictureFileName
+        ? getPublicS3Url(row.coverPictureFileName)
+        : null;
+
+      return {
+        userId: row.userId,
+        email: row.email,
+        isEmailVerified: row.isEmailVerified,
+        isActive: row.isActive,
+        createdAt: row.createdAt,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        gender: row.gender,
+        country: row.country,
+        city: row.city,
+        profilePictureUrl,
+        coverPictureUrl,
+      };
+    });
+
+    logger.info("Successfully fetched individual users", {
+      count: users.length,
+    });
+    return users;
+  } catch (error) {
+    logger.error("Failed to fetch individual users", {
+      error: error.message,
+      filters,
+    });
+    throw new DatabaseError("Failed to fetch individual users", error);
+  }
+};
+
+/**
+ * Toggle user active status (admin only)
+ * @param {string} userId - User ID to toggle
+ * @param {boolean} isActive - New active status
+ * @returns {Promise<Object>} Updated user data
+ */
+export const toggleUserStatus = async (userId, isActive) => {
+  try {
+    logger.info("Toggling user active status", { userId, isActive });
+
+    const queryText = `
+      UPDATE "users" 
+      SET "isActive" = $1, "updatedAt" = NOW()
+      WHERE "userId" = $2 AND "userType" = 'individualUser'
+      RETURNING "userId", email, "isEmailVerified", "isActive", "createdAt"
+    `;
+
+    const result = await query(queryText, [isActive, userId]);
+
+    if (result.rowCount === 0) {
+      throw new NotFoundError("Individual user not found");
+    }
+
+    const user = result.rows[0];
+
+    logger.info("User status updated successfully", {
+      userId,
+      isActive: user.isActive,
+    });
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  } catch (error) {
+    logger.error("Failed to toggle user status", {
+      error: error.message,
+      userId,
+      isActive,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to toggle user status", error);
+  }
+};
+
+/**
+ * Make user an admin (super admin only)
+ * @param {string} userId - User ID to promote to admin
+ * @param {string} adminRole - Admin role to assign (superAdmin, supportAdmin, etc.)
+ * @returns {Promise<Object>} Updated user data
+ */
+export const makeUserAdmin = async (userId, adminRole = "supportAdmin") => {
+  try {
+    logger.info("Making user admin", { userId, adminRole });
+
+    // Validate admin role
+    const validRoles = [
+      "superAdmin",
+      "supportAdmin",
+      "eventModerator",
+      "financialAdmin",
+    ];
+    if (!validRoles.includes(adminRole)) {
+      throw new Error(`Invalid admin role: ${adminRole}`);
+    }
+
+    const queryText = `
+      UPDATE "users" 
+      SET "userType" = $1, "updatedAt" = NOW()
+      WHERE "userId" = $2 AND "userType" = 'individualUser'
+      RETURNING "userId", email, "userType", "isEmailVerified", "isActive", "createdAt"
+    `;
+
+    const result = await query(queryText, [adminRole, userId]);
+
+    if (result.rowCount === 0) {
+      throw new NotFoundError("Individual user not found");
+    }
+
+    const user = result.rows[0];
+
+    logger.info("User promoted to admin successfully", {
+      userId,
+      newRole: user.userType,
+    });
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      userType: user.userType,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  } catch (error) {
+    logger.error("Failed to make user admin", {
+      error: error.message,
+      userId,
+      adminRole,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to make user admin", error);
+  }
+};
+
+/**
+ * Fetch all admin users with optional filters (admin only)
+ * @param {Object} filters - { emailVerified, active, search }
+ * @returns {Promise<Array>} List of admin users
+ */
+export const getAllAdmins = async (filters = {}) => {
+  try {
+    logger.info("Fetching all admin users with filters", { filters });
+
+    let whereConditions = ['u."userType" IN ($1, $2, $3, $4)'];
+    let queryParams = [
+      "superAdmin",
+      "supportAdmin",
+      "eventModerator",
+      "financialAdmin",
+    ];
+    let paramIndex = 5;
+
+    // Add email verification filter
+    if (filters.emailVerified !== undefined) {
+      whereConditions.push(`u."isEmailVerified" = $${paramIndex}`);
+      queryParams.push(
+        filters.emailVerified === true || filters.emailVerified === "true"
+      );
+      paramIndex++;
+    }
+
+    // Add active status filter
+    if (filters.active !== undefined) {
+      whereConditions.push(`u."isActive" = $${paramIndex}`);
+      queryParams.push(filters.active === true || filters.active === "true");
+      paramIndex++;
+    }
+
+    // Add search filter
+    if (filters.search) {
+      whereConditions.push(`(
+        LOWER(p."firstName") LIKE LOWER($${paramIndex}) OR 
+        LOWER(p."lastName") LIKE LOWER($${paramIndex}) OR 
+        LOWER(u.email) LIKE LOWER($${paramIndex})
+      )`);
+      queryParams.push(`%${filters.search}%`);
+      paramIndex++;
+    }
+
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
+
+    const queryText = `
+      SELECT 
+        u."userId",
+        u.email,
+        u."userType",
+        u."isEmailVerified",
+        u."isActive",
+        u."createdAt",
+        p."firstName",
+        p."lastName",
+        p.gender,
+        p.country,
+        p.city,
+        p."profilePictureMediaId",
+        p."coverPictureMediaId",
+        pp."fileName" AS "profilePictureFileName",
+        cp."fileName" AS "coverPictureFileName",
+        u."createdAt" AS "adminSince"
+      FROM "users" u
+      LEFT JOIN "individualProfiles" p ON u."userId" = p."userId"
+      LEFT JOIN "media" pp ON p."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" cp ON p."coverPictureMediaId" = cp."mediaId"
+      ${whereClause}
+      ORDER BY u."createdAt" DESC
+    `;
+
+    const result = await query(queryText, queryParams);
+
+    // Format the results
+    const admins = result.rows.map((row) => {
+      const profilePictureUrl = row.profilePictureFileName
+        ? getPublicS3Url(row.profilePictureFileName)
+        : null;
+      const coverPictureUrl = row.coverPictureFileName
+        ? getPublicS3Url(row.coverPictureFileName)
+        : null;
+
+      return {
+        userId: row.userId,
+        email: row.email,
+        userType: row.userType,
+        isEmailVerified: row.isEmailVerified,
+        isActive: row.isActive,
+        createdAt: row.createdAt,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        gender: row.gender,
+        country: row.country,
+        city: row.city,
+        profilePictureUrl,
+        coverPictureUrl,
+        adminSince: row.adminSince,
+      };
+    });
+
+    logger.info("Successfully fetched admin users", { count: admins.length });
+    return admins;
+  } catch (error) {
+    logger.error("Failed to fetch admin users", {
+      error: error.message,
+      filters,
+    });
+    throw new DatabaseError("Failed to fetch admin users", error);
+  }
+};
+
+/**
+ * Remove admin privileges from user (super admin only)
+ * @param {string} userId - User ID to remove admin privileges from
+ * @returns {Promise<Object>} Updated user data
+ */
+export const removeAdminPrivileges = async (userId) => {
+  try {
+    logger.info("Removing admin privileges", { userId });
+
+    const queryText = `
+      UPDATE "users" 
+      SET "userType" = $1, "updatedAt" = NOW()
+      WHERE "userId" = $2 AND "userType" IN ('superAdmin', 'supportAdmin', 'eventModerator', 'financialAdmin')
+      RETURNING "userId", email, "userType", "isEmailVerified", "isActive", "createdAt"
+    `;
+
+    const result = await query(queryText, ["individualUser", userId]);
+
+    if (result.rowCount === 0) {
+      throw new NotFoundError("Admin user not found");
+    }
+
+    const user = result.rows[0];
+
+    logger.info("Admin privileges removed successfully", {
+      userId,
+      newRole: user.userType,
+    });
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      userType: user.userType,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  } catch (error) {
+    logger.error("Failed to remove admin privileges", {
+      error: error.message,
+      userId,
+    });
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to remove admin privileges", error);
+  }
+};
