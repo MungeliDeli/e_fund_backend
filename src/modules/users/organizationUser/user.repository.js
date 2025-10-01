@@ -67,6 +67,10 @@ export const getUserWithProfileById = async (userId) => {
       error: error.message,
       userId,
     });
+    // Preserve NotFoundError so it can be mapped to 404 upstream
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
     throw new DatabaseError("Failed to fetch organization user/profile", error);
   }
 };

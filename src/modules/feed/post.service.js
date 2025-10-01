@@ -4,6 +4,14 @@ import logger from "../../utils/logger.js";
 import { uploadPostMediaToS3, getPublicS3Url } from "../../utils/s3.utils.js";
 
 class PostService {
+  // Helper function to generate profile picture URL
+  generateProfilePictureUrl(post) {
+    if (post.profilePictureFileName) {
+      return getPublicS3Url(post.profilePictureFileName);
+    }
+    return null;
+  }
+
   async createPost(postData, organizerId) {
     try {
       const { campaignId, type, body, media } = postData;
@@ -110,9 +118,13 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const media = post.media || [];
 
+      // Generate profile picture URL
+      const profilePictureUrl = this.generateProfilePictureUrl(post);
+
       return {
         ...post,
         media,
+        profilePictureUrl,
       };
     } catch (error) {
       logger.error("Error fetching post:", error);
@@ -130,7 +142,8 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
@@ -150,7 +163,8 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
@@ -167,7 +181,8 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
@@ -285,10 +300,12 @@ class PostService {
 
       // Media is already parsed as object from PostgreSQL JSONB column
       const media = post.media || [];
+      const profilePictureUrl = this.generateProfilePictureUrl(post);
 
       return {
         ...post,
         media,
+        profilePictureUrl,
       };
     } catch (error) {
       logger.error("Error fetching campaign post:", error);

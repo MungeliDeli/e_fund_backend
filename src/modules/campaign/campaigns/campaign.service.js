@@ -495,6 +495,8 @@ export const updateCampaign = async (
 
     // Handle campaign post creation/update based on status changes
     try {
+      console.log("we are here");
+
       if (updateData.status) {
         const publishedStatuses = ["active", "successful", "closed"];
         const archivedStatuses = [

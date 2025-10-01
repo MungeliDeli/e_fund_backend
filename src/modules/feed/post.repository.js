@@ -52,12 +52,16 @@ class PostRepository {
         COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
         c."name" as "campaignTitle",
-        c."shareLink" as "campaignShareLink"
+        c."shareLink" as "campaignShareLink",
+        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
+        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
       LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."postId" = $1 AND p."isSoftDeleted" = false
     `;
 
@@ -89,12 +93,16 @@ class PostRepository {
         COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
         c."name" as "campaignTitle",
-        c."shareLink" as "campaignShareLink"
+        c."shareLink" as "campaignShareLink",
+        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
+        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
       LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."campaignId" = $1 
         AND p."isSoftDeleted" = false
         AND p."status" = $2
@@ -134,12 +142,16 @@ class PostRepository {
         COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
         c."name" as "campaignTitle",
-        c."shareLink" as "campaignShareLink"
+        c."shareLink" as "campaignShareLink",
+        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
+        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
       LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."organizerId" = $1 
         AND p."isSoftDeleted" = false
         AND p."status" = $2
@@ -173,12 +185,16 @@ class PostRepository {
         COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
         c."name" as "campaignTitle",
-        c."shareLink" as "campaignShareLink"
+        c."shareLink" as "campaignShareLink",
+        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
+        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
       LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."isSoftDeleted" = false
         AND p."status" = $1
     `;
@@ -259,12 +275,16 @@ class PostRepository {
         COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
         c."name" as "campaignTitle",
-        c."shareLink" as "campaignShareLink"
+        c."shareLink" as "campaignShareLink",
+        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
+        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
       LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
+      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."campaignId" = $1 
         AND p."type" = 'campaign'
         AND p."isSoftDeleted" = false
