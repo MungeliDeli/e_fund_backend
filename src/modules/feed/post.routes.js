@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { catchAsync } from "../../middlewares/errorHandler.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
+import processUploadsMiddleware from "../../middlewares/processUploads.middleware.js";
 import {
   createPost,
   getPostById,
@@ -38,6 +39,7 @@ router.post(
   "/",
   authenticate,
   upload.array("media", 5),
+  processUploadsMiddleware(),
   validateCreatePost,
   catchAsync(createPost)
 );

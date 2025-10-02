@@ -26,6 +26,7 @@ import { authenticate } from "../../../middlewares/auth.middleware.js";
 import multer from "multer";
 import { logRequestCount } from "../../../middlewares/requestLogger.middleware.js";
 import { catchAsync } from "../../../middlewares/errorHandler.js";
+import processUploadsMiddleware from "../../../middlewares/processUploads.middleware.js";
 import {
   updateProfileImage,
   getMediaUrl,
@@ -64,6 +65,7 @@ router.patch(
     { name: "profilePicture", maxCount: 1 },
     { name: "coverPicture", maxCount: 1 },
   ]),
+  processUploadsMiddleware(),
   catchAsync(updateProfileImage)
 );
 
@@ -84,6 +86,7 @@ router.put(
     { name: "coverPicture", maxCount: 1 },
   ]),
   validateUpdateOrganizationProfile,
+  processUploadsMiddleware(),
   catchAsync(updateOrganizationProfileWithImages)
 );
 

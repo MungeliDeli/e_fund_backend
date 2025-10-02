@@ -38,6 +38,7 @@ import {
 import { logRequestCount } from "../../../middlewares/requestLogger.middleware.js";
 import { catchAsync } from "../../../middlewares/errorHandler.js";
 import { authenticate } from "../../../middlewares/auth.middleware.js";
+import processUploadsMiddleware from "../../../middlewares/processUploads.middleware.js";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -77,6 +78,7 @@ router.use(authenticate);
 router.post(
   "/",
   upload,
+  processUploadsMiddleware(),
   validateCreateCampaign, 
   catchAsync(createCampaign)
 );
