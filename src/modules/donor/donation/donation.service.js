@@ -1,6 +1,7 @@
 import * as donationRepository from "./donation.repository.js";
 import * as transactionService from "../../payment/transactions/transaction.service.js";
 import * as messageService from "../messages/message.service.js";
+import zynlepayProvider from "../../payment/providers/zynlepay.provider.js";
 import { logServiceEvent } from "../../audit/audit.utils.js";
 import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
 import { getCampaignById } from "../../campaign/campaigns/campaign.service.js";
@@ -36,6 +37,11 @@ export const createDonation = async (donationData, userId = null) => {
         }
       }
       // 1. Create transaction record FIRST
+      const generateReference = () =>
+        `FR_${donationData.campaignId}_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+
       const transactionPayload = {
         userId: userId,
         campaignId: donationData.campaignId,
@@ -45,8 +51,7 @@ export const createDonation = async (donationData, userId = null) => {
         status: "pending",
         transactionType: "donation_in",
         gatewayTransactionId:
-          donationData.gatewayTransactionId ||
-          `MOCK_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          donationData.gatewayTransactionId || generateReference(),
         phoneNumber: donationData.phoneNumber,
       };
 
@@ -145,82 +150,7 @@ export const createDonation = async (donationData, userId = null) => {
         }
       }
 
-      // 5. Update campaign statistics
-      await donationRepository.updateCampaignStatistics(
-        donationData.campaignId,
-        donationData.amount,
-        client
-      );
-
-      logger.info("Campaign statistics updated", {
-        campaignId: donationData.campaignId,
-        amount: donationData.amount,
-      });
-
-      // 6. Send notifications to campaign organizer
-      try {
-        await sendCampaignOrganizerNotifications(
-          donationData.campaignId,
-          donation.donationId,
-          donationData.amount,
-          donationData.currency || "USD",
-          donationData.messageText,
-          isAnonymousEffective,
-          donationData.phoneNumber
-        );
-      } catch (notificationError) {
-        logger.warn("Failed to send campaign organizer notifications", {
-          error: notificationError.message,
-          campaignId: donationData.campaignId,
-          donationId: donation.donationId,
-        });
-      }
-
-      // 7. Send notifications to donor (if registered user)
-      if (userId && !isAnonymousEffective) {
-        try {
-          await sendDonorNotifications(
-            userId,
-            donation.donationId,
-            donationData.campaignId,
-            donationData.amount,
-            donationData.currency || "USD",
-            donationData.messageText
-          );
-        } catch (donorNotificationError) {
-          logger.warn("Failed to send donor notifications", {
-            error: donorNotificationError.message,
-            userId,
-            donationId: donation.donationId,
-          });
-        }
-      } else if (isAnonymousEffective) {
-        // Handle anonymous donor differently - generate receipt but don't send notifications
-        try {
-          await sendAnonymousDonorReceipt(
-            donation.donationId,
-            donationData.campaignId,
-            donationData.amount,
-            donationData.currency || "USD",
-            donationData.messageText
-          );
-        } catch (anonymousReceiptError) {
-          logger.warn("Failed to generate anonymous donor receipt", {
-            error: anonymousReceiptError.message,
-            donationId: donation.donationId,
-            campaignId: donationData.campaignId,
-          });
-        }
-
-        // Log anonymous donation activity
-        logger.info("Anonymous donation received - receipt generated", {
-          donationId: donation.donationId,
-          campaignId: donationData.campaignId,
-          amount: donationData.amount,
-          phoneNumber: donationData.phoneNumber,
-          hasMessage: !!donationData.messageText,
-        });
-      }
+      // 5. Defer campaign statistics updates and notifications until payment success
 
       return {
         donation,
@@ -237,45 +167,192 @@ export const createDonation = async (donationData, userId = null) => {
       amount: donationData.amount,
     });
 
-    // Simulate payment processing asynchronously (mock gateway)
-    simulatePaymentProcessing(result.donation, result.transaction).catch(
-      async (error) => {
-        logger.error("Payment simulation failed", {
-          donationId: result.donation.donationId,
-          transactionId: result.transaction.transactionId,
-          error,
+    // Real payment initiation (post-commit): fire-and-monitor
+    (async () => {
+      try {
+        console.log("=== PAYMENT INITIATION START ===");
+        const referenceNo = result.transaction.gatewayTransactionId;
+        console.log("Reference No:", referenceNo);
+        console.log("Original Phone Number:", donationData.phoneNumber);
+
+        // Strip +260 prefix from phone number for ZynlePay
+        const cleanPhoneNumber =
+          donationData.phoneNumber?.replace(/^\+260/, "") ||
+          donationData.phoneNumber;
+        console.log("Cleaned Phone Number:", cleanPhoneNumber);
+        console.log("Amount:", donationData.amount);
+        console.log("Payment Method:", donationData.paymentMethod);
+
+        const providerRes = await zynlepayProvider.initiateDeposit({
+          phoneNumber: cleanPhoneNumber,
+          amount: donationData.amount,
+          referenceNo,
         });
 
-        // Log failed donation in audit logs
-        try {
-          await logServiceEvent(
-            result.donation.donorUserId || null,
-            DONATION_ACTIONS.DONATION_MADE,
-            ENTITY_TYPES.DONATION,
+        console.log("=== PROVIDER RESPONSE ===");
+        console.log("Provider Response:", JSON.stringify(providerRes, null, 2));
+
+        const responseCode = providerRes.responseCode;
+        console.log("Response Code:", responseCode);
+
+        if (responseCode === "100") {
+          console.log("=== IMMEDIATE SUCCESS PATH ===");
+          // Immediate success (rare) → mark txn succeeded and donation completed
+          await transactionService.processPaymentSuccess(
+            referenceNo,
+            providerRes.raw
+          );
+          await donationRepository.updateDonationStatus(
             result.donation.donationId,
+            "completed"
+          );
+          // Update campaign stats and send notifications only now
+          await donationRepository.recalculateCampaignStatistics(
+            result.donation.campaignId
+          );
+          try {
+            await sendCampaignOrganizerNotifications(
+              result.donation.campaignId,
+              result.donation.donationId,
+              donationData.amount,
+              donationData.currency || "USD",
+              donationData.messageText,
+              isAnonymousEffective,
+              donationData.phoneNumber
+            );
+            if (userId && !isAnonymousEffective) {
+              await sendDonorNotifications(
+                userId,
+                result.donation.donationId,
+                result.donation.campaignId,
+                donationData.amount,
+                donationData.currency || "USD",
+                donationData.messageText
+              );
+            } else if (isAnonymousEffective) {
+              await sendAnonymousDonorReceipt(
+                result.donation.donationId,
+                result.donation.campaignId,
+                donationData.amount,
+                donationData.currency || "USD",
+                donationData.messageText
+              );
+            }
+          } catch (notifyErr) {
+            logger.warn("Post-success notifications failed", {
+              error: notifyErr.message,
+              donationId: result.donation.donationId,
+            });
+          }
+          logger.info("Payment completed immediately by provider", {
+            donationId: result.donation.donationId,
+            transactionId: result.transaction.transactionId,
+          });
+        } else if (responseCode === "120" || responseCode === "990") {
+          console.log("=== PROCESSING PATH ===");
+          // Initiated / pending → mark processing with gateway request id & payload
+          await transactionService.markProcessingWithGatewayData(
+            result.transaction.transactionId,
             {
-              campaignId: result.donation.campaignId,
-              amount: result.donation.amount,
-              currency: donationData.currency || "USD",
-              status: "failed",
-              isAnonymous: result.donation.isAnonymous,
-              paymentMethod: result.transaction.gatewayUsed,
-              phoneNumber: result.transaction.phoneNumber,
-              transactionId: result.transaction.transactionId,
-              gatewayTransactionId: result.transaction.gatewayTransactionId,
-              gatewayUsed: result.transaction.gatewayUsed,
-              simulation: true,
-              error: error.message,
-              failedAt: new Date().toISOString(),
+              gatewayRequestId: providerRes.gatewayRequestId,
+              gatewayResponse: providerRes.raw,
+              status: "processing",
             }
           );
-        } catch (auditError) {
-          logger.warn("Failed to log failed donation audit", {
-            error: auditError.message,
+          logger.info("Payment initiated; awaiting webhook/status", {
+            donationId: result.donation.donationId,
+            transactionId: result.transaction.transactionId,
+            gatewayRequestId: providerRes.gatewayRequestId,
+          });
+        } else {
+          console.log("=== FAILURE PATH ===");
+          console.log("Response Code:", responseCode);
+          console.log("Provider Message:", providerRes.message);
+          // Treat other codes as failure (including 2000 - no active simulator)
+          await transactionService.processPaymentFailure(referenceNo, {
+            code: responseCode,
+            message: providerRes.message,
+          });
+          await donationRepository.updateDonationStatus(
+            result.donation.donationId,
+            "failed"
+          );
+          // If a message was created for this donation, delete it
+          try {
+            if (result.messageId) {
+              await messageService.deleteMessage(result.messageId);
+              await donationRepository.updateDonationMessageId(
+                result.donation.donationId,
+                null
+              );
+            }
+          } catch (msgDeleteErr) {
+            logger.warn(
+              "Failed to delete donation message after payment failure",
+              {
+                error: msgDeleteErr?.message,
+                donationId: result.donation.donationId,
+                messageId: result.messageId,
+              }
+            );
+          }
+          logger.warn("Payment initiation failed", {
+            donationId: result.donation.donationId,
+            transactionId: result.transaction.transactionId,
+            responseCode,
+            message: providerRes.message,
           });
         }
+      } catch (error) {
+        console.log("=== PROVIDER CALL ERROR ===");
+        console.log("Error:", error.message);
+        console.log("Error Stack:", error.stack);
+        console.log("Error Details:", JSON.stringify(error, null, 2));
+        // Provider call itself failed → mark failed and log
+        try {
+          await transactionService.processPaymentFailure(
+            result.transaction.gatewayTransactionId,
+            { error: error.message }
+          );
+          await donationRepository.updateDonationStatus(
+            result.donation.donationId,
+            "failed"
+          );
+          // If a message was created for this donation, delete it
+          try {
+            if (result.messageId) {
+              await messageService.deleteMessage(result.messageId);
+              await donationRepository.updateDonationMessageId(
+                result.donation.donationId,
+                null
+              );
+            }
+          } catch (msgDeleteErr) {
+            logger.warn(
+              "Failed to delete donation message after provider error",
+              {
+                error: msgDeleteErr?.message,
+                donationId: result.donation.donationId,
+                messageId: result.messageId,
+              }
+            );
+          }
+        } catch (inner) {
+          logger.error(
+            "Failed to mark payment as failed after provider error",
+            {
+              error: inner.message,
+            }
+          );
+        }
+
+        logger.error("Provider initiation error", {
+          error: error.message,
+          donationId: result.donation.donationId,
+          transactionId: result.transaction.transactionId,
+        });
       }
-    );
+    })();
 
     return result;
   } catch (error) {
@@ -488,7 +565,48 @@ export const getDonationsByCampaign = async (
     offset
   );
 
-  return donations;
+  // Process donations to include donor details for non-anonymous donations
+  const processedDonations = donations.map((donation) => {
+    const processedDonation = { ...donation };
+
+    // Only include donor details if the donation is not anonymous
+    if (!donation.isAnonymous && donation.donorUserId) {
+      processedDonation.donorDetails = null;
+
+      if (donation.userType === "individualUser") {
+        // For individual users, include firstName and lastName
+        if (donation.firstName && donation.lastName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "individual",
+            displayName: `${donation.firstName} ${donation.lastName}`,
+            firstName: donation.firstName,
+            lastName: donation.lastName,
+          };
+        }
+      } else if (donation.userType === "organizationUser") {
+        // For organization users, include organizationShortName
+        if (donation.organizationShortName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "organization",
+            displayName: donation.organizationShortName,
+            organizationShortName: donation.organizationShortName,
+          };
+        }
+      }
+    }
+
+    // Remove the raw profile fields from the response
+    delete processedDonation.userType;
+    delete processedDonation.firstName;
+    delete processedDonation.lastName;
+    delete processedDonation.organizationShortName;
+
+    return processedDonation;
+  });
+
+  return processedDonations;
 };
 
 export const updateDonationStatus = async (donationId, status, userId) => {
@@ -566,7 +684,48 @@ export const getDonationsByUser = async (userId, limit = 50, offset = 0) => {
     offset
   );
 
-  return donations;
+  // Process donations to include donor details for non-anonymous donations
+  const processedDonations = donations.map((donation) => {
+    const processedDonation = { ...donation };
+
+    // Only include donor details if the donation is not anonymous
+    if (!donation.isAnonymous && donation.donorUserId) {
+      processedDonation.donorDetails = null;
+
+      if (donation.userType === "individualUser") {
+        // For individual users, include firstName and lastName
+        if (donation.firstName && donation.lastName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "individual",
+            displayName: `${donation.firstName} ${donation.lastName}`,
+            firstName: donation.firstName,
+            lastName: donation.lastName,
+          };
+        }
+      } else if (donation.userType === "organizationUser") {
+        // For organization users, include organizationShortName
+        if (donation.organizationShortName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "organization",
+            displayName: donation.organizationShortName,
+            organizationShortName: donation.organizationShortName,
+          };
+        }
+      }
+    }
+
+    // Remove the raw profile fields from the response
+    delete processedDonation.userType;
+    delete processedDonation.firstName;
+    delete processedDonation.lastName;
+    delete processedDonation.organizationShortName;
+
+    return processedDonation;
+  });
+
+  return processedDonations;
 };
 
 export const getDonationsByOrganizer = async (
@@ -580,12 +739,95 @@ export const getDonationsByOrganizer = async (
     offset
   );
 
-  return donations;
+  // Process donations to include donor details for non-anonymous donations
+  const processedDonations = donations.map((donation) => {
+    const processedDonation = { ...donation };
+
+    // Only include donor details if the donation is not anonymous
+    if (!donation.isAnonymous && donation.donorUserId) {
+      processedDonation.donorDetails = null;
+
+      if (donation.userType === "individualUser") {
+        // For individual users, include firstName and lastName
+        if (donation.firstName && donation.lastName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "individual",
+            displayName: `${donation.firstName} ${donation.lastName}`,
+            firstName: donation.firstName,
+            lastName: donation.lastName,
+          };
+        }
+      } else if (donation.userType === "organizationUser") {
+        // For organization users, include organizationShortName
+        if (donation.organizationShortName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "organization",
+            displayName: donation.organizationShortName,
+            organizationShortName: donation.organizationShortName,
+          };
+        }
+      }
+    }
+
+    // Remove the raw profile fields from the response
+    delete processedDonation.userType;
+    delete processedDonation.firstName;
+    delete processedDonation.lastName;
+    delete processedDonation.organizationShortName;
+
+    return processedDonation;
+  });
+
+  return processedDonations;
 };
 
 export const getAllDonations = async (limit = 50, offset = 0) => {
   const donations = await donationRepository.getAllDonations(limit, offset);
-  return donations;
+
+  // Process donations to include donor details for non-anonymous donations
+  const processedDonations = donations.map((donation) => {
+    const processedDonation = { ...donation };
+
+    // Only include donor details if the donation is not anonymous
+    if (!donation.isAnonymous && donation.donorUserId) {
+      processedDonation.donorDetails = null;
+
+      if (donation.userType === "individualUser") {
+        // For individual users, include firstName and lastName
+        if (donation.firstName && donation.lastName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "individual",
+            displayName: `${donation.firstName} ${donation.lastName}`,
+            firstName: donation.firstName,
+            lastName: donation.lastName,
+          };
+        }
+      } else if (donation.userType === "organizationUser") {
+        // For organization users, include organizationShortName
+        if (donation.organizationShortName) {
+          processedDonation.donorDetails = {
+            donorId: donation.donorUserId,
+            donorType: "organization",
+            displayName: donation.organizationShortName,
+            organizationShortName: donation.organizationShortName,
+          };
+        }
+      }
+    }
+
+    // Remove the raw profile fields from the response
+    delete processedDonation.userType;
+    delete processedDonation.firstName;
+    delete processedDonation.lastName;
+    delete processedDonation.organizationShortName;
+
+    return processedDonation;
+  });
+
+  return processedDonations;
 };
 
 export const updateCampaignStatistics = async (campaignId, amount) => {

@@ -35,11 +35,8 @@ export const getUserWithProfileById = async (userId) => {
     if (userResult.rowCount === 0) throw new NotFoundError("User not found");
     const user = userResult.rows[0];
 
-    // Only handle individual users
-    if (user.userType !== "individualUser") {
-      throw new NotFoundError("Individual user not found");
-    }
-
+    // Check if user has an individual profile (regardless of current user type)
+    // This handles cases where users were promoted to admin roles but still have individual profiles
     let profile = null;
     const profileResult = await query(
       `SELECT 
@@ -55,6 +52,11 @@ export const getUserWithProfileById = async (userId) => {
       [userId]
     );
     profile = profileResult.rows[0] || null;
+
+    // If no individual profile found, throw error
+    if (!profile) {
+      throw new NotFoundError("Individual user profile not found");
+    }
 
     return { user, profile };
   } catch (error) {

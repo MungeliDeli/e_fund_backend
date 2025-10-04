@@ -87,9 +87,25 @@ export const getCampaignTopDonors = async (campaignId, limit = 10) => {
         d.amount,
         d."donationDate",
         dm."messageText",
-        dm."status" as "messageStatus"
+        dm."status" as "messageStatus",
+        -- Individual profile details
+        ip."firstName" as "individualFirstName",
+        ip."lastName" as "individualLastName",
+        ip."userId" as "individualUserId",
+        -- Organization profile details
+        op."organizationShortName" as "organizationShortName",
+        op."organizationName" as "organizationName",
+        op."userId" as "organizationUserId",
+        -- User type determination
+        CASE 
+          WHEN ip."userId" IS NOT NULL THEN 'individual'
+          WHEN op."userId" IS NOT NULL THEN 'organization'
+          ELSE 'unknown'
+        END as "profileType"
       FROM "donations" d
       LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+      LEFT JOIN "individualProfiles" ip ON d."donorUserId" = ip."userId"
+      LEFT JOIN "organizationProfiles" op ON d."donorUserId" = op."userId"
       WHERE d."campaignId" = $1
       ORDER BY d.amount DESC
       LIMIT $2

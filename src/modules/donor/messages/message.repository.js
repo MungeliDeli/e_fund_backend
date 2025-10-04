@@ -60,6 +60,19 @@ export const updateMessageStatus = async (
   return result.rows[0] || null;
 };
 
+export const deleteMessageById = async (messageId, client = null) => {
+  const query = `DELETE FROM "donationMessages" WHERE "messageId" = $1 RETURNING *`;
+  const params = [messageId];
+
+  if (client) {
+    const result = await client.query(query, params);
+    return result.rows[0] || null;
+  } else {
+    const result = await db.query(query, params);
+    return result.rows[0] || null;
+  }
+};
+
 export const getPendingMessagesCount = async (campaignId) => {
   const result = await db.query(
     `SELECT COUNT(*) as "pendingCount"

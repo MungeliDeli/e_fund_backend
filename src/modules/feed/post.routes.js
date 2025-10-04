@@ -8,6 +8,7 @@ import {
   getPostById,
   getPostsByCampaign,
   getPostsByOrganizer,
+  getCampaignPostsByOrganizer,
   getAllPosts,
 } from "./post.controller.js";
 import { validateCreatePost, validatePostId } from "./post.validation.js";
@@ -52,6 +53,12 @@ router.get("/campaigns/:campaignId", catchAsync(getPostsByCampaign));
 
 // Get posts by organizer (public)
 router.get("/organizers/:organizerId", catchAsync(getPostsByOrganizer));
+
+// Get campaign posts by organizer (public)
+router.get(
+  "/organizers/:organizerId/campaigns",
+  catchAsync(getCampaignPostsByOrganizer)
+);
 
 // Get all posts (public feed)
 router.get("/", catchAsync(getAllPosts));

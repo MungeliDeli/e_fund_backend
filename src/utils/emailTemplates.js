@@ -331,6 +331,122 @@ export function createThankYouTemplate(data) {
 }
 
 /**
+ * Donation receipt email template (to donor)
+ * @param {Object} data
+ * @param {string} data.organizerName
+ * @param {string} data.campaignTitle
+ * @param {string} data.donorName
+ * @param {number|string} data.donationAmount
+ * @param {string} data.currency
+ * @param {string} data.donationId
+ * @param {string} data.campaignUrl
+ * @param {string} [data.thankYouMessage]
+ * @param {string} [data.linkTokenId]
+ */
+export function createDonationReceiptTemplate(data) {
+  const {
+    organizerName,
+    campaignTitle,
+    donorName,
+    donationAmount,
+    currency,
+    donationId,
+    campaignUrl,
+    thankYouMessage,
+    linkTokenId,
+  } = data;
+
+  const niceMessage =
+    thankYouMessage ||
+    `On behalf of ${organizerName}, thank you for supporting "${campaignTitle}". Your generosity makes a real difference.`;
+
+  const content = `
+    <div class="message">
+      <p>Dear ${donorName || "Supporter"},</p>
+      <p>We’ve received your donation. Please find your receipt below.</p>
+    </div>
+
+    <div class="campaign-details">
+      <h2>${campaignTitle}</h2>
+      <p class="amount-highlight">${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: currency || "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(donationAmount) || 0)}</p>
+      <p><strong>Donation ID:</strong> ${donationId}</p>
+    </div>
+
+    <div class="personalized-message">
+      <p>${niceMessage}</p>
+      <p><em>- ${organizerName}</em></p>
+    </div>
+
+    <a href="${
+      campaignUrl || FRONTEND_URL
+    }" class="cta-button">View Campaign</a>
+
+    <div class="message">
+      <p>Warm regards,<br/>The ${APP_NAME} Team</p>
+    </div>
+  `;
+
+  return createBaseTemplate(content, linkTokenId);
+}
+
+/**
+ * Campaign milestone email template (to organizer)
+ * @param {Object} data
+ * @param {string} data.organizerName
+ * @param {string} data.campaignTitle
+ * @param {number} data.percentageReached - 25, 50, 70, 100
+ * @param {number|string} data.currentAmount
+ * @param {number|string} data.goalAmount
+ * @param {string} data.campaignUrl
+ * @param {string} [data.linkTokenId]
+ */
+export function createMilestoneTemplate(data) {
+  const {
+    organizerName,
+    campaignTitle,
+    percentageReached,
+    currentAmount,
+    goalAmount,
+    campaignUrl,
+    linkTokenId,
+  } = data;
+
+  const content = `
+    <div class="message">
+      <p>Hi ${organizerName},</p>
+      <p>Your campaign <strong>${campaignTitle}</strong> just reached <strong>${percentageReached}%</strong> of its goal!</p>
+    </div>
+
+    <div class="campaign-details">
+      <p><strong>Raised so far:</strong> ${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(currentAmount) || 0)}</p>
+      <p><strong>Goal:</strong> ${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(goalAmount) || 0)}</p>
+    </div>
+
+    <a href="${
+      campaignUrl || FRONTEND_URL
+    }" class="cta-button">Open Campaign Dashboard</a>
+
+    <div class="message">
+      <p>Keep up the great work!<br/>The ${APP_NAME} Team</p>
+    </div>
+  `;
+
+  return createBaseTemplate(content, linkTokenId);
+}
+
+/**
  * Generate tracking link with UTM parameters
  * @param {string} baseUrl - Base campaign URL
  * @param {string} linkTokenId - Link token ID

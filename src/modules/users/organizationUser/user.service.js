@@ -38,12 +38,9 @@ const JPEG_QUALITY = 80;
 function formatProfile(user, profile, isOwner) {
   if (!user || !profile) return null;
 
-  // Only handle organization users
-  if (user.userType !== "organizationUser") {
-    return null;
-  }
+  // Handle users with organization profiles (regardless of current user type)
+  // This allows admin users who still have organization profiles to be displayed
 
-  console.log("Formatting organization user profile", { profile });
   // Generate public URLs for profile and cover pictures
   const profilePictureUrl = profile.profilePictureFileName
     ? getPublicS3Url(profile.profilePictureFileName)
@@ -67,20 +64,16 @@ function formatProfile(user, profile, isOwner) {
     establishmentDate: profile.establishmentDate,
     campusAffiliationScope: profile.campusAffiliationScope,
     createdAt: profile.createdAt,
+    // Include verification status for public profiles (important for trust)
+    isEmailVerified: user.isEmailVerified,
+    isActive: user.isActive,
+    email: user.email,
+    officialEmail: profile.officialEmail,
+    primaryContactPersonName: profile.primaryContactPersonName,
+    primaryContactPersonEmail: profile.primaryContactPersonEmail,
+    primaryContactPersonPhone: profile.primaryContactPersonPhone,
+    createdByAdminId: profile.createdByAdminId,
   };
-
-  if (isOwner) {
-    return {
-      ...publicFields,
-      email: user.email,
-      officialEmail: profile.officialEmail,
-      primaryContactPersonName: profile.primaryContactPersonName,
-      primaryContactPersonEmail: profile.primaryContactPersonEmail,
-      primaryContactPersonPhone: profile.primaryContactPersonPhone,
-      isEmailVerified: user.isEmailVerified,
-      isActive: user.isActive,
-    };
-  }
 
   return publicFields;
 }
@@ -95,10 +88,8 @@ export const getUserById = async (userId, isOwner = false) => {
   const { user, profile } = await getUserWithProfileById(userId);
   if (!user || !profile) throw new NotFoundError("User/profile not found");
 
-  // Only handle organization users in this service
-  if (user.userType !== "organizationUser") {
-    throw new NotFoundError("Organization user not found");
-  }
+  // Handle users with organization profiles (regardless of current user type)
+  // This allows admin users who still have organization profiles to be displayed
 
   return formatProfile(user, profile, isOwner);
 };

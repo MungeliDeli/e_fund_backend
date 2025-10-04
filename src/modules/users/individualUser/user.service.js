@@ -34,18 +34,21 @@ const JPEG_QUALITY = 80;
 function formatProfile(user, profile, isOwner) {
   if (!user || !profile) return null;
 
-  // Only handle individual users
-  if (user.userType !== "individualUser") {
-    return null;
-  }
+  // Handle users with individual profiles (regardless of current user type)
+  // This allows admin users who still have individual profiles to be displayed
+
 
   // Generate public URLs for profile and cover pictures
-  const profilePictureUrl = profile.profilePictureFileName
-    ? getPublicS3Url(profile.profilePictureFileName)
+ 
+  
+  const profilePictureUrl = profile.profilepicturefilename
+    ? getPublicS3Url(profile.profilepicturefilename)
     : null;
-  const coverPictureUrl = profile.coverPictureFileName
-    ? getPublicS3Url(profile.coverPictureFileName)
+  const coverPictureUrl = profile.coverpicturefilename
+    ? getPublicS3Url(profile.coverpicturefilename)
     : null;
+
+
 
   // Individual user profile
   const publicFields = {
@@ -59,15 +62,21 @@ function formatProfile(user, profile, isOwner) {
     profilePictureUrl,
     coverPictureUrl,
     createdAt: profile.createdAt,
+    // Include verification status for public profiles (important for trust)
+    isEmailVerified: user.isEmailVerified,
+    isActive: user.isActive,
+    // Include contact details for public profiles
+    email: user.email,
+    phoneNumber: profile.phoneNumber,
+    dateOfBirth: profile.dateOfBirth,
+    address: profile.address,
   };
+ 
 
   if (isOwner) {
     return {
       ...publicFields,
-      email: user.email,
-      phoneNumber: profile.phoneNumber,
-      dateOfBirth: profile.dateOfBirth,
-      address: profile.address,
+      // Additional owner-only fields can be added here if needed
       isEmailVerified: user.isEmailVerified,
       isActive: user.isActive,
     };
@@ -86,10 +95,8 @@ export const getUserById = async (userId, isOwner = false) => {
   const { user, profile } = await getUserWithProfileById(userId);
   if (!user || !profile) throw new NotFoundError("User/profile not found");
 
-  // Only handle individual users in this service
-  if (user.userType !== "individualUser") {
-    throw new NotFoundError("Individual user not found");
-  }
+  // Handle users with individual profiles (regardless of current user type)
+  // This allows admin users who still have individual profiles to be displayed
 
   return formatProfile(user, profile, isOwner);
 };

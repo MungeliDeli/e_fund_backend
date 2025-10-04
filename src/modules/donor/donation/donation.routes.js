@@ -7,6 +7,7 @@ import {
 import {
   createDonation,
   getDonationById,
+  getDonationStatus,
   getDonationsByCampaign,
   getDonationsByOrganizer,
   getAllDonations,
@@ -39,6 +40,11 @@ router.get(
   catchAsync(getDonationStats)
 );
 router.get("/:donationId", validateDonationId, catchAsync(getDonationById));
+router.get(
+  "/:donationId/status",
+  validateDonationId,
+  catchAsync(getDonationStatus)
+);
 
 // Authenticated routes
 router.get("/user/:userId", authenticate, catchAsync(getDonationsByUser));

@@ -29,6 +29,17 @@ export const getTransactionById = async (req, res) => {
   );
 };
 
+export const getTransactionStatus = async (req, res) => {
+  const { transactionId } = req.params;
+
+  const txn = await transactionService.getTransactionById(transactionId);
+
+  return ResponseFactory.ok(res, "Transaction status", {
+    status: txn.status,
+    updatedAt: txn.updatedAt,
+  });
+};
+
 export const getTransactionsByCampaign = async (req, res) => {
   const { campaignId } = req.params;
   const { limit = 50, offset = 0 } = req.query;

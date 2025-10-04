@@ -42,6 +42,18 @@ export const getDonationById = async (donationId) => {
   return result.rows[0] || null;
 };
 
+export const getDonationByPaymentTransactionId = async (transactionId) => {
+  const result = await db.query(
+    `SELECT d.*
+     FROM "donations" d
+     WHERE d."paymentTransactionId" = $1
+     LIMIT 1`,
+    [transactionId]
+  );
+
+  return result.rows[0] || null;
+};
+
 export const getDonationsByCampaign = async (
   campaignId,
   limit = 50,
@@ -49,9 +61,15 @@ export const getDonationsByCampaign = async (
 ) => {
   console.log("campaignId", campaignId);
   const result = await db.query(
-    `SELECT d.*, dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+    `SELECT d.*, dm."messageText", dm."status" as "messageStatus", dm."isFeatured",
+            u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donations" d
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "users" u ON d."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      WHERE d."campaignId" = $1
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,
@@ -68,10 +86,16 @@ export const getDonationsByOrganizer = async (
 ) => {
   const result = await db.query(
     `SELECT d.*, c.name AS "campaignName",
-            dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+            dm."messageText", dm."status" as "messageStatus", dm."isFeatured",
+            u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donations" d
      JOIN "campaigns" c ON d."campaignId" = c."campaignId"
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "users" u ON d."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      WHERE d."organizerId" = $1
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,
@@ -84,10 +108,16 @@ export const getDonationsByOrganizer = async (
 export const getAllDonations = async (limit = 50, offset = 0) => {
   const result = await db.query(
     `SELECT d.*, c.name AS "campaignName",
-            dm."messageText", dm."status" as "messageStatus", dm."isFeatured"
+            dm."messageText", dm."status" as "messageStatus", dm."isFeatured",
+            u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donations" d
      JOIN "campaigns" c ON d."campaignId" = c."campaignId"
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "users" u ON d."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      ORDER BY d."donationDate" DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
@@ -166,11 +196,17 @@ export const getDonationStats = async (campaignId) => {
 export const getDonationsByUser = async (userId, limit = 50, offset = 0) => {
   const result = await db.query(
     `SELECT d.*, c."name" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
-            dm."messageText", dm."status" as "messageStatus"
+            dm."messageText", dm."status" as "messageStatus",
+            u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donations" d
      LEFT JOIN "campaigns" c ON d."campaignId" = c."campaignId"
      LEFT JOIN "transactions" t ON d."paymentTransactionId" = t."transactionId"
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+     LEFT JOIN "users" u ON d."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      WHERE d."donorUserId" = $1
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,

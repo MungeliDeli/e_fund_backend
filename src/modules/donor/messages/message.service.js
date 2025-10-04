@@ -184,6 +184,31 @@ export const createMessage = async (messageData, client = null) => {
   }
 };
 
+export const deleteMessage = async (messageId, client = null) => {
+  try {
+    if (!messageId) {
+      throw new AppError("Message ID is required", 400);
+    }
+
+    const deleted = await messageRepository.deleteMessageById(
+      messageId,
+      client
+    );
+
+    if (!deleted) {
+      // Already deleted or not found; treat as no-op
+      return null;
+    }
+
+    logger.info("Donation message deleted", { messageId });
+    return deleted;
+  } catch (error) {
+    logger.error("Error deleting donation message:", error);
+    if (error instanceof AppError) throw error;
+    throw new AppError("Failed to delete donation message", 500);
+  }
+};
+
 /**
  * Get messages by campaign for organizers with permission verification
  * @param {string} campaignId - Campaign ID

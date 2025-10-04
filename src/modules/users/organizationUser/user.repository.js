@@ -36,11 +36,8 @@ export const getUserWithProfileById = async (userId) => {
     if (userResult.rowCount === 0) throw new NotFoundError("User not found");
     const user = userResult.rows[0];
 
-    // Only handle organization users
-    if (user.userType !== "organizationUser") {
-      throw new NotFoundError("Organization user not found");
-    }
-
+    // Check if user has an organization profile (regardless of current user type)
+    // This handles cases where users were promoted to admin roles but still have organization profiles
     let profile = null;
     const profileResult = await query(
       `SELECT 
@@ -60,6 +57,11 @@ export const getUserWithProfileById = async (userId) => {
       [userId]
     );
     profile = profileResult.rows[0] || null;
+
+    // If no organization profile found, throw error
+    if (!profile) {
+      throw new NotFoundError("Organization user profile not found");
+    }
 
     return { user, profile };
   } catch (error) {

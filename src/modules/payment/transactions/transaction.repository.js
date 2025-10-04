@@ -81,6 +81,65 @@ export const updateTransactionStatus = async (transactionId, status) => {
   return result.rows[0] || null;
 };
 
+export const setTransactionProcessing = async (
+  transactionId,
+  {
+    gatewayRequestId = null,
+    gatewayResponse = null,
+    status = "processing",
+  } = {}
+) => {
+  const result = await db.query(
+    `UPDATE "transactions"
+     SET "status" = $3,
+         "gatewayRequestId" = COALESCE($1, "gatewayRequestId"),
+         "gatewayResponse" = COALESCE($2, "gatewayResponse"),
+         "processingStartedAt" = COALESCE("processingStartedAt", CURRENT_TIMESTAMP),
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "transactionId" = $4
+     RETURNING *`,
+    [gatewayRequestId, gatewayResponse, status, transactionId]
+  );
+
+  return result.rows[0] || null;
+};
+
+export const setTransactionFailureByGatewayId = async (
+  gatewayTransactionId,
+  failurePayload = null
+) => {
+  const result = await db.query(
+    `UPDATE "transactions"
+     SET "status" = 'failed',
+         "gatewayResponse" = COALESCE($2, "gatewayResponse"),
+         "processingCompletedAt" = CURRENT_TIMESTAMP,
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "gatewayTransactionId" = $1
+     RETURNING *`,
+    [gatewayTransactionId, failurePayload]
+  );
+
+  return result.rows[0] || null;
+};
+
+export const setTransactionSuccessByGatewayId = async (
+  gatewayTransactionId,
+  gatewayResponse = null
+) => {
+  const result = await db.query(
+    `UPDATE "transactions"
+     SET "status" = 'succeeded',
+         "gatewayResponse" = COALESCE($2, "gatewayResponse"),
+         "processingCompletedAt" = CURRENT_TIMESTAMP,
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "gatewayTransactionId" = $1
+     RETURNING *`,
+    [gatewayTransactionId, gatewayResponse]
+  );
+
+  return result.rows[0] || null;
+};
+
 export const getTransactionStats = async (campaignId) => {
   const result = await db.query(
     `SELECT 
@@ -101,6 +160,59 @@ export const getTransactionByGatewayId = async (gatewayTransactionId) => {
   const result = await db.query(
     `SELECT * FROM "transactions" WHERE "gatewayTransactionId" = $1`,
     [gatewayTransactionId]
+  );
+
+  return result.rows[0] || null;
+};
+
+export const getTransactionByGatewayRequestId = async (gatewayRequestId) => {
+  const result = await db.query(
+    `SELECT * FROM "transactions" WHERE "gatewayRequestId" = $1`,
+    [gatewayRequestId]
+  );
+
+  return result.rows[0] || null;
+};
+
+export const setTransactionWebhookByGatewayRequestId = async (
+  gatewayRequestId,
+  { status, gatewayResponse, webhookReceived = true }
+) => {
+  const result = await db.query(
+    `UPDATE "transactions"
+     SET "status" = $2,
+         "gatewayResponse" = COALESCE($3, "gatewayResponse"),
+         "webhookReceived" = $4,
+         "processingCompletedAt" = CASE WHEN $5 IN ('succeeded','failed','timeout','cancelled') THEN CURRENT_TIMESTAMP ELSE "processingCompletedAt" END,
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "gatewayRequestId" = $1
+     RETURNING *`,
+    [gatewayRequestId, status, gatewayResponse, webhookReceived, String(status)]
+  );
+
+  return result.rows[0] || null;
+};
+
+export const setTransactionWebhookByGatewayId = async (
+  gatewayTransactionId,
+  { status, gatewayResponse, webhookReceived = true }
+) => {
+  const result = await db.query(
+    `UPDATE "transactions"
+     SET "status" = $2,
+         "gatewayResponse" = COALESCE($3, "gatewayResponse"),
+         "webhookReceived" = $4,
+         "processingCompletedAt" = CASE WHEN $5 IN ('succeeded','failed','timeout','cancelled') THEN CURRENT_TIMESTAMP ELSE "processingCompletedAt" END,
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "gatewayTransactionId" = $1
+     RETURNING *`,
+    [
+      gatewayTransactionId,
+      status,
+      gatewayResponse,
+      webhookReceived,
+      String(status),
+    ]
   );
 
   return result.rows[0] || null;

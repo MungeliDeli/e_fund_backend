@@ -138,19 +138,16 @@ class PostRepository {
         p.*,
         u."email",
         u."userType",
-        COALESCE(ip."firstName", op."primaryContactPersonName") as "firstName",
-        COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
+        op."primaryContactPersonName",
         c."name" as "campaignTitle",
         c."shareLink" as "campaignShareLink",
-        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
-        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
+        op."profilePictureMediaId",
+        opp."fileName" as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
-      LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
-      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
       LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."organizerId" = $1 
         AND p."isSoftDeleted" = false
@@ -173,7 +170,7 @@ class PostRepository {
     return result.rows;
   }
 
-  async getAllPosts(options = {}) {
+  async getCampaignPostsByOrganizer(organizerId, options = {}) {
     const { status = "published", limit = 20, cursor } = options;
 
     let query = `
@@ -181,19 +178,57 @@ class PostRepository {
         p.*,
         u."email",
         u."userType",
-        COALESCE(ip."firstName", op."primaryContactPersonName") as "firstName",
-        COALESCE(ip."lastName", '') as "lastName",
         op."organizationName",
+        op."primaryContactPersonName",
         c."name" as "campaignTitle",
         c."shareLink" as "campaignShareLink",
-        COALESCE(ip."profilePictureMediaId", op."profilePictureMediaId") as "profilePictureMediaId",
-        COALESCE(pp."fileName", opp."fileName") as "profilePictureFileName"
+        op."profilePictureMediaId",
+        opp."fileName" as "profilePictureFileName"
       FROM "posts" p
       LEFT JOIN "users" u ON p."organizerId" = u."userId"
-      LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
       LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
-      LEFT JOIN "media" pp ON ip."profilePictureMediaId" = pp."mediaId"
+      LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
+      WHERE p."organizerId" = $1 
+        AND p."isSoftDeleted" = false
+        AND p."status" = $2
+        AND p."type" = 'campaign'
+    `;
+
+    const values = [organizerId, status];
+    let paramIndex = 3;
+
+    if (cursor) {
+      query += ` AND p."createdAt" < $${paramIndex}`;
+      values.push(cursor);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY p."isPinnedToCampaign" DESC, p."createdAt" DESC LIMIT $${paramIndex}`;
+    values.push(limit);
+
+    const result = await db.query(query, values);
+    return result.rows;
+  }
+
+  async getAllPosts(options = {}) {
+    const { status = "published", limit = 20, cursor, type } = options;
+
+    let query = `
+      SELECT 
+        p.*,
+        u."email",
+        u."userType",
+        op."organizationName",
+        op."primaryContactPersonName",
+        c."name" as "campaignTitle",
+        c."shareLink" as "campaignShareLink",
+        op."profilePictureMediaId",
+        opp."fileName" as "profilePictureFileName"
+      FROM "posts" p
+      LEFT JOIN "users" u ON p."organizerId" = u."userId"
+      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
+      LEFT JOIN "campaigns" c ON p."campaignId" = c."campaignId"
       LEFT JOIN "media" opp ON op."profilePictureMediaId" = opp."mediaId"
       WHERE p."isSoftDeleted" = false
         AND p."status" = $1
@@ -201,6 +236,13 @@ class PostRepository {
 
     const values = [status];
     let paramIndex = 2;
+
+    // Add type filter if specified
+    if (type) {
+      query += ` AND p."type" = $${paramIndex}`;
+      values.push(type);
+      paramIndex++;
+    }
 
     if (cursor) {
       query += ` AND p."createdAt" < $${paramIndex}`;

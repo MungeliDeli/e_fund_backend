@@ -174,6 +174,27 @@ class PostService {
     }
   }
 
+  async getCampaignPostsByOrganizer(organizerId, options = {}) {
+    try {
+      const posts = await postRepository.getCampaignPostsByOrganizer(
+        organizerId,
+        options
+      );
+
+      // Media is already parsed as object from PostgreSQL JSONB column
+      const postsWithMedia = posts.map((post) => {
+        const media = post.media || [];
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
+      });
+
+      return postsWithMedia;
+    } catch (error) {
+      logger.error("Error fetching organizer campaign posts:", error);
+      throw error;
+    }
+  }
+
   async getAllPosts(options = {}) {
     try {
       const posts = await postRepository.getAllPosts(options);

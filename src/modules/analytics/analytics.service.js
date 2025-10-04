@@ -185,7 +185,7 @@ class AnalyticsService {
         throw new ValidationError("Campaign ID is required");
       }
 
-      if (limit && (limit < 1 || limit > 50)) {
+      if (limit !== undefined && (limit < 1 || limit > 50)) {
         throw new ValidationError("Limit must be between 1 and 50");
       }
 
@@ -201,15 +201,42 @@ class AnalyticsService {
       }
 
       // Format donor data for display
-      const formattedDonors = topDonors.map((donor, index) => ({
-        rank: index + 1,
-        donorId: donor.donorUserId,
-        isAnonymous: donor.isAnonymous,
-        amount: parseFloat(donor.amount || 0),
-        donationDate: donor.donationDate,
-        message: donor.messageText || null,
-        messageStatus: donor.messageStatus || null,
-      }));
+      const formattedDonors = topDonors.map((donor, index) => {
+        const baseDonor = {
+          rank: index + 1,
+          donorId: donor.donorUserId,
+          isAnonymous: donor.isAnonymous,
+          amount: parseFloat(donor.amount || 0),
+          donationDate: donor.donationDate,
+          message: donor.messageText || null,
+          messageStatus: donor.messageStatus || null,
+        };
+
+        // Add donor details based on profile type (only if not anonymous)
+        if (!donor.isAnonymous && donor.profileType) {
+          if (donor.profileType === "individual") {
+            baseDonor.donorDetails = {
+              type: "individual",
+              userId: donor.individualUserId,
+              firstName: donor.individualFirstName,
+              lastName: donor.individualLastName,
+              displayName:
+                `${donor.individualFirstName} ${donor.individualLastName}`.trim(),
+            };
+          } else if (donor.profileType === "organization") {
+            baseDonor.donorDetails = {
+              type: "organization",
+              userId: donor.organizationUserId,
+              organizationName: donor.organizationName,
+              organizationShortName: donor.organizationShortName,
+              displayName:
+                donor.organizationShortName || donor.organizationName,
+            };
+          }
+        }
+
+        return baseDonor;
+      });
 
       logger.info("Campaign top donors retrieved successfully", {
         campaignId,

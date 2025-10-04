@@ -7,6 +7,7 @@ import {
 import {
   createTransaction,
   getTransactionById,
+  getTransactionStatus,
   getTransactionsByCampaign,
   getTransactionsByUser,
   updateTransactionStatus,
@@ -51,6 +52,11 @@ router.get(
   "/:transactionId",
   validateTransactionId,
   catchAsync(getTransactionById)
+);
+router.get(
+  "/:transactionId/status",
+  validateTransactionId,
+  catchAsync(getTransactionStatus)
 );
 
 // Admin/System routes (require authentication)
