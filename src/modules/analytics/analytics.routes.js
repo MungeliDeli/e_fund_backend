@@ -28,6 +28,8 @@ import {
   getCampaignTopDonors,
   getCampaignProgress,
   healthCheck,
+  getTopOrganizers,
+  getTopCampaigns,
 } from "./analytics.controller.js";
 
 const router = Router();
@@ -96,5 +98,9 @@ router.get(
  * @access  Public
  */
 router.get("/health", healthCheck);
+
+// Leaderboards (public)
+router.get("/leaderboard/top-organizers", catchAsync(getTopOrganizers));
+router.get("/leaderboard/top-campaigns", catchAsync(getTopCampaigns));
 
 export default router;

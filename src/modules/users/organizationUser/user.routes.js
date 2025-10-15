@@ -1,13 +1,14 @@
 /**
- * User Routes
+ * Organization User Routes
  *
- * Defines all user profile management API endpoints for the FundFlow backend.
+ * Defines all organization user profile management API endpoints for the FundFlow backend.
  * Maps HTTP routes to controller actions, applies middleware for authentication and file upload,
  * and organizes endpoints for public/private profile fetching and profile/cover image upload.
  *
  * Key Features:
- * - Public and private profile routes
+ * - Public and private organization profile routes
  * - Profile and cover image upload route (multipart/form-data)
+ * - Organization listing route
  * - Middleware integration for authentication and file upload
  * - RESTful route organization
  *
@@ -21,17 +22,21 @@ import {
   getMyProfile,
   getOrganizers,
 } from "./user.controller.js";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate } from "../../../middlewares/auth.middleware.js";
 import multer from "multer";
-import { logRequestCount } from "../../middlewares/requestLogger.middleware.js";
-import { catchAsync } from "../../middlewares/errorHandler.js";
+import { logRequestCount } from "../../../middlewares/requestLogger.middleware.js";
+import { catchAsync } from "../../../middlewares/errorHandler.js";
+import processUploadsMiddleware from "../../../middlewares/processUploads.middleware.js";
 import {
   updateProfileImage,
   getMediaUrl,
   updateUserProfile,
+  updatePayoutSettings,
+  updateOrganizationProfileWithImages,
 } from "./user.controller.js";
 import {
-  validateUpdateProfile,
+  validateUpdateOrganizationProfile,
+  validateUpdatePayoutSettings,
   validateUserId,
   validateMediaId,
 } from "./user.validation.js";
@@ -45,6 +50,7 @@ const upload = multer({
 const router = Router();
 // Apply request logger to all auth routes
 router.use(logRequestCount);
+
 // Public profile (anyone)
 router.get("/:userId/profile", validateUserId, catchAsync(getUserProfile));
 // Private profile (owner only)
@@ -61,6 +67,7 @@ router.patch(
     { name: "profilePicture", maxCount: 1 },
     { name: "coverPicture", maxCount: 1 },
   ]),
+  processUploadsMiddleware(),
   catchAsync(updateProfileImage)
 );
 
@@ -68,8 +75,29 @@ router.patch(
 router.put(
   "/me/profile",
   authenticate,
-  validateUpdateProfile,
+  validateUpdateOrganizationProfile,
   catchAsync(updateUserProfile)
+);
+
+// Update payout settings
+router.put(
+  "/me/payout-settings",
+  authenticate,
+  validateUpdatePayoutSettings,
+  catchAsync(updatePayoutSettings)
+);
+
+// Update profile information with images
+router.put(
+  "/me/profile-with-images",
+  authenticate,
+  upload.fields([
+    { name: "profilePicture", maxCount: 1 },
+    { name: "coverPicture", maxCount: 1 },
+  ]),
+  validateUpdateOrganizationProfile,
+  processUploadsMiddleware(),
+  catchAsync(updateOrganizationProfileWithImages)
 );
 
 export default router;

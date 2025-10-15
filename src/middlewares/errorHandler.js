@@ -1,70 +1,70 @@
 /**
  * Error Handling Middleware Module
- * 
+ *
  * This module provides comprehensive error handling middleware for the Express application.
  * It centralizes error processing, provides consistent error responses, and handles
  * different types of errors with appropriate HTTP status codes and logging.
- * 
+ *
  * ERROR HANDLING FEATURES:
  * - Centralized error processing
  * - Custom error class handling
  * - Environment-specific error responses
  * - Comprehensive error logging
  * - Async error handling wrapper
- * 
+ *
  * MIDDLEWARE FUNCTIONS:
  * - catchAsync: Wrapper for async route handlers to catch errors
  * - errorHandler: Main error handling middleware
  * - notFound: 404 error handler for undefined routes
  * - globalErrorHandler: Global error processing middleware
- * 
+ *
  * ERROR CATEGORIES:
  * - Operational errors: Expected errors (validation, auth, etc.)
  * - Programming errors: Unexpected errors (bugs, system errors)
  * - Database errors: Database operation failures
  * - Validation errors: Input validation failures
  * - Authentication errors: Auth-related failures
- * 
+ *
  * ERROR RESPONSE FORMAT:
  * - Development: Detailed error information with stack traces
  * - Production: Sanitized error messages without sensitive data
  * - Consistent response structure
  * - Proper HTTP status codes
  * - Error logging for monitoring
- * 
+ *
  * SECURITY FEATURES:
  * - Error message sanitization in production
  * - Stack trace hiding in production
  * - Sensitive data protection
  * - Error information filtering
  * - Security event logging
- * 
+ *
  * LOGGING FEATURES:
  * - Error severity classification
  * - Request context logging
  * - User information logging
  * - Error stack trace logging
  * - Performance impact logging
- * 
+ *
  * ENVIRONMENT HANDLING:
  * - Development: Detailed error information
  * - Production: Minimal error exposure
  * - Testing: Error simulation support
  * - Staging: Balanced error information
- * 
+ *
  * INTEGRATION:
  * - Works with custom error classes
  * - Compatible with Express.js
  * - Supports monitoring tools
  * - Enables debugging and troubleshooting
- * 
+ *
  * ERROR FLOW:
  * - Error occurrence in route handler
  * - catchAsync wrapper catches error
  * - Error passed to error handler middleware
  * - Error classification and processing
  * - Response generation and logging
- * 
+ *
  * @author Your Name
  * @version 1.0.0
  * @since 2024
@@ -280,30 +280,30 @@ const databaseErrorHandler = (error, req, res, next) => {
 const rateLimitLogger = (req, res, next) => {
   // Store the original send function
   const originalSend = res.send;
-  
+
   // Override the send function to intercept responses
-  res.send = function(data) {
+  res.send = function (data) {
     // Check if this is a rate limit response (429)
     if (res.statusCode === 429) {
       let responseData;
       try {
-        responseData = typeof data === 'string' ? JSON.parse(data) : data;
+        responseData = typeof data === "string" ? JSON.parse(data) : data;
       } catch (e) {
         responseData = { message: data };
       }
-      
+
       // Determine which rate limiter was triggered based on the endpoint
-      let rateLimiterType = 'UNKNOWN';
-      if (req.originalUrl.includes('/login')) {
-        rateLimiterType = 'LOGIN_RATE_LIMITER';
-      } else if (req.originalUrl.includes('/forgot-password')) {
-        rateLimiterType = 'PASSWORD_RESET_RATE_LIMITER';
-      } else if (req.originalUrl.includes('/resend-verification')) {
-        rateLimiterType = 'RESEND_VERIFICATION_RATE_LIMITER';
-      } else if (req.originalUrl.startsWith('/api/')) {
-        rateLimiterType = 'GLOBAL_API_RATE_LIMITER';
+      let rateLimiterType = "UNKNOWN";
+      if (req.originalUrl.includes("/login")) {
+        rateLimiterType = "LOGIN_RATE_LIMITER";
+      } else if (req.originalUrl.includes("/forgot-password")) {
+        rateLimiterType = "PASSWORD_RESET_RATE_LIMITER";
+      } else if (req.originalUrl.includes("/resend-verification")) {
+        rateLimiterType = "RESEND_VERIFICATION_RATE_LIMITER";
+      } else if (req.originalUrl.startsWith("/api/")) {
+        rateLimiterType = "GLOBAL_API_RATE_LIMITER";
       }
-      
+
       logger.warn("Rate limit exceeded", {
         ip: req.ip,
         endpoint: req.originalUrl,
@@ -314,14 +314,14 @@ const rateLimitLogger = (req, res, next) => {
         message: responseData.message,
         timestamp: new Date().toISOString(),
         // Include email if available in request body (for email-based limiters)
-        email: req.body?.email?.toLowerCase()
+        email: req.body?.email?.toLowerCase(),
       });
     }
-    
+
     // Call the original send function
     return originalSend.call(this, data);
   };
-  
+
   next();
 };
 

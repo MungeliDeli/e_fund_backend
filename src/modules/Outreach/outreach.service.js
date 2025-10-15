@@ -46,7 +46,7 @@ import {
 import { getSegmentById } from "./segments/segment.repository.js";
 import { findCampaignById } from "../campaign/campaigns/campaign.repository.js";
 import { getCampaignsByOrganizer } from "../campaign/campaigns/campaign.service.js";
-import { getUserById } from "../users/user.service.js";
+import { getUserById } from "../users/individualUser/user.service.js";
 import {
   getDonationAttributionStats,
   getDonationsByContact,
@@ -696,10 +696,22 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
             campaign.campaignId,
             organizerId
           );
+          // Normalize keys expected for organizer aggregation
+          const normalized = {
+            emailsSent: analytics.totalSends || analytics.emailsSent || 0,
+            opens: analytics.totalOpens || analytics.opens || 0,
+            clicks: analytics.totalClicks || analytics.clicks || 0,
+            donations: analytics.totalDonations || analytics.donations || 0,
+            revenue: analytics.totalDonationAmount || analytics.revenue || 0,
+            outreachCampaigns: analytics.outreachCampaigns || 0,
+            bySegment: analytics.bySegment || null,
+            byContact: analytics.byContact || null,
+          };
+
           return {
             campaignId: campaign.campaignId,
             campaignName: campaign.name,
-            ...analytics,
+            ...normalized,
           };
         } catch (error) {
           logger.warn("Failed to get analytics for campaign", {
@@ -727,6 +739,7 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
         acc.clicks += campaign.clicks || 0;
         acc.donations += campaign.donations || 0;
         acc.revenue += campaign.revenue || 0;
+        acc.outreachCampaigns += campaign.outreachCampaigns || 0;
         return acc;
       },
       {
@@ -735,6 +748,7 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
         clicks: 0,
         donations: 0,
         revenue: 0,
+        outreachCampaigns: 0,
       }
     );
 
@@ -754,16 +768,19 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
     campaignAnalytics.forEach((campaign) => {
       if (campaign.bySegment) {
         Object.entries(campaign.bySegment).forEach(([segmentId, data]) => {
+          const segmentName = data.segmentName || data.name || "Segment";
+          const clicks = data.clicks || data.totalClicks || 0;
+          const opens = data.opens || data.totalOpens || 0;
           if (!allSegments[segmentId]) {
             allSegments[segmentId] = {
               segmentId,
-              name: data.segmentName,
+              name: segmentName,
               clicks: 0,
               opens: 0,
             };
           }
-          allSegments[segmentId].clicks += data.clicks || 0;
-          allSegments[segmentId].opens += data.opens || 0;
+          allSegments[segmentId].clicks += clicks;
+          allSegments[segmentId].opens += opens;
         });
       }
     });
@@ -777,17 +794,21 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
     campaignAnalytics.forEach((campaign) => {
       if (campaign.byContact) {
         Object.entries(campaign.byContact).forEach(([contactId, data]) => {
+          const name = data.contactName || data.name || data.email || "Contact";
+          const email = data.contactEmail || data.email || null;
+          const clicks = data.clicks || data.totalClicks || 0;
+          const opens = data.opens || data.totalOpens || 0;
           if (!allContacts[contactId]) {
             allContacts[contactId] = {
               contactId,
-              name: data.contactName,
-              email: data.contactEmail,
+              name,
+              email,
               clicks: 0,
               opens: 0,
             };
           }
-          allContacts[contactId].clicks += data.clicks || 0;
-          allContacts[contactId].opens += data.opens || 0;
+          allContacts[contactId].clicks += clicks;
+          allContacts[contactId].opens += opens;
         });
       }
     });
@@ -810,6 +831,7 @@ export const getOrganizerAnalytics = async (organizerId, filters = {}) => {
       openRate,
       clickRate,
       revenue: aggregated.revenue,
+      outreachCampaigns: aggregated.outreachCampaigns,
       topSegments,
       topContacts,
       campaignBreakdown,

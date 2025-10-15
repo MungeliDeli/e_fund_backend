@@ -33,6 +33,28 @@ const userIdSchema = Joi.object({
   userId: Joi.string().uuid().required(),
 });
 
+const adminTransactionsSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(50),
+  search: Joi.string().allow("").optional(),
+  campaignId: Joi.string().uuid().optional(),
+  status: Joi.string()
+    .valid("succeeded", "failed", "pending", "refunded")
+    .optional(),
+  gatewayUsed: Joi.string().optional(),
+  sortBy: Joi.string()
+    .valid(
+      "transactionTimestamp",
+      "amount",
+      "status",
+      "gatewayUsed",
+      "campaignName",
+      "userEmail"
+    )
+    .default("transactionTimestamp"),
+  sortOrder: Joi.string().valid("asc", "desc").default("desc"),
+});
+
 // Validation middlewares
 export const validateCreateTransaction = validate(createTransactionSchema);
 export const validateUpdateTransactionStatus = validate(
@@ -41,3 +63,7 @@ export const validateUpdateTransactionStatus = validate(
 export const validateTransactionId = validate(transactionIdSchema, "params");
 export const validateCampaignId = validate(campaignIdSchema, "params");
 export const validateUserId = validate(userIdSchema, "params");
+export const validateAdminTransactions = validate(
+  adminTransactionsSchema,
+  "query"
+);

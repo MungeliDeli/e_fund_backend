@@ -9,7 +9,7 @@
  */
 
 import Joi from "joi";
-import { validate } from "../../utils/validation.js";
+import { validate } from "../../../utils/validation.js";
 
 export const updateProfileSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(50).required().messages({

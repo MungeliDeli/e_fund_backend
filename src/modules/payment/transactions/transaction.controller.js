@@ -29,6 +29,17 @@ export const getTransactionById = async (req, res) => {
   );
 };
 
+export const getTransactionStatus = async (req, res) => {
+  const { transactionId } = req.params;
+
+  const txn = await transactionService.getTransactionById(transactionId);
+
+  return ResponseFactory.ok(res, "Transaction status", {
+    status: txn.status,
+    updatedAt: txn.updatedAt,
+  });
+};
+
 export const getTransactionsByCampaign = async (req, res) => {
   const { campaignId } = req.params;
   const { limit = 50, offset = 0 } = req.query;
@@ -149,5 +160,38 @@ export const processPaymentFailure = async (req, res) => {
     res,
     "Payment failure processed successfully",
     transaction
+  );
+};
+
+export const getAdminTransactions = async (req, res) => {
+  const {
+    page = 1,
+    limit = 50,
+    search,
+    campaignId,
+    status,
+    gatewayUsed,
+    sortBy = "transactionTimestamp",
+    sortOrder = "desc",
+  } = req.query;
+
+  const result = await transactionService.getAdminTransactions({
+    page: parseInt(page),
+    limit: parseInt(limit),
+    search,
+    campaignId,
+    status,
+    gatewayUsed,
+    sortBy,
+    sortOrder,
+  });
+
+  return ResponseFactory.ok(
+    res,
+    "Admin transactions retrieved successfully",
+    result.transactions,
+    {
+      pagination: result.pagination,
+    }
   );
 };

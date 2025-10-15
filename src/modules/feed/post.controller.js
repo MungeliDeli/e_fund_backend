@@ -71,11 +71,33 @@ const getPostsByOrganizer = async (req, res) => {
   );
 };
 
+const getCampaignPostsByOrganizer = async (req, res) => {
+  const { organizerId } = req.params;
+  const options = {
+    status: req.query.status || "published",
+    limit: parseInt(req.query.limit) || 20,
+    cursor: req.query.cursor,
+  };
+
+  const posts = await postService.getCampaignPostsByOrganizer(
+    organizerId,
+    options
+  );
+
+  return ResponseFactory.ok(
+    res,
+    "Organizer campaign posts retrieved successfully",
+    posts
+  );
+};
+
 const getAllPosts = async (req, res) => {
   const options = {
     status: req.query.status || "published",
     limit: parseInt(req.query.limit) || 20,
     cursor: req.query.cursor,
+    type: req.query.type,
+    sort: req.query.sort === "popular" ? "popular" : "latest",
   };
 
   const posts = await postService.getAllPosts(options);
@@ -83,10 +105,19 @@ const getAllPosts = async (req, res) => {
   return ResponseFactory.ok(res, "Posts retrieved successfully", posts);
 };
 
+const toggleLike = async (req, res) => {
+  const { postId } = req.params;
+  const userId = req.user.userId;
+  const result = await postService.toggleLike(postId, userId);
+  return ResponseFactory.ok(res, "Post like updated", result);
+};
+
 export {
   createPost,
   getPostById,
   getPostsByCampaign,
   getPostsByOrganizer,
+  getCampaignPostsByOrganizer,
   getAllPosts,
+  toggleLike,
 };

@@ -18,7 +18,8 @@ import setAuditContext from "./middlewares/auditContext.middleware.js";
 
 // Import routes
 import authRoutes from "./modules/auth/auth.routes.js";
-import userRoutes from "./modules/users/user.routes.js";
+import userRoutes from "./modules/users/individualUser/user.routes.js";
+import organizationUserRoutes from "./modules/users/organizationUser/user.routes.js";
 import categoryRoutes from "./modules/campaign/categories/category.routes.js";
 import campaignRoutes from "./modules/campaign/campaigns/campaign.routes.js";
 import segmentRoutes from "./modules/Outreach/segments/segment.routes.js";
@@ -28,7 +29,11 @@ import outreachRoutes from "./modules/Outreach/outreach.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import { donationRoutes, messageRoutes } from "./modules/donor/index.js";
-import { transactionRoutes } from "./modules/payment/index.js";
+import {
+  transactionRoutes,
+  webhookRoutes,
+  withdrawalRoutes,
+} from "./modules/payment/index.js";
 import analyticsRoutes from "./modules/analytics/analytics.routes.js";
 import postRoutes from "./modules/feed/post.routes.js";
 
@@ -102,6 +107,7 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/organizations", organizationUserRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/campaigns", campaignRoutes);
 app.use("/api/v1/outreach/segments", segmentRoutes);
@@ -111,6 +117,8 @@ app.use("/t", trackingRoutes);
 app.use("/api/v1/donations", donationRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
+app.use("/api/webhooks", webhookRoutes);
+app.use("/api/v1/withdrawals", withdrawalRoutes);
 app.use("/api/v1/audit", auditRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1", analyticsRoutes);

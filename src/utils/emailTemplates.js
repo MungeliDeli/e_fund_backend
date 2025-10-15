@@ -331,6 +331,122 @@ export function createThankYouTemplate(data) {
 }
 
 /**
+ * Donation receipt email template (to donor)
+ * @param {Object} data
+ * @param {string} data.organizerName
+ * @param {string} data.campaignTitle
+ * @param {string} data.donorName
+ * @param {number|string} data.donationAmount
+ * @param {string} data.currency
+ * @param {string} data.donationId
+ * @param {string} data.campaignUrl
+ * @param {string} [data.thankYouMessage]
+ * @param {string} [data.linkTokenId]
+ */
+export function createDonationReceiptTemplate(data) {
+  const {
+    organizerName,
+    campaignTitle,
+    donorName,
+    donationAmount,
+    currency,
+    donationId,
+    campaignUrl,
+    thankYouMessage,
+    linkTokenId,
+  } = data;
+
+  const niceMessage =
+    thankYouMessage ||
+    `On behalf of ${organizerName}, thank you for supporting "${campaignTitle}". Your generosity makes a real difference.`;
+
+  const content = `
+    <div class="message">
+      <p>Dear ${donorName || "Supporter"},</p>
+      <p>We’ve received your donation. Please find your receipt below.</p>
+    </div>
+
+    <div class="campaign-details">
+      <h2>${campaignTitle}</h2>
+      <p class="amount-highlight">${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: currency || "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(donationAmount) || 0)}</p>
+      <p><strong>Donation ID:</strong> ${donationId}</p>
+    </div>
+
+    <div class="personalized-message">
+      <p>${niceMessage}</p>
+      <p><em>- ${organizerName}</em></p>
+    </div>
+
+    <a href="${
+      campaignUrl || FRONTEND_URL
+    }" class="cta-button">View Campaign</a>
+
+    <div class="message">
+      <p>Warm regards,<br/>The ${APP_NAME} Team</p>
+    </div>
+  `;
+
+  return createBaseTemplate(content, linkTokenId);
+}
+
+/**
+ * Campaign milestone email template (to organizer)
+ * @param {Object} data
+ * @param {string} data.organizerName
+ * @param {string} data.campaignTitle
+ * @param {number} data.percentageReached - 25, 50, 70, 100
+ * @param {number|string} data.currentAmount
+ * @param {number|string} data.goalAmount
+ * @param {string} data.campaignUrl
+ * @param {string} [data.linkTokenId]
+ */
+export function createMilestoneTemplate(data) {
+  const {
+    organizerName,
+    campaignTitle,
+    percentageReached,
+    currentAmount,
+    goalAmount,
+    campaignUrl,
+    linkTokenId,
+  } = data;
+
+  const content = `
+    <div class="message">
+      <p>Hi ${organizerName},</p>
+      <p>Your campaign <strong>${campaignTitle}</strong> just reached <strong>${percentageReached}%</strong> of its goal!</p>
+    </div>
+
+    <div class="campaign-details">
+      <p><strong>Raised so far:</strong> ${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(currentAmount) || 0)}</p>
+      <p><strong>Goal:</strong> ${new Intl.NumberFormat("en-ZM", {
+        style: "currency",
+        currency: "ZMW",
+        minimumFractionDigits: 0,
+      }).format(Number(goalAmount) || 0)}</p>
+    </div>
+
+    <a href="${
+      campaignUrl || FRONTEND_URL
+    }" class="cta-button">Open Campaign Dashboard</a>
+
+    <div class="message">
+      <p>Keep up the great work!<br/>The ${APP_NAME} Team</p>
+    </div>
+  `;
+
+  return createBaseTemplate(content, linkTokenId);
+}
+
+/**
  * Generate tracking link with UTM parameters
  * @param {string} baseUrl - Base campaign URL
  * @param {string} linkTokenId - Link token ID
@@ -346,4 +462,296 @@ export function generateTrackingLink(baseUrl, linkTokenId, utmParams = {}) {
   });
 
   return `${trackingUrl}?${params.toString()}`;
+}
+
+/**
+ * Withdrawal Initiated Email Template
+ * @param {Object} data - Template data
+ * @param {string} data.organizerName - Name of the organizer
+ * @param {number} data.amount - Withdrawal amount
+ * @param {string} data.currency - Currency code
+ * @param {string} data.phoneNumber - Destination phone number
+ * @param {string} data.withdrawalRequestId - Withdrawal request ID
+ * @returns {string} HTML email template
+ */
+export function createWithdrawalInitiatedTemplate(data) {
+  const {
+    organizerName = "Organizer",
+    amount,
+    currency = "ZMW",
+    phoneNumber,
+    withdrawalRequestId,
+  } = data;
+
+  const content = `
+    <div style="text-align: center; padding: 20px;">
+      <h2 style="color: #2563eb; margin-bottom: 20px;">Withdrawal Payment Initiated</h2>
+      
+      <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0 0 10px 0; font-size: 16px;">
+          <strong>Hello ${organizerName},</strong>
+        </p>
+        <p style="margin: 0 0 15px 0; color: #64748b;">
+          Your withdrawal request has been approved and payment is being processed.
+        </p>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Amount</p>
+          <p style="margin: 0; font-size: 20px; font-weight: bold; color: #059669;">
+            ${amount} ${currency}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Destination</p>
+          <p style="margin: 0; font-size: 16px; color: #1f2937;">
+            ${phoneNumber}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Reference</p>
+          <p style="margin: 0; font-size: 14px; color: #6b7280; font-family: monospace;">
+            ${withdrawalRequestId}
+          </p>
+        </div>
+      </div>
+      
+      <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #92400e;">
+          <strong>⏱️ Processing Time:</strong> Payments typically take 5-15 minutes to complete. 
+          You will receive another notification once the payment is successful.
+        </p>
+      </div>
+      
+      <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+        If you have any questions or concerns, please contact our support team.
+      </p>
+    </div>
+  `;
+
+  return createBaseTemplate(content);
+}
+
+/**
+ * Withdrawal Completed Email Template
+ * @param {Object} data - Template data
+ * @param {string} data.organizerName - Name of the organizer
+ * @param {number} data.amount - Withdrawal amount
+ * @param {string} data.currency - Currency code
+ * @param {string} data.phoneNumber - Destination phone number
+ * @param {string} data.withdrawalRequestId - Withdrawal request ID
+ * @returns {string} HTML email template
+ */
+export function createWithdrawalCompletedTemplate(data) {
+  const {
+    organizerName = "Organizer",
+    amount,
+    currency = "ZMW",
+    phoneNumber,
+    withdrawalRequestId,
+  } = data;
+
+  const content = `
+    <div style="text-align: center; padding: 20px;">
+      <h2 style="color: #059669; margin-bottom: 20px;">✅ Withdrawal Completed</h2>
+      
+      <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
+        <p style="margin: 0 0 10px 0; font-size: 16px;">
+          <strong>Hello ${organizerName},</strong>
+        </p>
+        <p style="margin: 0 0 15px 0; color: #166534;">
+          🎉 Great news! Your withdrawal has been successfully processed.
+        </p>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Amount</p>
+          <p style="margin: 0; font-size: 20px; font-weight: bold; color: #059669;">
+            ${amount} ${currency}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Sent to</p>
+          <p style="margin: 0; font-size: 16px; color: #1f2937;">
+            ${phoneNumber}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Reference</p>
+          <p style="margin: 0; font-size: 14px; color: #6b7280; font-family: monospace;">
+            ${withdrawalRequestId}
+          </p>
+        </div>
+      </div>
+      
+      <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #1e40af;">
+          <strong>💡 Tip:</strong> Check your mobile money account to confirm receipt. 
+          The funds should appear within a few minutes.
+        </p>
+      </div>
+      
+      <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+        Thank you for using FundFlow! If you have any questions, please contact our support team.
+      </p>
+    </div>
+  `;
+
+  return createBaseTemplate(content);
+}
+
+/**
+ * Withdrawal Failed Email Template
+ * @param {Object} data - Template data
+ * @param {string} data.organizerName - Name of the organizer
+ * @param {number} data.amount - Withdrawal amount
+ * @param {string} data.currency - Currency code
+ * @param {string} data.phoneNumber - Destination phone number
+ * @param {string} data.withdrawalRequestId - Withdrawal request ID
+ * @param {string} data.errorMessage - Error message from payment provider
+ * @returns {string} HTML email template
+ */
+export function createWithdrawalFailedTemplate(data) {
+  const {
+    organizerName = "Organizer",
+    amount,
+    currency = "ZMW",
+    phoneNumber,
+    withdrawalRequestId,
+    errorMessage = "Unknown error",
+  } = data;
+
+  const content = `
+    <div style="text-align: center; padding: 20px;">
+      <h2 style="color: #dc2626; margin-bottom: 20px;">❌ Withdrawal Failed</h2>
+      
+      <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fecaca;">
+        <p style="margin: 0 0 10px 0; font-size: 16px;">
+          <strong>Hello ${organizerName},</strong>
+        </p>
+        <p style="margin: 0 0 15px 0; color: #991b1b;">
+          We're sorry, but your withdrawal request could not be processed.
+        </p>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Amount</p>
+          <p style="margin: 0; font-size: 20px; font-weight: bold; color: #dc2626;">
+            ${amount} ${currency}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Destination</p>
+          <p style="margin: 0; font-size: 16px; color: #1f2937;">
+            ${phoneNumber}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Reference</p>
+          <p style="margin: 0; font-size: 14px; color: #6b7280; font-family: monospace;">
+            ${withdrawalRequestId}
+          </p>
+        </div>
+        
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #92400e; font-weight: bold;">Error Details:</p>
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ${errorMessage}
+          </p>
+        </div>
+      </div>
+      
+      <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #1e40af;">
+          <strong>🔧 What's Next:</strong> Please contact our support team to resolve this issue. 
+          We'll help you complete your withdrawal successfully.
+        </p>
+      </div>
+      
+      <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+        We apologize for any inconvenience. Our support team is here to help.
+      </p>
+    </div>
+  `;
+
+  return createBaseTemplate(content);
+}
+
+/**
+ * Withdrawal Rejected Email Template
+ * @param {Object} data - Template data
+ * @param {string} data.organizerName - Name of the organizer
+ * @param {number} data.amount - Withdrawal amount
+ * @param {string} data.currency - Currency code
+ * @param {string} data.withdrawalRequestId - Withdrawal request ID
+ * @param {string} data.reason - Rejection reason
+ * @returns {string} HTML email template
+ */
+export function createWithdrawalRejectedTemplate(data) {
+  const {
+    organizerName = "Organizer",
+    amount,
+    currency = "ZMW",
+    withdrawalRequestId,
+    reason = "No reason provided",
+  } = data;
+
+  const content = `
+    <div style="text-align: center; padding: 20px;">
+      <h2 style="color: #dc2626; margin-bottom: 20px;">❌ Withdrawal Request Rejected</h2>
+      
+      <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fecaca;">
+        <p style="margin: 0 0 10px 0; font-size: 16px;">
+          <strong>Hello ${organizerName},</strong>
+        </p>
+        <p style="margin: 0 0 15px 0; color: #991b1b;">
+          We're sorry, but your withdrawal request has been rejected.
+        </p>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Amount</p>
+          <p style="margin: 0; font-size: 20px; font-weight: bold; color: #dc2626;">
+            ${amount} ${currency}
+          </p>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #64748b;">Reference</p>
+          <p style="margin: 0; font-size: 14px; color: #6b7280; font-family: monospace;">
+            ${withdrawalRequestId}
+          </p>
+        </div>
+        
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 15px 0;">
+          <p style="margin: 0 0 5px 0; font-size: 14px; color: #92400e; font-weight: bold;">Rejection Reason:</p>
+          <p style="margin: 0; font-size: 14px; color: #92400e;">
+            ${reason}
+          </p>
+        </div>
+      </div>
+      
+      <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #1e40af;">
+          <strong>🔧 What's Next:</strong> Please review the reason for rejection and address any issues. 
+          You can submit a new withdrawal request once the issues are resolved.
+        </p>
+      </div>
+      
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #166534;">
+          <strong>💡 Need Help?</strong> If you have questions about this rejection or need assistance, 
+          please contact our support team. We're here to help you succeed.
+        </p>
+      </div>
+      
+      <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+        Thank you for using FundFlow. We appreciate your understanding.
+      </p>
+    </div>
+  `;
+
+  return createBaseTemplate(content);
 }

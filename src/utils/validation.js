@@ -37,7 +37,22 @@ export const validate = (schema, context = "body") => {
     }
 
     // Replace the validated context with sanitized data
-    req[context] = value;
+    // Note: In some router versions, req.query/req.params are read-only properties.
+    // Avoid reassigning the whole object; instead, mutate existing object keys.
+    if (context === "query" || context === "params") {
+      const target = req[context] || {};
+      // Remove existing keys
+      Object.keys(target).forEach((k) => {
+        delete target[k];
+      });
+      // Assign validated keys
+      Object.keys(value || {}).forEach((k) => {
+        target[k] = value[k];
+      });
+    } else {
+      req[context] = value;
+    }
+
     next();
   };
 };

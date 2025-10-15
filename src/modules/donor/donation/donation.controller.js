@@ -23,6 +23,17 @@ export const getDonationById = async (req, res) => {
   return ResponseFactory.ok(res, "Donation retrieved successfully", donation);
 };
 
+export const getDonationStatus = async (req, res) => {
+  const { donationId } = req.params;
+
+  const donation = await donationService.getDonationById(donationId);
+
+  return ResponseFactory.ok(res, "Donation status", {
+    status: donation.status,
+    updatedAt: donation.updatedAt,
+  });
+};
+
 export const getDonationsByCampaign = async (req, res) => {
   const { campaignId } = req.params;
   const { limit = 50, offset = 0 } = req.query;

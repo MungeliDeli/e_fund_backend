@@ -14,6 +14,7 @@ export const getCampaignFinancialSummary = async (campaignId) => {
         COUNT(d."donationId") as "totalDonations"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -37,6 +38,7 @@ export const getCampaignUniqueDonors = async (campaignId) => {
       FROM "donations" d
       WHERE d."campaignId" = $1
       AND d."donorUserId" IS NOT NULL
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -62,6 +64,7 @@ export const getCampaignDonorBreakdown = async (campaignId) => {
         COUNT(*) as "totalDonations"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -87,10 +90,27 @@ export const getCampaignTopDonors = async (campaignId, limit = 10) => {
         d.amount,
         d."donationDate",
         dm."messageText",
-        dm."status" as "messageStatus"
+        dm."status" as "messageStatus",
+        -- Individual profile details
+        ip."firstName" as "individualFirstName",
+        ip."lastName" as "individualLastName",
+        ip."userId" as "individualUserId",
+        -- Organization profile details
+        op."organizationShortName" as "organizationShortName",
+        op."organizationName" as "organizationName",
+        op."userId" as "organizationUserId",
+        -- User type determination
+        CASE 
+          WHEN ip."userId" IS NOT NULL THEN 'individual'
+          WHEN op."userId" IS NOT NULL THEN 'organization'
+          ELSE 'unknown'
+        END as "profileType"
       FROM "donations" d
       LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
+      LEFT JOIN "individualProfiles" ip ON d."donorUserId" = ip."userId"
+      LEFT JOIN "organizationProfiles" op ON d."donorUserId" = op."userId"
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
       ORDER BY d.amount DESC
       LIMIT $2
     `;
@@ -123,6 +143,7 @@ export const getCampaignAnalyticsSummary = async (campaignId) => {
         COUNT(CASE WHEN d."isAnonymous" = false THEN 1 END) as "namedCount"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -130,6 +151,70 @@ export const getCampaignAnalyticsSummary = async (campaignId) => {
   } catch (error) {
     logger.error("Error getting campaign analytics summary", {
       campaignId,
+      error: error.message,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Get top organizers by total completed donations (sum of amount)
+ */
+export const getTopOrganizersByDonations = async (limit = 5) => {
+  try {
+    const query = `
+      SELECT 
+        d."organizerId",
+        COALESCE(SUM(d.amount), 0) AS "totalRaised",
+        COUNT(*) AS "completedCount",
+        op."organizationShortName",
+        op."organizationName",
+        op."profilePictureMediaId",
+        m."fileName" as "profilePictureFileName"
+      FROM "donations" d
+      JOIN "organizationProfiles" op ON d."organizerId" = op."userId"
+      LEFT JOIN "media" m ON op."profilePictureMediaId" = m."mediaId"
+      WHERE d."status" = 'completed'
+      GROUP BY d."organizerId", op."organizationShortName", op."organizationName", op."profilePictureMediaId", m."fileName"
+      ORDER BY "totalRaised" DESC
+      LIMIT $1
+    `;
+
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  } catch (error) {
+    logger.error("Error getting top organizers by donations", {
+      error: error.message,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Get top campaigns by total completed donations (sum of amount)
+ */
+export const getTopCampaignsByDonations = async (limit = 5) => {
+  try {
+    const query = `
+      SELECT 
+        d."campaignId",
+        COALESCE(SUM(d.amount), 0) AS "totalRaised",
+        COUNT(*) AS "completedCount",
+        c."name" as "campaignTitle",
+        c."shareLink" as "campaignShareLink",
+        c."customPageSettings" 
+      FROM "donations" d
+      JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+      WHERE d."status" = 'completed'
+      GROUP BY d."campaignId", c."name", c."shareLink", c."customPageSettings"
+      ORDER BY "totalRaised" DESC
+      LIMIT $1
+    `;
+
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  } catch (error) {
+    logger.error("Error getting top campaigns by donations", {
       error: error.message,
     });
     throw error;

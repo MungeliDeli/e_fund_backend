@@ -38,6 +38,7 @@ import {
 } from "./auth.controller.js";
 import { loginLimiter, passwordResetLimiter, resendVerificationLimiter } from '../../middlewares/rateLimiters.js';
 import multer from 'multer';
+import processUploadsMiddleware from "../../middlewares/processUploads.middleware.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -155,6 +156,7 @@ router.post(
     { name: 'coverPicture', maxCount: 1 }
   ]),
   validateCreateOrganizationUser,
+  processUploadsMiddleware(),
   catchAsync(createOrganizationUser)
 );
 

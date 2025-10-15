@@ -179,3 +179,21 @@ export const healthCheck = (req, res) => {
     timestamp: new Date().toISOString(),
   });
 };
+
+/**
+ * Get top organizers leaderboard
+ */
+export const getTopOrganizers = async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 5, 20);
+  const data = await analyticsService.getTopOrganizers(limit);
+  ResponseFactory.ok(res, "Top organizers retrieved", data);
+};
+
+/**
+ * Get top campaigns leaderboard
+ */
+export const getTopCampaigns = async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 5, 20);
+  const data = await analyticsService.getTopCampaigns(limit);
+  ResponseFactory.ok(res, "Top campaigns retrieved", data);
+};

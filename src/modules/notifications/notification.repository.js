@@ -134,6 +134,34 @@ export const selectEmailRetryBatch = async ({ batchSize = 20 } = {}) => {
   return rows;
 };
 
+export const getSubscribers = async (organizerId) => {
+  const { rows } = await query(
+    `SELECT DISTINCT u."userId", u.email, u.name
+     FROM "users" u
+     INNER JOIN "campaigns" c ON c."organizerId" = $1
+     INNER JOIN "donations" d ON d."campaignId" = c."campaignId" AND d."donorId" = u."userId"
+     WHERE u."isActive" = true
+     UNION
+     SELECT DISTINCT u."userId", u.email, u.name
+     FROM "users" u
+     INNER JOIN "feed" f ON f."organizerId" = $1
+     INNER JOIN "feed_likes" fl ON fl."feedId" = f."feedId" AND fl."userId" = u."userId"
+     WHERE u."isActive" = true`,
+    [organizerId]
+  );
+  return rows;
+};
+
+export const getUnreadCount = async (userId) => {
+  const { rows } = await query(
+    `SELECT COUNT(*) as count
+     FROM "notifications"
+     WHERE "userId" = $1 AND "type" = 'inApp' AND "readAt" IS NULL`,
+    [userId]
+  );
+  return parseInt(rows[0]?.count || 0, 10);
+};
+
 export default {
   createNotification,
   markAsRead,
@@ -143,4 +171,6 @@ export default {
   setFailedWithError,
   selectEmailByUserId,
   selectEmailRetryBatch,
+  getSubscribers,
+  getUnreadCount,
 };

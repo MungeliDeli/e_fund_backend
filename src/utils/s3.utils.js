@@ -146,6 +146,40 @@ export async function uploadPostMediaToS3({
 }
 
 /**
+ * Upload organization profile media to S3 with organization-specific key
+ * @param {Object} params
+ * @param {Buffer} params.fileBuffer - File data
+ * @param {string} params.fileName - Original file name (for extension)
+ * @param {string} params.mimeType - MIME type
+ * @param {string} params.organizationId - Organization ID for folder structure
+ * @param {string} params.mediaType - Media type ('profile' or 'cover')
+ * @param {string} [params.folder] - Optional folder prefix (default: 'organization-profiles')
+ * @returns {Promise<string>} S3 key of the uploaded file
+ */
+export async function uploadOrganizationProfileMediaToS3({
+  fileBuffer,
+  fileName,
+  mimeType,
+  organizationId,
+  mediaType,
+  folder = "organization-profiles",
+}) {
+  // Remove extension from filename to avoid consistency issues
+  // S3 will handle content type based on MIME type
+  const key = `${folder}/${organizationId}/${organizationId}${mediaType}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: mimeType,
+  });
+
+  await s3.send(command);
+  return key;
+}
+
+/**
  * GENERATE PUBLIC URL FOR S3 OBJECTS
  * This function is suitable for objects with public read access.
  * @param {string} key - S3 object key (this is the file_name stored in your media table)

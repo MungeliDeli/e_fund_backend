@@ -138,8 +138,6 @@ const createOrganizationUserSchema = Joi.object({
   missionDescription: Joi.string().optional(),
   establishmentDate: Joi.date().optional(),
   campusAffiliationScope: Joi.string().max(50).optional(),
-  affiliatedSchoolsNames: Joi.string().optional(),
-  affiliatedDepartmentNames: Joi.string().optional(),
   primaryContactPersonName: Joi.string().max(255).optional(),
   primaryContactPersonEmail: Joi.string()
     .email({ tlds: { allow: false } })

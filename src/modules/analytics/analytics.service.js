@@ -18,6 +18,7 @@
 import * as analyticsRepository from "./analytics.repository.js";
 import { NotFoundError, ValidationError } from "../../utils/appError.js";
 import logger from "../../utils/logger.js";
+import { getPublicS3Url } from "../../utils/s3.utils.js";
 
 /**
  * Analytics Service
@@ -62,6 +63,51 @@ class AnalyticsService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Get top organizers by completed donations
+   */
+  async getTopOrganizers(limit = 5) {
+    const rows = await analyticsRepository.getTopOrganizersByDonations(limit);
+    return rows.map((row) => ({
+      organizerId: row.organizerId,
+      organizationShortName: row.organizationShortName,
+      organizationName: row.organizationName,
+      profilePictureUrl: row.profilePictureFileName
+        ? getPublicS3Url(row.profilePictureFileName)
+        : null,
+    }));
+  }
+
+  /**
+   * Get top campaigns by completed donations
+   */
+  async getTopCampaigns(limit = 5) {
+    const rows = await analyticsRepository.getTopCampaignsByDonations(limit);
+    return rows.map((row) => {
+      let mainMediaUrl = null;
+      let mainMediaType = null;
+      try {
+        const settings =
+          typeof row.customPageSettings === "string"
+            ? JSON.parse(row.customPageSettings)
+            : row.customPageSettings;
+        if (settings?.mainMedia?.url && settings?.mainMedia?.type) {
+          mainMediaUrl = settings.mainMedia.url;
+          mainMediaType = settings.mainMedia.type;
+        }
+      } catch (e) {
+        // ignore invalid JSON
+      }
+      return {
+        campaignId: row.campaignId,
+        campaignTitle: row.campaignTitle,
+        campaignShareLink: row.campaignShareLink,
+        mainMediaUrl,
+        mainMediaType,
+      };
+    });
   }
 
   /**
@@ -185,7 +231,7 @@ class AnalyticsService {
         throw new ValidationError("Campaign ID is required");
       }
 
-      if (limit && (limit < 1 || limit > 50)) {
+      if (limit !== undefined && (limit < 1 || limit > 50)) {
         throw new ValidationError("Limit must be between 1 and 50");
       }
 
@@ -201,15 +247,42 @@ class AnalyticsService {
       }
 
       // Format donor data for display
-      const formattedDonors = topDonors.map((donor, index) => ({
-        rank: index + 1,
-        donorId: donor.donorUserId,
-        isAnonymous: donor.isAnonymous,
-        amount: parseFloat(donor.amount || 0),
-        donationDate: donor.donationDate,
-        message: donor.messageText || null,
-        messageStatus: donor.messageStatus || null,
-      }));
+      const formattedDonors = topDonors.map((donor, index) => {
+        const baseDonor = {
+          rank: index + 1,
+          donorId: donor.donorUserId,
+          isAnonymous: donor.isAnonymous,
+          amount: parseFloat(donor.amount || 0),
+          donationDate: donor.donationDate,
+          message: donor.messageText || null,
+          messageStatus: donor.messageStatus || null,
+        };
+
+        // Add donor details based on profile type (only if not anonymous)
+        if (!donor.isAnonymous && donor.profileType) {
+          if (donor.profileType === "individual") {
+            baseDonor.donorDetails = {
+              type: "individual",
+              userId: donor.individualUserId,
+              firstName: donor.individualFirstName,
+              lastName: donor.individualLastName,
+              displayName:
+                `${donor.individualFirstName} ${donor.individualLastName}`.trim(),
+            };
+          } else if (donor.profileType === "organization") {
+            baseDonor.donorDetails = {
+              type: "organization",
+              userId: donor.organizationUserId,
+              organizationName: donor.organizationName,
+              organizationShortName: donor.organizationShortName,
+              displayName:
+                donor.organizationShortName || donor.organizationName,
+            };
+          }
+        }
+
+        return baseDonor;
+      });
 
       logger.info("Campaign top donors retrieved successfully", {
         campaignId,

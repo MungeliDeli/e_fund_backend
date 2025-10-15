@@ -37,7 +37,7 @@ import {
   sendPasswordResetEmail,
   sendSetupEmail,
 } from "../../utils/email.utils.js";
-import { uploadFileToS3 } from "../../utils/s3.utils.js";
+import { uploadOrganizationProfileMediaToS3 } from "../../utils/s3.utils.js";
 import { v4 as uuidv4 } from "uuid";
 import { transaction } from "../../db/index.js";
 import { logAuthEvent, logUserAction } from "../audit/audit.utils.js";
@@ -240,15 +240,22 @@ class AuthService {
 
   // ORGANIZATION USER CREATION
 
-  // Helper to handle S3 upload and media record construction
-  async _processMediaFile(mediaFile, description, createdById) {
+  // Helper to handle S3 upload and media record construction for organization profiles
+  async _processOrganizationMediaFile(
+    mediaFile,
+    description,
+    organizationId,
+    mediaType,
+    createdById
+  ) {
     if (!mediaFile) return { mediaId: null, mediaRecord: null };
     try {
-      const s3Key = await uploadFileToS3({
+      const s3Key = await uploadOrganizationProfileMediaToS3({
         fileBuffer: mediaFile.buffer,
         fileName: mediaFile.originalname,
         mimeType: mediaFile.mimetype,
-        folder: "organization-profiles",
+        organizationId,
+        mediaType,
       });
       const mediaId = uuidv4();
       return {
@@ -288,8 +295,6 @@ class AuthService {
       missionDescription,
       establishmentDate,
       campusAffiliationScope,
-      affiliatedSchoolsNames,
-      affiliatedDepartmentNames,
       primaryContactPersonName,
       primaryContactPersonEmail,
       primaryContactPersonPhone,
@@ -299,44 +304,12 @@ class AuthService {
 
     const emailExists = await authRepository.emailExists(officialEmail);
     if (emailExists) {
-      throw new ConflictError("Email address is alread registered");
+      throw new ConflictError("Email address is already registered");
     }
-
-    // Use helper to process both media files
-    const {
-      mediaId: profilePictureMediaId,
-      mediaRecord: profilePictureMediaRecord,
-    } = await this._processMediaFile(
-      profilePictureFile,
-      "Organization profile picture",
-      createdByAdminId
-    );
-    const {
-      mediaId: coverPictureMediaId,
-      mediaRecord: coverPictureMediaRecord,
-    } = await this._processMediaFile(
-      coverPictureFile,
-      "Organization cover picture",
-      createdByAdminId
-    );
 
     let orgResult;
     await transaction(async (client) => {
-      // 1. Insert media records first (with entityId: null)
-      if (profilePictureMediaRecord) {
-        await authRepository.createMediaRecord(
-          { ...profilePictureMediaRecord, entityId: null },
-          client
-        );
-      }
-      if (coverPictureMediaRecord) {
-        await authRepository.createMediaRecord(
-          { ...coverPictureMediaRecord, entityId: null },
-          client
-        );
-      }
-
-      // 2. Create org user and profile, referencing the media IDs
+      // 1. Create org user and profile first (without media IDs)
       orgResult = await authRepository.createOrganizationUserAndProfile(
         {
           email: officialEmail.toLowerCase().trim(),
@@ -357,8 +330,8 @@ class AuthService {
           officialWebsiteUrl: officialWebsiteUrl
             ? officialWebsiteUrl.trim()
             : null,
-          profilePictureMediaId: profilePictureMediaId || null,
-          coverPictureMediaId: coverPictureMediaId || null,
+          profilePictureMediaId: null, // Will be set after upload
+          coverPictureMediaId: null, // Will be set after upload
           address: address ? address.trim() : null,
           missionDescription: missionDescription
             ? missionDescription.trim()
@@ -366,12 +339,6 @@ class AuthService {
           establishmentDate: establishmentDate ? establishmentDate : null,
           campusAffiliationScope: campusAffiliationScope
             ? campusAffiliationScope.trim()
-            : null,
-          affiliatedSchoolsNames: affiliatedSchoolsNames
-            ? affiliatedSchoolsNames.trim()
-            : null,
-          affiliatedDepartmentNames: affiliatedDepartmentNames
-            ? affiliatedDepartmentNames.trim()
             : null,
           primaryContactPersonName: primaryContactPersonName
             ? primaryContactPersonName.trim()
@@ -386,19 +353,57 @@ class AuthService {
         },
         client
       );
+    });
 
-      // 3. Update media records with the new entityId (userId)
+    // 2. Now upload images using the organization ID
+    const organizationId = orgResult.user.userId;
+
+    // Process profile picture
+    const {
+      mediaId: profilePictureMediaId,
+      mediaRecord: profilePictureMediaRecord,
+    } = await this._processOrganizationMediaFile(
+      profilePictureFile,
+      "Organization profile picture",
+      organizationId,
+      "profile",
+      createdByAdminId
+    );
+
+    // Process cover picture
+    const {
+      mediaId: coverPictureMediaId,
+      mediaRecord: coverPictureMediaRecord,
+    } = await this._processOrganizationMediaFile(
+      coverPictureFile,
+      "Organization cover picture",
+      organizationId,
+      "cover",
+      createdByAdminId
+    );
+
+    // 3. Update the organization profile with media IDs
+    await transaction(async (client) => {
+      // Insert media records
       if (profilePictureMediaRecord) {
-        await authRepository.updateMediaEntityId(
-          profilePictureMediaId,
-          orgResult.user.userId,
+        await authRepository.createMediaRecord(
+          { ...profilePictureMediaRecord, entityId: organizationId },
           client
         );
       }
       if (coverPictureMediaRecord) {
-        await authRepository.updateMediaEntityId(
+        await authRepository.createMediaRecord(
+          { ...coverPictureMediaRecord, entityId: organizationId },
+          client
+        );
+      }
+
+      // Update organization profile with media IDs
+      if (profilePictureMediaId || coverPictureMediaId) {
+        await authRepository.updateOrganizationProfileMediaIds(
+          organizationId,
+          profilePictureMediaId,
           coverPictureMediaId,
-          orgResult.user.userId,
           client
         );
       }
@@ -431,7 +436,7 @@ class AuthService {
       });
 
     logger.info(
-      `Organization user created successfully (pending verification )`,
+      `Organization user created successfully (pending verification)`,
       {
         userId: orgResult.user.userId,
         email: orgResult.user.email,

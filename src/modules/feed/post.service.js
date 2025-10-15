@@ -4,6 +4,14 @@ import logger from "../../utils/logger.js";
 import { uploadPostMediaToS3, getPublicS3Url } from "../../utils/s3.utils.js";
 
 class PostService {
+  // Helper function to generate profile picture URL
+  generateProfilePictureUrl(post) {
+    if (post.profilePictureFileName) {
+      return getPublicS3Url(post.profilePictureFileName);
+    }
+    return null;
+  }
+
   async createPost(postData, organizerId) {
     try {
       const { campaignId, type, body, media } = postData;
@@ -110,9 +118,13 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const media = post.media || [];
 
+      // Generate profile picture URL
+      const profilePictureUrl = this.generateProfilePictureUrl(post);
+
       return {
         ...post,
         media,
+        profilePictureUrl,
       };
     } catch (error) {
       logger.error("Error fetching post:", error);
@@ -130,7 +142,8 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
@@ -150,12 +163,34 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
     } catch (error) {
       logger.error("Error fetching organizer posts:", error);
+      throw error;
+    }
+  }
+
+  async getCampaignPostsByOrganizer(organizerId, options = {}) {
+    try {
+      const posts = await postRepository.getCampaignPostsByOrganizer(
+        organizerId,
+        options
+      );
+
+      // Media is already parsed as object from PostgreSQL JSONB column
+      const postsWithMedia = posts.map((post) => {
+        const media = post.media || [];
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
+      });
+
+      return postsWithMedia;
+    } catch (error) {
+      logger.error("Error fetching organizer campaign posts:", error);
       throw error;
     }
   }
@@ -167,12 +202,145 @@ class PostService {
       // Media is already parsed as object from PostgreSQL JSONB column
       const postsWithMedia = posts.map((post) => {
         const media = post.media || [];
-        return { ...post, media };
+        const profilePictureUrl = this.generateProfilePictureUrl(post);
+        return { ...post, media, profilePictureUrl };
       });
 
       return postsWithMedia;
     } catch (error) {
       logger.error("Error fetching all posts:", error);
+      throw error;
+    }
+  }
+
+  async toggleLike(postId, userId) {
+    // Returns { liked: boolean, likesCount: number }
+    const already = await postRepository.hasUserLiked(postId, userId);
+    if (already) {
+      const likesCount = await postRepository.unlikePost(postId, userId);
+      return { liked: false, likesCount };
+    }
+    const likesCount = await postRepository.likePost(postId, userId);
+    return { liked: true, likesCount };
+  }
+
+  async createCampaignPost(campaignData) {
+    try {
+      const { campaignId, organizerId, customPageSettings } = campaignData;
+
+      // Extract data from customPageSettings
+      const title = customPageSettings?.title || null;
+      const body = customPageSettings?.message || null;
+
+      // Prepare media array from customPageSettings
+      const media = [];
+
+      // Add main media if exists
+      if (customPageSettings?.mainMedia) {
+        media.push({
+          url: customPageSettings.mainMedia.url,
+          type: customPageSettings.mainMedia.type,
+          s3Key: customPageSettings.mainMedia.s3Key,
+          fileName: customPageSettings.mainMedia.fileName,
+          fileSize: customPageSettings.mainMedia.fileSize,
+          mimeType: customPageSettings.mainMedia.mimeType,
+          altText: "",
+          uploadedAt: customPageSettings.mainMedia.uploadedAt,
+        });
+      }
+
+      // Add secondary images if they exist
+      if (
+        customPageSettings?.secondaryImages &&
+        Array.isArray(customPageSettings.secondaryImages)
+      ) {
+        customPageSettings.secondaryImages.forEach((img) => {
+          media.push({
+            url: img.url,
+            type: img.type,
+            s3Key: img.s3Key,
+            fileName: img.fileName,
+            fileSize: img.fileSize,
+            mimeType: img.mimeType,
+            altText: "",
+            uploadedAt: img.uploadedAt,
+          });
+        });
+      }
+
+      // Determine post status based on campaign status
+      const campaignStatus = campaignData.status;
+      const publishedStatuses = ["active", "successful", "closed"];
+      const postStatus = publishedStatuses.includes(campaignStatus)
+        ? "published"
+        : "archived";
+
+      const post = await postRepository.createCampaignPost({
+        campaignId,
+        organizerId,
+        title,
+        body,
+        media,
+        status: postStatus,
+      });
+
+      logger.info("Campaign post created successfully", {
+        postId: post.postId,
+        campaignId,
+        organizerId,
+        status: postStatus,
+      });
+
+      return post;
+    } catch (error) {
+      logger.error("Error creating campaign post:", error);
+      throw error;
+    }
+  }
+
+  async updateCampaignPostStatus(campaignId, campaignStatus) {
+    try {
+      const publishedStatuses = ["active", "successful", "closed"];
+      const postStatus = publishedStatuses.includes(campaignStatus)
+        ? "published"
+        : "archived";
+
+      const updatedPost = await postRepository.updateCampaignPostStatus(
+        campaignId,
+        postStatus
+      );
+
+      logger.info("Campaign post status updated", {
+        campaignId,
+        campaignStatus,
+        postStatus,
+      });
+
+      return updatedPost;
+    } catch (error) {
+      logger.error("Error updating campaign post status:", error);
+      throw error;
+    }
+  }
+
+  async getCampaignPostByCampaignId(campaignId) {
+    try {
+      const post = await postRepository.getCampaignPostByCampaignId(campaignId);
+      if (!post) {
+        return null;
+      }
+
+      // Media is already parsed as object from PostgreSQL JSONB column
+      const media = post.media || [];
+      const profilePictureUrl = this.generateProfilePictureUrl(post);
+
+      return {
+        ...post,
+        media,
+        profilePictureUrl,
+      };
+    } catch (error) {
+      logger.error("Error fetching campaign post:", error);
       throw error;
     }
   }

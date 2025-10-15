@@ -43,7 +43,9 @@ const validate = (schema, property = "body") => {
       return next(new ValidationError(errorMessage));
     }
 
-    req[property] = value;
+    // Avoid mutating req.query; store validated payload under req.validated
+    if (!req.validated) req.validated = {};
+    req.validated[property] = value;
     next();
   };
 };

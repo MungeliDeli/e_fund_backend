@@ -175,11 +175,11 @@ export const processPaymentSuccess = async (
       return transaction;
     }
 
-    // Update transaction status to succeeded
+    // Update transaction status to succeeded and store response + completion time
     const updatedTransaction =
-      await transactionRepository.updateTransactionStatus(
-        transaction.transactionId,
-        "succeeded"
+      await transactionRepository.setTransactionSuccessByGatewayId(
+        gatewayTransactionId,
+        gatewayResponse
       );
 
     logger.info("Payment processed successfully", {
@@ -210,11 +210,11 @@ export const processPaymentFailure = async (
       throw new AppError("Transaction not found", 404);
     }
 
-    // Update transaction status to failed
+    // Update transaction status to failed and store failure payload + completion time
     const updatedTransaction =
-      await transactionRepository.updateTransactionStatus(
-        transaction.transactionId,
-        "failed"
+      await transactionRepository.setTransactionFailureByGatewayId(
+        gatewayTransactionId,
+        failureReason
       );
 
     logger.info("Payment failed", {
@@ -226,6 +226,46 @@ export const processPaymentFailure = async (
     return updatedTransaction;
   } catch (error) {
     logger.error("Error processing payment failure:", error);
+    throw error;
+  }
+};
+
+export const markProcessingWithGatewayData = async (
+  transactionId,
+  { gatewayRequestId, gatewayResponse, status = "processing" }
+) => {
+  try {
+    const updated = await transactionRepository.setTransactionProcessing(
+      transactionId,
+      { gatewayRequestId, gatewayResponse, status }
+    );
+
+    logger.info("Transaction marked processing", {
+      transactionId,
+      gatewayRequestId,
+      status: updated?.status,
+    });
+
+    return updated;
+  } catch (error) {
+    logger.error("Error marking transaction processing:", error);
+    throw error;
+  }
+};
+
+export const getAdminTransactions = async (filters) => {
+  try {
+    const result = await transactionRepository.getAdminTransactions(filters);
+
+    logger.info("Admin transactions retrieved successfully", {
+      count: result.transactions.length,
+      page: filters.page,
+      limit: filters.limit,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error("Error retrieving admin transactions:", error);
     throw error;
   }
 };
