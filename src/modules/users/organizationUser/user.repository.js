@@ -47,6 +47,7 @@ export const getUserWithProfileById = async (userId) => {
         p."establishmentDate", p."campusAffiliationScope", 
         p."primaryContactPersonName", 
         p."primaryContactPersonEmail", p."primaryContactPersonPhone", 
+        p."payoutDisplayName", p."payoutPhoneNumber", p."payoutNetwork", p."payoutUpdatedAt",
         p."createdByAdminId", p."createdAt",
         pp."fileName" AS "profilePictureFileName",
         cp."fileName" AS "coverPictureFileName"
@@ -157,6 +158,9 @@ const userRepository = {
       primaryContactPersonName,
       primaryContactPersonEmail,
       primaryContactPersonPhone,
+      payoutDisplayName,
+      payoutPhoneNumber,
+      payoutNetwork,
     } = profileData;
 
     const fields = {
@@ -172,6 +176,9 @@ const userRepository = {
       primaryContactPersonName,
       primaryContactPersonEmail,
       primaryContactPersonPhone,
+      payoutDisplayName,
+      payoutPhoneNumber,
+      payoutNetwork,
     };
 
     const setClauses = [];
@@ -192,7 +199,7 @@ const userRepository = {
     values.push(userId);
     const queryText = `
       UPDATE "organizationProfiles"
-      SET ${setClauses.join(", ")}
+      SET ${setClauses.join(", ")}, "payoutUpdatedAt" = CURRENT_TIMESTAMP
       WHERE "userId" = $${valueIndex}
       RETURNING *;
     `;

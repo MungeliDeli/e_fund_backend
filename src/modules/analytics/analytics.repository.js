@@ -14,6 +14,7 @@ export const getCampaignFinancialSummary = async (campaignId) => {
         COUNT(d."donationId") as "totalDonations"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -37,6 +38,7 @@ export const getCampaignUniqueDonors = async (campaignId) => {
       FROM "donations" d
       WHERE d."campaignId" = $1
       AND d."donorUserId" IS NOT NULL
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -62,6 +64,7 @@ export const getCampaignDonorBreakdown = async (campaignId) => {
         COUNT(*) as "totalDonations"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);
@@ -107,6 +110,7 @@ export const getCampaignTopDonors = async (campaignId, limit = 10) => {
       LEFT JOIN "individualProfiles" ip ON d."donorUserId" = ip."userId"
       LEFT JOIN "organizationProfiles" op ON d."donorUserId" = op."userId"
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
       ORDER BY d.amount DESC
       LIMIT $2
     `;
@@ -139,6 +143,7 @@ export const getCampaignAnalyticsSummary = async (campaignId) => {
         COUNT(CASE WHEN d."isAnonymous" = false THEN 1 END) as "namedCount"
       FROM "donations" d
       WHERE d."campaignId" = $1
+      AND d."status" = 'completed'
     `;
 
     const result = await db.query(query, [campaignId]);

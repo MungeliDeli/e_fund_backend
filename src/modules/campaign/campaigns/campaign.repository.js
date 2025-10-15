@@ -228,10 +228,17 @@ export const findCampaignById = async (campaignId) => {
         c.*,
         u.email as organizerEmail,
         u."userType" as organizerType,
-        op."organizationName" as organizerName
+        op."organizationName" as organizerName,
+        COALESCE(pw.total_withdrawn, 0) AS "totalWithdrawn"
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
+      LEFT JOIN (
+        SELECT "campaignId", SUM("amount") AS total_withdrawn
+        FROM "withdrawalRequests"
+        WHERE "status" = 'paid'
+        GROUP BY "campaignId"
+      ) pw ON pw."campaignId" = c."campaignId"
       WHERE c."campaignId" = $1
     `;
 
@@ -362,16 +369,23 @@ export const findCampaignsByOrganizer = async (organizerId, filters = {}) => {
         c.*,
         u.email as organizerEmail,
         op."organizationName" as organizerName,
-        COALESCE(dc."completedDonations", 0) AS "donationCount"
+        COALESCE(dc."completedDonations", 0) AS "donationCount",
+        COALESCE(pw.total_withdrawn, 0) AS "totalWithdrawn"
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
       LEFT JOIN (
         SELECT "campaignId", COUNT(*) AS "completedDonations"
         FROM "donations"
-       
+        WHERE "status" = 'completed'
         GROUP BY "campaignId"
       ) dc ON dc."campaignId" = c."campaignId"
+      LEFT JOIN (
+        SELECT "campaignId", SUM("amount") AS total_withdrawn
+        FROM "withdrawalRequests"
+        WHERE "status" = 'paid'
+        GROUP BY "campaignId"
+      ) pw ON pw."campaignId" = c."campaignId"
       WHERE ${whereClauses.join(" AND ")}
       ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}
@@ -565,7 +579,8 @@ export const findAllCampaigns = async (filters = {}) => {
         c.*,
         u.email as organizerEmail,
         op."organizationName" as organizerName,
-        COALESCE(dc."completedDonations", 0) AS "donationCount"
+        COALESCE(dc."completedDonations", 0) AS "donationCount",
+        COALESCE(pw.total_withdrawn, 0) AS "totalWithdrawn"
       FROM "campaigns" c
       JOIN "users" u ON c."organizerId" = u."userId"
       LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId"
@@ -575,6 +590,12 @@ export const findAllCampaigns = async (filters = {}) => {
         WHERE "status" = 'completed'
         GROUP BY "campaignId"
       ) dc ON dc."campaignId" = c."campaignId"
+      LEFT JOIN (
+        SELECT "campaignId", SUM("amount") AS total_withdrawn
+        FROM "withdrawalRequests"
+        WHERE "status" = 'paid'
+        GROUP BY "campaignId"
+      ) pw ON pw."campaignId" = c."campaignId"
       ${whereClause}
       ORDER BY c."createdAt" DESC
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}

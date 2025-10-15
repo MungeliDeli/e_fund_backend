@@ -26,7 +26,7 @@ export const createTransaction = async (transactionData) => {
 
 export const getTransactionById = async (transactionId) => {
   const result = await db.query(
-    `SELECT t.*, c."title" as "campaignTitle", u."email" as "userEmail"
+    `SELECT t.*, c.name as "campaignName", u."email" as "userEmail"
      FROM "transactions" t
      LEFT JOIN "campaigns" c ON t."campaignId" = c."campaignId"
      LEFT JOIN "users" u ON t."userId" = u."userId"
@@ -57,7 +57,7 @@ export const getTransactionsByCampaign = async (
 
 export const getTransactionsByUser = async (userId, limit = 50, offset = 0) => {
   const result = await db.query(
-    `SELECT t.*, c."title" as "campaignTitle"
+    `SELECT t.*, c.name as "campaignName"
      FROM "transactions" t
      LEFT JOIN "campaigns" c ON t."campaignId" = c."campaignId"
      WHERE t."userId" = $1
@@ -224,7 +224,7 @@ export const getTransactionsByType = async (
   offset = 0
 ) => {
   const result = await db.query(
-    `SELECT t.*, c."title" as "campaignTitle", u."email" as "userEmail"
+    `SELECT t.*, c.name as "campaignName", u."email" as "userEmail"
      FROM "transactions" t
      LEFT JOIN "campaigns" c ON t."campaignId" = c."campaignId"
      LEFT JOIN "users" u ON t."userId" = u."userId"
@@ -253,4 +253,119 @@ export const getTransactionSummary = async (limit = 10) => {
   );
 
   return result.rows;
+};
+
+export const getAdminTransactions = async (filters) => {
+  const {
+    page = 1,
+    limit = 50,
+    search,
+    campaignId,
+    status,
+    gatewayUsed,
+    sortBy = "transactionTimestamp",
+    sortOrder = "desc",
+  } = filters;
+
+  const offset = (page - 1) * limit;
+
+  // Build the base query with joins
+  let baseQuery = `
+    FROM "transactions" t
+    LEFT JOIN "users" u ON t."userId" = u."userId"
+    LEFT JOIN "campaigns" c ON t."campaignId" = c."campaignId"
+    WHERE 1=1
+  `;
+
+  const queryParams = [];
+  let paramCount = 0;
+
+  // Add search filter
+  if (search) {
+    paramCount++;
+    baseQuery += ` AND (
+      u."email" ILIKE $${paramCount} OR 
+      c.name ILIKE $${paramCount} OR 
+      t."gatewayTransactionId" ILIKE $${paramCount}
+    )`;
+    queryParams.push(`%${search}%`);
+  }
+
+  // Add campaign filter
+  if (campaignId) {
+    paramCount++;
+    baseQuery += ` AND t."campaignId" = $${paramCount}`;
+    queryParams.push(campaignId);
+  }
+
+  // Add status filter
+  if (status) {
+    paramCount++;
+    baseQuery += ` AND t."status" = $${paramCount}`;
+    queryParams.push(status);
+  }
+
+  // Add gateway filter
+  if (gatewayUsed) {
+    paramCount++;
+    baseQuery += ` AND t."gatewayUsed" = $${paramCount}`;
+    queryParams.push(gatewayUsed);
+  }
+
+  // Normalize sortBy for joined/alias columns
+  const sortColumnMap = {
+    campaignName: "c.name",
+    userEmail: 'u."email"',
+  };
+  const orderBy = sortColumnMap[sortBy] || `t."${sortBy}"`;
+
+  // Build the SELECT query
+  const selectQuery = `
+    SELECT 
+      t."transactionId",
+      t."userId",
+      t."campaignId",
+      t."amount",
+      t."currency",
+      t."gatewayTransactionId",
+      t."gatewayUsed",
+      t."status",
+      t."transactionTimestamp",
+      t."feesAmount",
+      t."transactionType",
+      t."phoneNumber",
+      t."createdAt",
+      t."updatedAt",
+      u."email" as "userEmail",
+      c.name as "campaignName"
+    ${baseQuery}
+    ORDER BY ${orderBy} ${sortOrder.toUpperCase()}
+    LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+  `;
+
+  // Build the count query
+  const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
+
+  // Add limit and offset parameters
+  queryParams.push(limit, offset);
+
+  // Execute both queries
+  const [transactionsResult, countResult] = await Promise.all([
+    db.query(selectQuery, queryParams),
+    db.query(countQuery, queryParams.slice(0, -2)), // Remove limit and offset for count
+  ]);
+
+  const transactions = transactionsResult.rows;
+  const total = parseInt(countResult.rows[0].total);
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    transactions,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  };
 };

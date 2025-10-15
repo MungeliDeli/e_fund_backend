@@ -8,9 +8,13 @@ export const getMessagesByCampaign = async (
   offset = 0
 ) => {
   let query = `
-    SELECT dm.*, u."email" as "donorEmail"
+    SELECT dm.*, u."email" as "donorEmail", u."userType",
+           ip."firstName", ip."lastName",
+           op."organizationShortName"
     FROM "donationMessages" dm
     LEFT JOIN "users" u ON dm."donorUserId" = u."userId"
+    LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+    LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
     WHERE dm."campaignId" = $1
   `;
 
@@ -86,9 +90,13 @@ export const getPendingMessagesCount = async (campaignId) => {
 
 export const getFeaturedMessages = async (campaignId, limit = 10) => {
   const result = await db.query(
-    `SELECT dm.*, u."email" as "donorEmail"
+    `SELECT dm.*, u."email" as "donorEmail", u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donationMessages" dm
      LEFT JOIN "users" u ON dm."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      WHERE dm."campaignId" = $1 AND dm."status" = 'approved' AND dm."isFeatured" = true
      ORDER BY dm."postedAt" DESC
      LIMIT $2`,
@@ -98,11 +106,27 @@ export const getFeaturedMessages = async (campaignId, limit = 10) => {
   return result.rows;
 };
 
+export const getFeaturedMessagesCount = async (campaignId) => {
+  const result = await db.query(
+    `SELECT COUNT(*) as "featuredCount"
+     FROM "donationMessages" 
+     WHERE "campaignId" = $1 AND "status" = 'approved' AND "isFeatured" = true`,
+    [campaignId]
+  );
+
+  return parseInt(result.rows[0].featuredCount) || 0;
+};
+
 export const getMessagesByUser = async (userId, limit = 50, offset = 0) => {
   const result = await db.query(
-    `SELECT dm.*, c."title" as "campaignTitle"
+    `SELECT dm.*, c."title" as "campaignTitle", u."userType",
+            ip."firstName", ip."lastName",
+            op."organizationShortName"
      FROM "donationMessages" dm
      LEFT JOIN "campaigns" c ON dm."campaignId" = c."campaignId"
+     LEFT JOIN "users" u ON dm."donorUserId" = u."userId"
+     LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
      WHERE dm."donorUserId" = $1
      ORDER BY dm."postedAt" DESC
      LIMIT $2 OFFSET $3`,

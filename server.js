@@ -2,6 +2,7 @@ import app from "./src/app.js";
 import config from "./src/config/index.js";
 import logger from "./src/utils/logger.js";
 import notificationService from "./src/modules/notifications/notification.service.js";
+import { initializeSocket } from "./src/config/socket.config.js";
 
 /**
  * Server Startup
@@ -35,6 +36,9 @@ const server = app.listen(PORT, () => {
       );
   }, intervalMs);
 });
+
+// Initialize Socket.IO
+initializeSocket(server);
 
 // Graceful shutdown
 const gracefulShutdown = (signal) => {

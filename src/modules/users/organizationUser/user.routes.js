@@ -31,10 +31,12 @@ import {
   updateProfileImage,
   getMediaUrl,
   updateUserProfile,
+  updatePayoutSettings,
   updateOrganizationProfileWithImages,
 } from "./user.controller.js";
 import {
   validateUpdateOrganizationProfile,
+  validateUpdatePayoutSettings,
   validateUserId,
   validateMediaId,
 } from "./user.validation.js";
@@ -75,6 +77,14 @@ router.put(
   authenticate,
   validateUpdateOrganizationProfile,
   catchAsync(updateUserProfile)
+);
+
+// Update payout settings
+router.put(
+  "/me/payout-settings",
+  authenticate,
+  validateUpdatePayoutSettings,
+  catchAsync(updatePayoutSettings)
 );
 
 // Update profile information with images

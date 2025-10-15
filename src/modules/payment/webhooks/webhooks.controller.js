@@ -3,9 +3,14 @@ import logger from "../../../utils/logger.js";
 import * as transactionRepository from "../transactions/transaction.repository.js";
 import * as transactionService from "../transactions/transaction.service.js";
 import * as donationRepository from "../../donor/donation/donation.repository.js";
+import * as withdrawalRepository from "../withdrawals/withdrawal.repository.js";
 import notificationService from "../../notifications/notification.service.js";
 import { logServiceEvent } from "../../audit/audit.utils.js";
-import { DONATION_ACTIONS, ENTITY_TYPES } from "../../audit/audit.constants.js";
+import {
+  DONATION_ACTIONS,
+  ENTITY_TYPES,
+  WITHDRAWAL_ACTIONS,
+} from "../../audit/audit.constants.js";
 
 const isTerminal = (status) =>
   ["succeeded", "failed", "timeout", "cancelled"].includes(status);
@@ -111,6 +116,87 @@ async function processWebhookBody(req, res) {
       txn.gatewayTransactionId,
       payload
     );
+
+    // Handle withdrawal transactions
+    if (txn.transactionType === "withdrawal_out") {
+      try {
+        const withdrawal =
+          await withdrawalRepository.getWithdrawalByTransactionId(
+            txn.transactionId
+          );
+        if (withdrawal) {
+          // Update withdrawal status to paid
+          await withdrawalRepository.updateWithdrawalRequest(
+            withdrawal.withdrawalRequestId,
+            { status: "paid" }
+          );
+
+          // Log audit event
+          await logServiceEvent(
+            withdrawal.organizerId,
+            WITHDRAWAL_ACTIONS.WITHDRAWAL_COMPLETED,
+            ENTITY_TYPES.WITHDRAWAL_REQUEST,
+            withdrawal.withdrawalRequestId,
+            {
+              transactionId: txn.transactionId,
+              gatewayRequestId: txn.gatewayRequestId,
+            }
+          );
+
+          // Send success notification to organizer
+          await notificationService.createAndDispatch({
+            userId: withdrawal.organizerId,
+            type: "inApp",
+            category: "withdrawals",
+            priority: "high",
+            title: "Withdrawal completed",
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} has been successfully processed`,
+            relatedEntityType: "WithdrawalRequest",
+            relatedEntityId: withdrawal.withdrawalRequestId,
+          });
+
+          // Send email notification
+          try {
+            const { createWithdrawalCompletedTemplate } = await import(
+              "../../../utils/emailTemplates.js"
+            );
+            const destination =
+              typeof withdrawal.destination === "string"
+                ? JSON.parse(withdrawal.destination)
+                : withdrawal.destination;
+
+            const html = createWithdrawalCompletedTemplate({
+              organizerName: "", // Will be filled by notification service
+              amount: withdrawal.amount,
+              currency: withdrawal.currency,
+              phoneNumber: destination?.phoneNumber,
+              withdrawalRequestId: withdrawal.withdrawalRequestId,
+            });
+
+            await notificationService.createAndDispatch({
+              userId: withdrawal.organizerId,
+              type: "email",
+              category: "withdrawals",
+              priority: "high",
+              title: "Withdrawal completed successfully",
+              message: html,
+              relatedEntityType: "WithdrawalRequest",
+              relatedEntityId: withdrawal.withdrawalRequestId,
+            });
+          } catch (emailErr) {
+            logger.warn("Failed to send withdrawal completed email", {
+              error: emailErr.message,
+              withdrawalRequestId: withdrawal.withdrawalRequestId,
+            });
+          }
+        }
+      } catch (withdrawalErr) {
+        logger.warn("Failed to process withdrawal success webhook", {
+          error: withdrawalErr.message,
+          transactionId: txn.transactionId,
+        });
+      }
+    }
 
     // Update donation status to completed and recalc campaign stats
     try {
@@ -314,6 +400,100 @@ async function processWebhookBody(req, res) {
       txn.gatewayTransactionId,
       payload
     );
+
+    // Handle withdrawal transaction failures
+    if (txn.transactionType === "withdrawal_out") {
+      try {
+        const withdrawal =
+          await withdrawalRepository.getWithdrawalByTransactionId(
+            txn.transactionId
+          );
+        if (withdrawal) {
+          // Update withdrawal status to failed
+          await withdrawalRepository.updateWithdrawalRequest(
+            withdrawal.withdrawalRequestId,
+            {
+              status: "failed",
+              notes: `Payment failed: ${
+                payload?.response_description ||
+                payload?.message ||
+                "Unknown error"
+              }`,
+            }
+          );
+
+          // Log audit event
+          await logServiceEvent(
+            withdrawal.organizerId,
+            WITHDRAWAL_ACTIONS.WITHDRAWAL_FAILED,
+            ENTITY_TYPES.WITHDRAWAL_REQUEST,
+            withdrawal.withdrawalRequestId,
+            {
+              transactionId: txn.transactionId,
+              gatewayRequestId: txn.gatewayRequestId,
+              error: payload?.response_description || payload?.message,
+            }
+          );
+
+          // Send failure notification to organizer
+          await notificationService.createAndDispatch({
+            userId: withdrawal.organizerId,
+            type: "inApp",
+            category: "withdrawals",
+            priority: "high",
+            title: "Withdrawal failed",
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} failed to process. Please contact support.`,
+            relatedEntityType: "WithdrawalRequest",
+            relatedEntityId: withdrawal.withdrawalRequestId,
+          });
+
+          // Send email notification
+          try {
+            const { createWithdrawalFailedTemplate } = await import(
+              "../../../utils/emailTemplates.js"
+            );
+            const destination =
+              typeof withdrawal.destination === "string"
+                ? JSON.parse(withdrawal.destination)
+                : withdrawal.destination;
+
+            const html = createWithdrawalFailedTemplate({
+              organizerName: "", // Will be filled by notification service
+              amount: withdrawal.amount,
+              currency: withdrawal.currency,
+              phoneNumber: destination?.phoneNumber,
+              withdrawalRequestId: withdrawal.withdrawalRequestId,
+              errorMessage:
+                payload?.response_description ||
+                payload?.message ||
+                "Unknown error",
+            });
+
+            await notificationService.createAndDispatch({
+              userId: withdrawal.organizerId,
+              type: "email",
+              category: "withdrawals",
+              priority: "high",
+              title: "Withdrawal failed",
+              message: html,
+              relatedEntityType: "WithdrawalRequest",
+              relatedEntityId: withdrawal.withdrawalRequestId,
+            });
+          } catch (emailErr) {
+            logger.warn("Failed to send withdrawal failed email", {
+              error: emailErr.message,
+              withdrawalRequestId: withdrawal.withdrawalRequestId,
+            });
+          }
+        }
+      } catch (withdrawalErr) {
+        logger.warn("Failed to process withdrawal failure webhook", {
+          error: withdrawalErr.message,
+          transactionId: txn.transactionId,
+        });
+      }
+    }
+
     try {
       const donation =
         await donationRepository.getDonationByPaymentTransactionId(

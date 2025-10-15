@@ -110,6 +110,26 @@ export const updateUserProfile = async (req, res) => {
 };
 
 /**
+ * Update payout settings for the authenticated organization user
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const updatePayoutSettings = async (req, res) => {
+  const userId = req.user.userId;
+  const updatedProfile = await userService.updatePayoutSettings(
+    userId,
+    req.body
+  );
+
+  ResponseFactory.ok(
+    res,
+    "Payout settings updated successfully",
+    updatedProfile
+  );
+};
+
+/**
  * Update organization profile with both data and images
  * @param {import('express').Request} req
  * @param {import('express').Response} res

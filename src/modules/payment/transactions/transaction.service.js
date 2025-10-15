@@ -252,3 +252,20 @@ export const markProcessingWithGatewayData = async (
     throw error;
   }
 };
+
+export const getAdminTransactions = async (filters) => {
+  try {
+    const result = await transactionRepository.getAdminTransactions(filters);
+
+    logger.info("Admin transactions retrieved successfully", {
+      count: result.transactions.length,
+      page: filters.page,
+      limit: filters.limit,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error("Error retrieving admin transactions:", error);
+    throw error;
+  }
+};

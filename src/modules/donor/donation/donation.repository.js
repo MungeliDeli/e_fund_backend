@@ -70,7 +70,7 @@ export const getDonationsByCampaign = async (
      LEFT JOIN "users" u ON d."donorUserId" = u."userId"
      LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
-     WHERE d."campaignId" = $1
+     WHERE d."campaignId" = $1 AND d."status" = 'completed'
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,
     [campaignId, limit, offset]
@@ -195,7 +195,8 @@ export const getDonationStats = async (campaignId) => {
 
 export const getDonationsByUser = async (userId, limit = 50, offset = 0) => {
   const result = await db.query(
-    `SELECT d.*, c."name" as "campaignTitle", t."gatewayTransactionId", t."gatewayUsed",
+    `SELECT d.*, c."name" as "campaignTitle", c."shareLink" as "campaignShareLink", 
+            c."customPageSettings", t."gatewayTransactionId", t."gatewayUsed",
             dm."messageText", dm."status" as "messageStatus",
             u."userType",
             ip."firstName", ip."lastName",

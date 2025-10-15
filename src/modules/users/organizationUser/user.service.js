@@ -72,6 +72,9 @@ function formatProfile(user, profile, isOwner) {
     primaryContactPersonName: profile.primaryContactPersonName,
     primaryContactPersonEmail: profile.primaryContactPersonEmail,
     primaryContactPersonPhone: profile.primaryContactPersonPhone,
+    payoutDisplayName: profile.payoutDisplayName,
+    payoutPhoneNumber: profile.payoutPhoneNumber,
+    payoutNetwork: profile.payoutNetwork,
     createdByAdminId: profile.createdByAdminId,
   };
 
@@ -158,6 +161,70 @@ export const updateUserProfile = async (userId, profileData) => {
       "Failed to update organization user profile.",
       error
     );
+  }
+};
+
+/**
+ * Update payout settings for an organization user.
+ * @param {string} userId - The ID of the user to update.
+ * @param {object} payoutData - The payout settings data to update.
+ * @returns {Promise<Object>} The updated profile data.
+ */
+export const updatePayoutSettings = async (userId, payoutData) => {
+  try {
+    logger.info("Updating organization user payout settings in service", {
+      userId,
+    });
+
+    // Get user info to verify it's an organization user
+    const { user } = await getUserWithProfileById(userId);
+
+    if (user.userType !== "organizationUser") {
+      throw new DatabaseError(
+        "Only organization users can update payout settings through this service"
+      );
+    }
+
+    const updatedProfile = await userRepository.updateOrganizationProfile(
+      userId,
+      payoutData
+    );
+
+    if (!updatedProfile) {
+      throw new NotFoundError("User profile not found or no fields to update.");
+    }
+
+    // After updating, refetch the full profile to return consistent data
+    const { user: updatedUser, profile: updatedProfileData } =
+      await getUserWithProfileById(userId);
+    // isOwner is true since the user is updating their own profile
+    const formattedProfile = formatProfile(
+      updatedUser,
+      updatedProfileData,
+      true
+    );
+
+    // Log audit event for payout settings update
+    if (global.req) {
+      await logUserAction(
+        global.req,
+        USER_ACTIONS.USER_PROFILE_UPDATED,
+        userId,
+        {
+          userType: updatedUser.userType,
+          updatedFields: Object.keys(payoutData),
+          updateType: "payout_settings",
+        }
+      );
+    }
+
+    return formattedProfile;
+  } catch (error) {
+    logger.error("Error updating organization user payout settings", {
+      error: error.message,
+      userId,
+    });
+    throw error;
   }
 };
 

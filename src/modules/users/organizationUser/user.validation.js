@@ -96,7 +96,21 @@ export const updateOrganizationProfileSchema = Joi.object({
     "string.max": "Phone number cannot be more than 20 characters.",
     "any.required": "Primary contact person phone is required.",
   }),
+  payoutDisplayName: Joi.string().trim().max(100).optional(),
+  payoutPhoneNumber: Joi.string().trim().max(20).optional(),
+  payoutNetwork: Joi.string().valid("mtn", "airtel").optional(),
 });
+
+// Schema for partial updates (payout settings only)
+export const updatePayoutSettingsSchema = Joi.object({
+  payoutDisplayName: Joi.string().trim().max(100).allow("").optional(),
+  payoutPhoneNumber: Joi.string().trim().max(20).allow("").optional(),
+  payoutNetwork: Joi.string().valid("mtn", "airtel").optional(),
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one payout field must be provided.",
+  });
 
 // User ID parameter schema
 export const userIdSchema = Joi.object({
@@ -123,6 +137,13 @@ export const mediaIdSchema = Joi.object({
  */
 export const validateUpdateOrganizationProfile = validate(
   updateOrganizationProfileSchema
+);
+
+/**
+ * Validates payout settings update data
+ */
+export const validateUpdatePayoutSettings = validate(
+  updatePayoutSettingsSchema
 );
 
 /**

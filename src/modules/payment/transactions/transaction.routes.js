@@ -3,6 +3,7 @@ import { catchAsync } from "../../../middlewares/errorHandler.js";
 import {
   authenticate,
   optionalAuth,
+  requireSupportAdmin,
 } from "../../../middlewares/auth.middleware.js";
 import {
   createTransaction,
@@ -16,6 +17,7 @@ import {
   getTransactionSummary,
   processPaymentSuccess,
   processPaymentFailure,
+  getAdminTransactions,
 } from "./transaction.controller.js";
 import {
   validateCreateTransaction,
@@ -23,6 +25,7 @@ import {
   validateTransactionId,
   validateCampaignId,
   validateUserId,
+  validateAdminTransactions,
 } from "./transaction.validation.js";
 
 const router = Router();
@@ -48,6 +51,16 @@ router.get(
   validateUserId,
   catchAsync(getTransactionsByUser)
 );
+
+// Admin routes (must be before /:transactionId route)
+router.get(
+  "/admin",
+  authenticate,
+  requireSupportAdmin,
+  validateAdminTransactions,
+  catchAsync(getAdminTransactions)
+);
+
 router.get(
   "/:transactionId",
   validateTransactionId,

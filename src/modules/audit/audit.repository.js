@@ -129,7 +129,7 @@ async function getAuditLogs(filters = {}, pagination = {}, client = pool) {
 
     if (search) {
       whereConditions.push(`(
-        "actionType" ILIKE $${valueIndex} OR 
+        "actionType"::text ILIKE $${valueIndex} OR 
         "entityType" ILIKE $${valueIndex} OR
         "details"::text ILIKE $${valueIndex}
       )`);
@@ -168,9 +168,21 @@ async function getAuditLogs(filters = {}, pagination = {}, client = pool) {
     const offset = (page - 1) * limit;
     const dataQuery = `
       SELECT 
-        "logId", "userId", "actionType", "entityType", "entityId",
-        "details", "timestamp", "ipAddress", "userAgent", "sessionId"
-      FROM "auditLogs"
+        a."logId",
+        a."userId",
+        -- Prefer organization name if exists; else individual's full name; else NULL
+        COALESCE(op."organizationShortName", CONCAT(ip."firstName", ' ', ip."lastName")) AS "userDisplayName",
+        a."actionType",
+        a."entityType",
+        a."entityId",
+        a."details",
+        a."timestamp",
+        a."ipAddress",
+        a."userAgent",
+        a."sessionId"
+      FROM "auditLogs" a
+      LEFT JOIN "organizationProfiles" op ON op."userId" = a."userId"
+      LEFT JOIN "individualProfiles" ip ON ip."userId" = a."userId"
       ${whereClause}
       ORDER BY "${safeSortBy}" ${safeSortOrder}
       LIMIT $${valueIndex++} OFFSET $${valueIndex++}

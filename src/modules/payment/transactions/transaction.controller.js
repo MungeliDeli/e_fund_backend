@@ -162,3 +162,36 @@ export const processPaymentFailure = async (req, res) => {
     transaction
   );
 };
+
+export const getAdminTransactions = async (req, res) => {
+  const {
+    page = 1,
+    limit = 50,
+    search,
+    campaignId,
+    status,
+    gatewayUsed,
+    sortBy = "transactionTimestamp",
+    sortOrder = "desc",
+  } = req.query;
+
+  const result = await transactionService.getAdminTransactions({
+    page: parseInt(page),
+    limit: parseInt(limit),
+    search,
+    campaignId,
+    status,
+    gatewayUsed,
+    sortBy,
+    sortOrder,
+  });
+
+  return ResponseFactory.ok(
+    res,
+    "Admin transactions retrieved successfully",
+    result.transactions,
+    {
+      pagination: result.pagination,
+    }
+  );
+};

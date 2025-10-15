@@ -69,6 +69,13 @@ function formatCampaign(campaign) {
         : campaign.donationCount != null
         ? parseInt(campaign.donationCount, 10)
         : 0,
+    totalWithdrawn:
+      campaign.totalWithdrawn != null ? parseFloat(campaign.totalWithdrawn) : 0,
+    availableToWithdraw:
+      campaign.currentRaisedAmount != null && campaign.totalWithdrawn != null
+        ? parseFloat(campaign.currentRaisedAmount) -
+          parseFloat(campaign.totalWithdrawn)
+        : null,
   };
 }
 

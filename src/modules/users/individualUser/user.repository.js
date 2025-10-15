@@ -147,7 +147,7 @@ const userRepository = {
 
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) {
-        setClauses.push(`${key} = $${valueIndex++}`);
+        setClauses.push(`"${key}" = $${valueIndex++}`);
         values.push(value);
       }
     }

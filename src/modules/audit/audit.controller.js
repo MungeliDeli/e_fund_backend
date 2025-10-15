@@ -45,21 +45,22 @@ async function createAuditLog(req, res) {
  * @param {Object} res - Express response object
  */
 async function getAuditLogs(req, res) {
+  const q = req.validated?.query || req.query || {};
   const filters = {
-    actionType: req.query.actionType,
-    entityType: req.query.entityType,
-    entityId: req.query.entityId,
-    userId: req.query.userId,
-    startDate: req.query.startDate,
-    endDate: req.query.endDate,
-    search: req.query.search,
+    actionType: q.actionType,
+    entityType: q.entityType,
+    entityId: q.entityId,
+    userId: q.userId,
+    startDate: q.startDate,
+    endDate: q.endDate,
+    search: q.search,
   };
 
   const pagination = {
-    page: parseInt(req.query.page) || 1,
-    limit: parseInt(req.query.limit) || 50,
-    sortBy: req.query.sortBy || "timestamp",
-    sortOrder: req.query.sortOrder || "desc",
+    page: parseInt(q.page) || 1,
+    limit: parseInt(q.limit) || 50,
+    sortBy: q.sortBy || "timestamp",
+    sortOrder: q.sortOrder || "desc",
   };
 
   // Remove undefined values
@@ -95,11 +96,12 @@ async function getAuditLogById(req, res) {
 async function getAuditLogsByUser(req, res) {
   const { userId } = req.params;
 
+  const q1 = req.validated?.query || req.query || {};
   const pagination = {
-    page: parseInt(req.query.page) || 1,
-    limit: parseInt(req.query.limit) || 50,
-    sortBy: req.query.sortBy || "timestamp",
-    sortOrder: req.query.sortOrder || "desc",
+    page: parseInt(q1.page) || 1,
+    limit: parseInt(q1.limit) || 50,
+    sortBy: q1.sortBy || "timestamp",
+    sortOrder: q1.sortOrder || "desc",
   };
 
   const result = await auditService.getAuditLogsByUser(userId, pagination);
@@ -115,11 +117,12 @@ async function getAuditLogsByUser(req, res) {
 async function getAuditLogsByEntity(req, res) {
   const { entityType, entityId } = req.params;
 
+  const q2 = req.validated?.query || req.query || {};
   const pagination = {
-    page: parseInt(req.query.page) || 1,
-    limit: parseInt(req.query.limit) || 50,
-    sortBy: req.query.sortBy || "timestamp",
-    sortOrder: req.query.sortOrder || "desc",
+    page: parseInt(q2.page) || 1,
+    limit: parseInt(q2.limit) || 50,
+    sortBy: q2.sortBy || "timestamp",
+    sortOrder: q2.sortOrder || "desc",
   };
 
   const result = await auditService.getAuditLogsByEntity(
@@ -137,11 +140,12 @@ async function getAuditLogsByEntity(req, res) {
  * @param {Object} res - Express response object
  */
 async function getAuditLogStats(req, res) {
+  const q3 = req.validated?.query || req.query || {};
   const filters = {
-    startDate: req.query.startDate,
-    endDate: req.query.endDate,
-    userId: req.query.userId,
-    actionType: req.query.actionType,
+    startDate: q3.startDate,
+    endDate: q3.endDate,
+    userId: q3.userId,
+    actionType: q3.actionType,
   };
 
   // Remove undefined values
@@ -162,11 +166,12 @@ async function getAuditLogStats(req, res) {
  * @param {Object} res - Express response object
  */
 async function getAuditLogSummary(req, res) {
+  const q4 = req.validated?.query || req.query || {};
   const filters = {
-    startDate: req.query.startDate,
-    endDate: req.query.endDate,
-    userId: req.query.userId,
-    actionType: req.query.actionType,
+    startDate: q4.startDate,
+    endDate: q4.endDate,
+    userId: q4.userId,
+    actionType: q4.actionType,
   };
 
   // Remove undefined values

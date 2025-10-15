@@ -16,7 +16,37 @@ export const getMessagesByCampaign = async (
     offset
   );
 
-  return messages;
+  // Build donorDetails for non-anonymous messages
+  const processed = messages.map((m) => {
+    const msg = { ...m };
+    if (!m.isAnonymous && m.donorUserId) {
+      msg.donorDetails = null;
+      if (m.userType === "individualUser" && m.firstName && m.lastName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "individual",
+          displayName: `${m.firstName} ${m.lastName}`,
+          firstName: m.firstName,
+          lastName: m.lastName,
+        };
+      } else if (m.userType === "organizationUser" && m.organizationShortName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "organization",
+          displayName: m.organizationShortName,
+          organizationShortName: m.organizationShortName,
+        };
+      }
+    }
+
+    delete msg.userType;
+    delete msg.firstName;
+    delete msg.lastName;
+    delete msg.organizationShortName;
+    return msg;
+  });
+
+  return processed;
 };
 
 export const getMessageById = async (messageId) => {
@@ -41,17 +71,30 @@ export const moderateMessage = async (
     throw new AppError("Message not found", 404);
   }
 
-  // Validate status transition
-  if (
-    existingMessage.status === "approved" ||
-    existingMessage.status === "rejected"
-  ) {
-    throw new AppError("Message has already been moderated", 400);
+  // Validate status transition - allow changing from approved to rejected
+  if (existingMessage.status === "rejected") {
+    throw new AppError(
+      "Message has already been rejected and cannot be changed",
+      400
+    );
   }
 
   // Only approved messages can be featured
   if (isFeatured && status !== "approved") {
     throw new AppError("Only approved messages can be featured", 400);
+  }
+
+  // Check featured message limit (max 2)
+  if (isFeatured && status === "approved") {
+    const featuredCount = await messageRepository.getFeaturedMessagesCount(
+      existingMessage.campaignId
+    );
+    if (featuredCount >= 2 && !existingMessage.isFeatured) {
+      throw new AppError(
+        "Maximum of 2 featured messages allowed per campaign",
+        400
+      );
+    }
   }
 
   const updatedMessage = await messageRepository.updateMessageStatus(
@@ -81,7 +124,35 @@ export const getFeaturedMessages = async (campaignId, limit = 10) => {
     campaignId,
     limit
   );
-  return messages;
+  const processed = messages.map((m) => {
+    const msg = { ...m };
+    if (!m.isAnonymous && m.donorUserId) {
+      msg.donorDetails = null;
+      if (m.userType === "individualUser" && m.firstName && m.lastName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "individual",
+          displayName: `${m.firstName} ${m.lastName}`,
+          firstName: m.firstName,
+          lastName: m.lastName,
+        };
+      } else if (m.userType === "organizationUser" && m.organizationShortName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "organization",
+          displayName: m.organizationShortName,
+          organizationShortName: m.organizationShortName,
+        };
+      }
+    }
+
+    delete msg.userType;
+    delete msg.firstName;
+    delete msg.lastName;
+    delete msg.organizationShortName;
+    return msg;
+  });
+  return processed;
 };
 
 export const getMessagesByUser = async (userId, limit = 50, offset = 0) => {
@@ -90,8 +161,36 @@ export const getMessagesByUser = async (userId, limit = 50, offset = 0) => {
     limit,
     offset
   );
+  const processed = messages.map((m) => {
+    const msg = { ...m };
+    if (!m.isAnonymous && m.donorUserId) {
+      msg.donorDetails = null;
+      if (m.userType === "individualUser" && m.firstName && m.lastName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "individual",
+          displayName: `${m.firstName} ${m.lastName}`,
+          firstName: m.firstName,
+          lastName: m.lastName,
+        };
+      } else if (m.userType === "organizationUser" && m.organizationShortName) {
+        msg.donorDetails = {
+          donorId: m.donorUserId,
+          donorType: "organization",
+          displayName: m.organizationShortName,
+          organizationShortName: m.organizationShortName,
+        };
+      }
+    }
 
-  return messages;
+    delete msg.userType;
+    delete msg.firstName;
+    delete msg.lastName;
+    delete msg.organizationShortName;
+    return msg;
+  });
+
+  return processed;
 };
 
 export const toggleFeaturedStatus = async (messageId, moderatedByUserId) => {
@@ -106,6 +205,19 @@ export const toggleFeaturedStatus = async (messageId, moderatedByUserId) => {
   }
 
   const newFeaturedStatus = !message.isFeatured;
+
+  // Check featured message limit (max 2) when trying to feature a message
+  if (newFeaturedStatus) {
+    const featuredCount = await messageRepository.getFeaturedMessagesCount(
+      message.campaignId
+    );
+    if (featuredCount >= 2) {
+      throw new AppError(
+        "Maximum of 2 featured messages allowed per campaign",
+        400
+      );
+    }
+  }
 
   const updatedMessage = await messageRepository.updateMessageStatus(
     messageId,
@@ -296,17 +408,30 @@ export const moderateMessageForOrganizer = async (
     );
   }
 
-  // Validate status transition
-  if (
-    existingMessage.status === "approved" ||
-    existingMessage.status === "rejected"
-  ) {
-    throw new AppError("Message has already been moderated", 400);
+  // Validate status transition - allow changing from approved to rejected
+  if (existingMessage.status === "rejected") {
+    throw new AppError(
+      "Message has already been rejected and cannot be changed",
+      400
+    );
   }
 
   // Only approved messages can be featured
   if (isFeatured && status !== "approved") {
     throw new AppError("Only approved messages can be featured", 400);
+  }
+
+  // Check featured message limit (max 2)
+  if (isFeatured && status === "approved") {
+    const featuredCount = await messageRepository.getFeaturedMessagesCount(
+      existingMessage.campaignId
+    );
+    if (featuredCount >= 2 && !existingMessage.isFeatured) {
+      throw new AppError(
+        "Maximum of 2 featured messages allowed per campaign",
+        400
+      );
+    }
   }
 
   const updatedMessage = await messageRepository.updateMessageStatus(
