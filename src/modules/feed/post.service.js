@@ -213,6 +213,17 @@ class PostService {
     }
   }
 
+  async toggleLike(postId, userId) {
+    // Returns { liked: boolean, likesCount: number }
+    const already = await postRepository.hasUserLiked(postId, userId);
+    if (already) {
+      const likesCount = await postRepository.unlikePost(postId, userId);
+      return { liked: false, likesCount };
+    }
+    const likesCount = await postRepository.likePost(postId, userId);
+    return { liked: true, likesCount };
+  }
+
   async createCampaignPost(campaignData) {
     try {
       const { campaignId, organizerId, customPageSettings } = campaignData;

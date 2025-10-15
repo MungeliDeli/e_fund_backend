@@ -65,6 +65,24 @@ SMTP_USER=your_mailgun_username
 SMTP_PASS=your_mailgun_password
 ```
 
+### Brevo (formerly Sendinblue)
+
+```env
+# Brevo SMTP
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_brevo_smtp_login   # e.g. 90cf24001@smtp-brevo.com
+SMTP_PASS=your_brevo_smtp_password
+FROM_EMAIL=your_verified_sender@yourdomain.com
+```
+
+Notes:
+
+- Ensure `FROM_EMAIL` is a verified sender or a domain authenticated in Brevo.
+- Port 587 uses STARTTLS, so keep `SMTP_SECURE=false`.
+- No code changes are required; the app reads these from environment variables.
+
 ## 4. Test Email Configuration
 
 After setting up the .env file, restart the backend server and try sending outreach emails again.

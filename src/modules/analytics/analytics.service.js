@@ -18,6 +18,7 @@
 import * as analyticsRepository from "./analytics.repository.js";
 import { NotFoundError, ValidationError } from "../../utils/appError.js";
 import logger from "../../utils/logger.js";
+import { getPublicS3Url } from "../../utils/s3.utils.js";
 
 /**
  * Analytics Service
@@ -62,6 +63,51 @@ class AnalyticsService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Get top organizers by completed donations
+   */
+  async getTopOrganizers(limit = 5) {
+    const rows = await analyticsRepository.getTopOrganizersByDonations(limit);
+    return rows.map((row) => ({
+      organizerId: row.organizerId,
+      organizationShortName: row.organizationShortName,
+      organizationName: row.organizationName,
+      profilePictureUrl: row.profilePictureFileName
+        ? getPublicS3Url(row.profilePictureFileName)
+        : null,
+    }));
+  }
+
+  /**
+   * Get top campaigns by completed donations
+   */
+  async getTopCampaigns(limit = 5) {
+    const rows = await analyticsRepository.getTopCampaignsByDonations(limit);
+    return rows.map((row) => {
+      let mainMediaUrl = null;
+      let mainMediaType = null;
+      try {
+        const settings =
+          typeof row.customPageSettings === "string"
+            ? JSON.parse(row.customPageSettings)
+            : row.customPageSettings;
+        if (settings?.mainMedia?.url && settings?.mainMedia?.type) {
+          mainMediaUrl = settings.mainMedia.url;
+          mainMediaType = settings.mainMedia.type;
+        }
+      } catch (e) {
+        // ignore invalid JSON
+      }
+      return {
+        campaignId: row.campaignId,
+        campaignTitle: row.campaignTitle,
+        campaignShareLink: row.campaignShareLink,
+        mainMediaUrl,
+        mainMediaType,
+      };
+    });
   }
 
   /**

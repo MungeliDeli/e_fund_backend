@@ -10,6 +10,7 @@ import {
   getPostsByOrganizer,
   getCampaignPostsByOrganizer,
   getAllPosts,
+  toggleLike,
 } from "./post.controller.js";
 import { validateCreatePost, validatePostId } from "./post.validation.js";
 
@@ -62,5 +63,13 @@ router.get(
 
 // Get all posts (public feed)
 router.get("/", catchAsync(getAllPosts));
+
+// Toggle like on a post (auth required)
+router.post(
+  "/:postId/like",
+  authenticate,
+  validatePostId,
+  catchAsync(toggleLike)
+);
 
 export default router;

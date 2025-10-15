@@ -97,11 +97,19 @@ const getAllPosts = async (req, res) => {
     limit: parseInt(req.query.limit) || 20,
     cursor: req.query.cursor,
     type: req.query.type,
+    sort: req.query.sort === "popular" ? "popular" : "latest",
   };
 
   const posts = await postService.getAllPosts(options);
 
   return ResponseFactory.ok(res, "Posts retrieved successfully", posts);
+};
+
+const toggleLike = async (req, res) => {
+  const { postId } = req.params;
+  const userId = req.user.userId;
+  const result = await postService.toggleLike(postId, userId);
+  return ResponseFactory.ok(res, "Post like updated", result);
 };
 
 export {
@@ -111,4 +119,5 @@ export {
   getPostsByOrganizer,
   getCampaignPostsByOrganizer,
   getAllPosts,
+  toggleLike,
 };

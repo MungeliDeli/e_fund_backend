@@ -212,7 +212,13 @@ class PostRepository {
   }
 
   async getAllPosts(options = {}) {
-    const { status = "published", limit = 20, cursor, type } = options;
+    const {
+      status = "published",
+      limit = 20,
+      cursor,
+      type,
+      sort = "latest",
+    } = options;
 
     let query = `
       SELECT 
@@ -250,11 +256,75 @@ class PostRepository {
       paramIndex++;
     }
 
-    query += ` ORDER BY p."isPinnedToCampaign" DESC, p."createdAt" DESC LIMIT $${paramIndex}`;
+    if (sort === "popular") {
+      query += ` ORDER BY p."isPinnedToCampaign" DESC, p."likesCount" DESC NULLS LAST, p."createdAt" DESC LIMIT $${paramIndex}`;
+    } else {
+      query += ` ORDER BY p."isPinnedToCampaign" DESC, p."createdAt" DESC LIMIT $${paramIndex}`;
+    }
     values.push(limit);
 
     const result = await db.query(query, values);
     return result.rows;
+  }
+
+  async hasUserLiked(postId, userId) {
+    const result = await db.query(
+      'SELECT 1 FROM "postLikes" WHERE "postId" = $1 AND "userId" = $2 LIMIT 1',
+      [postId, userId]
+    );
+    return result.rowCount > 0;
+  }
+
+  async likePost(postId, userId) {
+    const client = await db.getClient();
+    try {
+      await client.query("BEGIN");
+      const ins = await client.query(
+        'INSERT INTO "postLikes" ("postId", "userId") VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [postId, userId]
+      );
+      if (ins.rowCount > 0) {
+        const update = await client.query(
+          'UPDATE "posts" SET "likesCount" = "likesCount" + 1, "updatedAt" = NOW() WHERE "postId" = $1 RETURNING "likesCount"',
+          [postId]
+        );
+        await client.query("COMMIT");
+        return update.rows[0]?.likesCount ?? null;
+      }
+      await client.query("COMMIT");
+      return null;
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async unlikePost(postId, userId) {
+    const client = await db.getClient();
+    try {
+      await client.query("BEGIN");
+      const del = await client.query(
+        'DELETE FROM "postLikes" WHERE "postId" = $1 AND "userId" = $2',
+        [postId, userId]
+      );
+      if (del.rowCount > 0) {
+        const update = await client.query(
+          'UPDATE "posts" SET "likesCount" = GREATEST("likesCount" - 1, 0), "updatedAt" = NOW() WHERE "postId" = $1 RETURNING "likesCount"',
+          [postId]
+        );
+        await client.query("COMMIT");
+        return update.rows[0]?.likesCount ?? null;
+      }
+      await client.query("COMMIT");
+      return null;
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   async checkCampaignOwnership(campaignId, organizerId) {

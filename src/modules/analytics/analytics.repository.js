@@ -156,3 +156,67 @@ export const getCampaignAnalyticsSummary = async (campaignId) => {
     throw error;
   }
 };
+
+/**
+ * Get top organizers by total completed donations (sum of amount)
+ */
+export const getTopOrganizersByDonations = async (limit = 5) => {
+  try {
+    const query = `
+      SELECT 
+        d."organizerId",
+        COALESCE(SUM(d.amount), 0) AS "totalRaised",
+        COUNT(*) AS "completedCount",
+        op."organizationShortName",
+        op."organizationName",
+        op."profilePictureMediaId",
+        m."fileName" as "profilePictureFileName"
+      FROM "donations" d
+      JOIN "organizationProfiles" op ON d."organizerId" = op."userId"
+      LEFT JOIN "media" m ON op."profilePictureMediaId" = m."mediaId"
+      WHERE d."status" = 'completed'
+      GROUP BY d."organizerId", op."organizationShortName", op."organizationName", op."profilePictureMediaId", m."fileName"
+      ORDER BY "totalRaised" DESC
+      LIMIT $1
+    `;
+
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  } catch (error) {
+    logger.error("Error getting top organizers by donations", {
+      error: error.message,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Get top campaigns by total completed donations (sum of amount)
+ */
+export const getTopCampaignsByDonations = async (limit = 5) => {
+  try {
+    const query = `
+      SELECT 
+        d."campaignId",
+        COALESCE(SUM(d.amount), 0) AS "totalRaised",
+        COUNT(*) AS "completedCount",
+        c."name" as "campaignTitle",
+        c."shareLink" as "campaignShareLink",
+        c."customPageSettings" 
+      FROM "donations" d
+      JOIN "campaigns" c ON d."campaignId" = c."campaignId"
+      WHERE d."status" = 'completed'
+      GROUP BY d."campaignId", c."name", c."shareLink", c."customPageSettings"
+      ORDER BY "totalRaised" DESC
+      LIMIT $1
+    `;
+
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  } catch (error) {
+    logger.error("Error getting top campaigns by donations", {
+      error: error.message,
+    });
+    throw error;
+  }
+};
