@@ -14,6 +14,7 @@ import { getLinkTokenById } from "../../Outreach/linkTokens/linkToken.repository
 import { recordEmailEvent } from "../../Outreach/emailEvents/emailEvent.repository.js";
 import { markRecipientClickedByLinkToken } from "../../Outreach/outreachCampaign/outreachCampaignRecipients.repository.js";
 import { query } from "../../../db/index.js";
+import { getPublicS3Url } from "../../../utils/s3.utils.js";
 
 export const createDonation = async (donationData, userId = null) => {
   try {
@@ -756,6 +757,9 @@ export const getDonationsByOrganizer = async (
             displayName: `${donation.firstName} ${donation.lastName}`,
             firstName: donation.firstName,
             lastName: donation.lastName,
+            profilePictureUrl: donation.individualProfilePictureFileName
+              ? getPublicS3Url(donation.individualProfilePictureFileName)
+              : null,
           };
         }
       } else if (donation.userType === "organizationUser") {
@@ -766,6 +770,9 @@ export const getDonationsByOrganizer = async (
             donorType: "organization",
             displayName: donation.organizationShortName,
             organizationShortName: donation.organizationShortName,
+            profilePictureUrl: donation.organizationProfilePictureFileName
+              ? getPublicS3Url(donation.organizationProfilePictureFileName)
+              : null,
           };
         }
       }
@@ -776,6 +783,8 @@ export const getDonationsByOrganizer = async (
     delete processedDonation.firstName;
     delete processedDonation.lastName;
     delete processedDonation.organizationShortName;
+    delete processedDonation.individualProfilePictureFileName;
+    delete processedDonation.organizationProfilePictureFileName;
 
     return processedDonation;
   });

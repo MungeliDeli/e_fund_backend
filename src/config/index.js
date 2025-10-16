@@ -98,6 +98,13 @@ const config = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    // Railway provides DATABASE_URL, parse it if available
+    url: process.env.DATABASE_URL,
+    // SSL configuration for Railway
+    ssl:
+      process.env.NODE_ENV === "production"
+        ? { rejectUnauthorized: false }
+        : false,
   },
   cors: {
     origins: process.env.CORS_ORIGIN || "*",
@@ -119,12 +126,14 @@ const config = {
   },
 };
 
+// Check for either DATABASE_URL (Railway) or individual DB config (local development)
 if (
-  !config.db.host ||
-  !config.db.port ||
-  !config.db.user ||
-  !config.db.password ||
-  !config.db.database
+  !config.db.url &&
+  (!config.db.host ||
+    !config.db.port ||
+    !config.db.user ||
+    !config.db.password ||
+    !config.db.database)
 ) {
   throw new Error("Fatal Error: Missing database configuration");
 }

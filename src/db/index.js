@@ -91,13 +91,20 @@ import logger from "../utils/logger.js";
 
 const { Pool } = pg;
 
-const dbConfig = {
-  host: config.db.host,
-  port: config.db.port,
-  user: config.db.user,
-  password: config.db.password,
-  database: config.db.database,
-};
+// Use DATABASE_URL if available (Railway), otherwise use individual config (local development)
+const dbConfig = config.db.url
+  ? {
+      connectionString: config.db.url,
+      ssl: config.db.ssl,
+    }
+  : {
+      host: config.db.host,
+      port: config.db.port,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.database,
+      ssl: config.db.ssl,
+    };
 
 const pool = new Pool(dbConfig);
 
