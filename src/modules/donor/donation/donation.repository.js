@@ -89,13 +89,17 @@ export const getDonationsByOrganizer = async (
             dm."messageText", dm."status" as "messageStatus", dm."isFeatured",
             u."userType",
             ip."firstName", ip."lastName",
-            op."organizationShortName"
+            op."organizationShortName",
+            mip."fileName" AS "individualProfilePictureFileName",
+            mop."fileName" AS "organizationProfilePictureFileName"
      FROM "donations" d
      JOIN "campaigns" c ON d."campaignId" = c."campaignId"
      LEFT JOIN "donationMessages" dm ON d."messageId" = dm."messageId"
      LEFT JOIN "users" u ON d."donorUserId" = u."userId"
      LEFT JOIN "individualProfiles" ip ON u."userId" = ip."userId" AND u."userType" = 'individualUser'
+     LEFT JOIN "media" mip ON ip."profilePictureMediaId" = mip."mediaId"
      LEFT JOIN "organizationProfiles" op ON u."userId" = op."userId" AND u."userType" = 'organizationUser'
+     LEFT JOIN "media" mop ON op."profilePictureMediaId" = mop."mediaId"
      WHERE d."organizerId" = $1
      ORDER BY d."donationDate" DESC
      LIMIT $2 OFFSET $3`,
