@@ -16,7 +16,7 @@ import {
 import { apiLimiter } from "./middlewares/rateLimiters.js";
 import setAuditContext from "./middlewares/auditContext.middleware.js";
 
-// Import routes
+
 import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/individualUser/user.routes.js";
 import organizationUserRoutes from "./modules/users/organizationUser/user.routes.js";
