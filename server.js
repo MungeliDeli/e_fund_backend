@@ -12,21 +12,16 @@ import { initializeSocket } from "./src/config/socket.config.js";
 const PORT = config.port;
 
 const server = app.listen(PORT, () => {
-  logger.info(`🚀 Server is running on port ${PORT}`);
-  logger.info(`📊 Environment: ${config.env}`);
-  logger.info(`🔗 API Base URL: http://localhost:${PORT}/api/v1`);
-  logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
+  logger.info(`Server is running on port ${PORT}`);
+  logger.info(`Environment: ${config.env}`);
+  logger.info(`API Base URL: http://localhost:${PORT}/api/v1`);
   logger.info(config.env);
   logger.info(config.db.database);
-  if (config.env === "development") {
-    logger.info(
-      `📝 API Documentation: http://localhost:${PORT}/api/v1/auth/health`
-    );
-  }
-  // Start tiny retry loop for failed/pending email notifications
+  
+
   const intervalMs = Number(
     process.env.NOTIFICATION_RETRY_INTERVAL_MS || 300000
-  ); // 5 min default
+  ); 
   setInterval(() => {
     notificationService
       .retryFailedEmails()
@@ -40,25 +35,23 @@ const server = app.listen(PORT, () => {
 // Initialize Socket.IO
 initializeSocket(server);
 
-// Graceful shutdown
+n
 const gracefulShutdown = (signal) => {
-  logger.info(`🛑 Received ${signal}. Starting graceful shutdown...`);
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
   server.close(() => {
-    logger.info("✅ HTTP server closed");
+    logger.info("HTTP server closed");
     process.exit(0);
   });
 
-  // Force close after 10 seconds
   setTimeout(() => {
     logger.error(
-      "❌ Could not close connections in time, forcefully shutting down"
+      "Could not close connections in time, forcefully shutting down"
     );
     process.exit(1);
   }, 10000);
 };
 
-// Listen for shutdown signals
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
